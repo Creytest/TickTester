@@ -1,5 +1,3 @@
-from itertools import islice
-
 import matplotlib.pyplot as plt
 import mplfinance as mpf
 import pandas as pd
@@ -14,7 +12,7 @@ from tick_config import (
     SLIPPAGE_TICKS,
     RISK_PER_TRADE,
 )
-from tick_data import load_ticks
+from tick_data import load_ticks_cached
 from tick_backtest import run_backtest
 from strategies.tick_BigBeluga_Stoch_80percent import generate_signals
 
@@ -24,8 +22,6 @@ from strategies.tick_BigBeluga_Stoch_80percent import generate_signals
 # ============================================================
 
 ASSET = "XAUUSD"
-CHUNK_SIZE = 20_000
-CHUNKS_TO_TEST = 3
 TIMEFRAME = "5min"
 
 START_DATE = "2014-01-01"
@@ -42,7 +38,13 @@ WARMUP_BARS = 300
 # DANE TICKOWE
 # ============================================================
 
-def tick_source():
+def load_period_ticks() -> pd.DataFrame:
+    """
+    Wczytuje ticki od początku rozgrzewki do końca okresu.
+
+    Przy pierwszym uruchomieniu dla danego roku tworzy pamięć
+    podręczną w folderze cache, kolejne uruchomienia są szybkie.
+    """
     start = (
         pd.Timestamp(START_DATE)
         - pd.Timedelta(TIMEFRAME) * WARMUP_BARS
@@ -50,32 +52,12 @@ def tick_source():
 
     end = pd.Timestamp(END_DATE) + pd.Timedelta(days=1)
 
-    yield from load_ticks(
+    return load_ticks_cached(
         ASSETS[ASSET],
-        chunksize=CHUNK_SIZE,
         reverse_bid_ask=REVERSE_BID_ASK[ASSET],
         start_date=start.strftime("%Y-%m-%d"),
         end_date=end.strftime("%Y-%m-%d"),
     )
-
-
-def filtered_tick_source(start_time, end_time):
-    """
-    Zwraca ticki od początku rozgrzewki do końca wybranego okresu.
-
-    Dzięki temu wskaźniki mają historię przed START_DATE,
-    ale backtest nie przetwarza danych po END_DATE.
-    """
-    for chunk in tick_source():
-        mask = (
-            (chunk["timestamp"] >= start_time)
-            & (chunk["timestamp"] < end_time)
-        )
-
-        filtered = chunk.loc[mask].copy()
-
-        if not filtered.empty:
-            yield filtered.reset_index(drop=True)
 
 
 def nearest_bar_index(index: pd.DatetimeIndex, timestamp) -> int:
@@ -97,12 +79,10 @@ def main():
 
     print("Wczytywanie danych tickowych...")
 
-    chunks = list(tick_source())
+    all_ticks = load_period_ticks()
 
-    if not chunks:
+    if all_ticks.empty:
         raise RuntimeError("Nie znaleziono danych tickowych.")
-
-    all_ticks = pd.concat(chunks, ignore_index=True)
 
     all_ticks = all_ticks.sort_values("timestamp").reset_index(drop=True)
 
@@ -114,7 +94,7 @@ def main():
     if selected_ticks.empty:
         raise RuntimeError(
             f"Brak ticków w okresie {START_DATE} – {END_DATE}. "
-            "Sprawdź zakres dat i CHUNKS_TO_TEST."
+            "Sprawdź zakres dat i ścieżkę w tick_config.py."
         )
 
     first_selected_tick = selected_ticks["timestamp"].iloc[0]
@@ -141,11 +121,8 @@ def main():
             & (all_ticks["timestamp"] < end_time)
         )
 
-        filtered = all_ticks.loc[mask].copy()
-
         # Silnik oczekuje iteratora DataFrame'ów.
-        for i in range(0, len(filtered), CHUNK_SIZE):
-            yield filtered.iloc[i:i + CHUNK_SIZE].reset_index(drop=True)
+        yield all_ticks.loc[mask].reset_index(drop=True)
 
     result = run_backtest(
         tick_source=backtest_tick_source,
@@ -473,8 +450,12 @@ def main():
 
     # mplfinance zwraca osie obu paneli; equity dodajemy jako
     # kolejny panel Matplotlib współdzielący oś X z wykresem ceny.
+    # Szerokość i lewa krawędź jak w panelu ceny, aby daty
+    # obu wykresów pokrywały się w pionie.
+    price_box = price_ax.get_position()
+
     equity_ax = fig.add_axes(
-        [0.10, 0.06, 0.82, 0.16],
+        [price_box.x0, 0.06, price_box.width, 0.14],
         sharex=price_ax,
     )
 
@@ -498,38 +479,47 @@ def main():
         times = times[valid_equity]
         values = values[valid_equity]
 
-        if len(values) >= 2:
+        # Oś X jest współdzielona ze świecami, które mplfinance
+        # rysuje w numerach świec (0, 1, 2...), a nie w datach.
+        # Zamieniamy więc czas każdego punktu na numer świecy.
+        positions = bars.index.searchsorted(times, side="right") - 1
+        x_equity = np.clip(positions, 0, len(bars) - 1).astype(float)
+        y_equity = values.to_numpy(dtype=float)
+
+        if len(y_equity) >= 2:
             # Kolor odcinka zależy od położenia obu punktów
             # względem kapitału początkowego.
-            for i in range(len(values) - 1):
-                x0 = times.iloc[i]
-                x1 = times.iloc[i + 1]
-                y0 = values.iloc[i]
-                y1 = values.iloc[i + 1]
+            y0 = y_equity[:-1]
+            y1 = y_equity[1:]
 
-                color = (
-                    "green"
-                    if y0 >= INITIAL_CAPITAL and y1 >= INITIAL_CAPITAL
-                    else "red"
-                    if y0 < INITIAL_CAPITAL and y1 < INITIAL_CAPITAL
-                    else "gray"
-                )
-
-                equity_ax.plot(
-                    [x0, x1],
-                    [y0, y1],
-                    color=color,
-                    linewidth=1.5,
-                )
-
-            equity_ax.plot(
-                times,
-                values,
-                alpha=0,
+            colors = np.where(
+                (y0 >= INITIAL_CAPITAL) & (y1 >= INITIAL_CAPITAL),
+                "green",
+                np.where(
+                    (y0 < INITIAL_CAPITAL) & (y1 < INITIAL_CAPITAL),
+                    "red",
+                    "gray",
+                ),
             )
 
-        elif len(values) == 1:
-            equity_ax.scatter(times, values, s=10)
+            points = np.column_stack((x_equity, y_equity))
+            segments = np.stack((points[:-1], points[1:]), axis=1)
+
+            equity_ax.add_collection(
+                LineCollection(
+                    segments,
+                    colors=list(colors),
+                    linewidths=1.5,
+                )
+            )
+
+            equity_ax.set_ylim(
+                min(y_equity.min(), INITIAL_CAPITAL) * 0.995,
+                max(y_equity.max(), INITIAL_CAPITAL) * 1.005,
+            )
+
+        elif len(y_equity) == 1:
+            equity_ax.scatter(x_equity, y_equity, s=10)
 
     else:
         equity_ax.text(

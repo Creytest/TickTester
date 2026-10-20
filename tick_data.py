@@ -69,11 +69,12 @@ def load_ticks(
     )
 
     def prepare(chunk: pd.DataFrame) -> pd.DataFrame:
-        chunk["timestamp"] = pd.to_datetime(
-            chunk["timestamp"],
-            format=DATE_FORMAT,
-            errors="coerce",
-        )
+        if not pd.api.types.is_datetime64_any_dtype(chunk["timestamp"]):
+            chunk["timestamp"] = pd.to_datetime(
+                chunk["timestamp"],
+                format=DATE_FORMAT,
+                errors="coerce",
+            )
 
         chunk = chunk.dropna(
             subset=["timestamp", "bid", "ask"]
@@ -100,14 +101,30 @@ def load_ticks(
 
     def prepared_chunks():
         for chunk in reader:
-            # Dane są chronologiczne, więc po przekroczeniu
-            # końca okresu możemy przerwać dalszy odczyt.
-            if end is not None:
-                timestamps = pd.to_datetime(
-                    chunk["timestamp"],
+            # Dane są chronologiczne, więc partię w całości
+            # sprzed start_date pomijamy bez parsowania wszystkich
+            # dat — wystarczy sprawdzić ostatni wiersz.
+            if start is not None and not chunk.empty:
+                last = pd.to_datetime(
+                    chunk["timestamp"].iloc[-1:],
                     format=DATE_FORMAT,
                     errors="coerce",
-                )
+                ).iloc[0]
+
+                if pd.notna(last) and last < start:
+                    continue
+
+            # Daty parsujemy raz i wykorzystujemy je zarówno
+            # do sprawdzenia końca okresu, jak i w prepare().
+            chunk["timestamp"] = pd.to_datetime(
+                chunk["timestamp"],
+                format=DATE_FORMAT,
+                errors="coerce",
+            )
+
+            # Po przekroczeniu końca okresu przerywamy odczyt.
+            if end is not None:
+                timestamps = chunk["timestamp"]
 
                 if (
                     timestamps.notna().any()
@@ -124,3 +141,106 @@ def load_ticks(
         return prepare(reader)
 
     return prepared_chunks()
+
+
+def load_ticks_cached(
+    file_path: str | Path,
+    reverse_bid_ask: bool = False,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    cache_dir: str | Path | None = None,
+    chunksize: int = 1_000_000,
+) -> pd.DataFrame:
+    """
+    Jak load_ticks, ale zwraca jeden DataFrame i zapisuje
+    przetworzone ticki na dysku w podziale na lata.
+
+    Pierwsze wczytanie danego roku czyta CSV, kolejne ładują
+    gotowy plik .pkl w kilka sekund. Pamięć podręczna jest
+    unieważniana, gdy zmieni się rozmiar lub data modyfikacji
+    pliku CSV. Folder cache można bezpiecznie usunąć.
+    """
+
+    path = Path(file_path)
+
+    if not path.is_file():
+        raise FileNotFoundError(
+            f"Nie znaleziono pliku z danymi tickowymi: {path}"
+        )
+
+    if start_date is None or end_date is None:
+        # Bez zakresu dat cache po latach nic nie daje.
+        chunks = load_ticks(
+            path,
+            chunksize=chunksize,
+            reverse_bid_ask=reverse_bid_ask,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        return _concat_ticks(list(chunks))
+
+    start = pd.Timestamp(start_date)
+    end = pd.Timestamp(end_date)
+
+    if start >= end:
+        raise ValueError("start_date musi być wcześniejsza niż end_date.")
+
+    if cache_dir is None:
+        cache_dir = Path(__file__).resolve().parent / "cache"
+
+    stat = path.stat()
+    signature = (
+        f"{path.stem}_{stat.st_size}_{stat.st_mtime_ns}"
+        f"_{'rev' if reverse_bid_ask else 'norm'}"
+    )
+    folder = Path(cache_dir) / signature
+    folder.mkdir(parents=True, exist_ok=True)
+
+    # end_date jest wyłączna, więc 2015-01-01 nie wymaga roku 2015.
+    years = list(range(start.year, (end - pd.Timedelta(1)).year + 1))
+    missing = [
+        year for year in years
+        if not (folder / f"{year}.pkl").is_file()
+    ]
+
+    if missing:
+        print(
+            "Tworzenie pamięci podręcznej ticków dla lat: "
+            + ", ".join(map(str, missing))
+            + " (jednorazowo, może potrwać)..."
+        )
+
+        chunks = load_ticks(
+            path,
+            chunksize=chunksize,
+            reverse_bid_ask=reverse_bid_ask,
+            start_date=f"{min(missing)}-01-01",
+            end_date=f"{max(missing) + 1}-01-01",
+        )
+        loaded = _concat_ticks(list(chunks))
+        by_year = loaded["timestamp"].dt.year
+
+        for year in missing:
+            part = loaded.loc[by_year == year].reset_index(drop=True)
+            part.to_pickle(folder / f"{year}.pkl")
+
+    parts = [pd.read_pickle(folder / f"{year}.pkl") for year in years]
+    ticks = _concat_ticks(parts)
+
+    mask = (ticks["timestamp"] >= start) & (ticks["timestamp"] < end)
+    return ticks.loc[mask].reset_index(drop=True)
+
+
+def _concat_ticks(chunks: list[pd.DataFrame]) -> pd.DataFrame:
+    chunks = [chunk for chunk in chunks if not chunk.empty]
+
+    if not chunks:
+        return pd.DataFrame(
+            {
+                "timestamp": pd.Series(dtype="datetime64[ns]"),
+                "bid": pd.Series(dtype="float64"),
+                "ask": pd.Series(dtype="float64"),
+            }
+        )
+
+    return pd.concat(chunks, ignore_index=True)

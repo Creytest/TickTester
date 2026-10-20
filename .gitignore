@@ -1,0 +1,7 @@
+# Pamięć podręczna ticków tworzona przez load_ticks_cached
+cache/
+
+# Python
+__pycache__/
+*.pyc
+.venv/

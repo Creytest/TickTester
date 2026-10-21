@@ -307,15 +307,42 @@ def save_interactive_chart(
 
     fig.update_layout(
         title=dict(
-            text=f"{title}<br><sup>{_stats_line(stats)}</sup>",
+            text=f"<b>{title}</b>",
             x=0.5,
+            y=0.985,
+            font=dict(size=20),
         ),
-        height=950,
+        height=1000,
         hovermode="closest",
         dragmode="pan",
-        legend=dict(orientation="h", y=-0.06),
-        margin=dict(l=70, r=30, t=90, b=70),
+        legend=dict(orientation="h", y=-0.06, font=dict(size=13)),
+        margin=dict(l=70, r=30, t=150, b=70),
         plot_bgcolor="white",
+        font=dict(size=13),
+    )
+
+    # Rząd statystyk nad wykresem, jak na wykresie PNG:
+    # szara etykieta, pod nią duża kolorowa wartość.
+    items = _stats_items(stats)
+    width = 1 / len(items)
+
+    for i, (label, value, color) in enumerate(items):
+        center = width * (i + 0.5)
+        fig.add_annotation(
+            text=label,
+            x=center, y=1.115, xref="paper", yref="paper",
+            showarrow=False, font=dict(size=12, color="gray"),
+        )
+        fig.add_annotation(
+            text=f"<b>{value}</b>",
+            x=center, y=1.08, xref="paper", yref="paper",
+            showarrow=False, font=dict(size=19, color=color),
+        )
+
+    fig.add_annotation(
+        text="W nawiasach: bez prowizji (gross). Avg trade: % kapitału.",
+        x=1, y=1.045, xref="paper", yref="paper", xanchor="right",
+        showarrow=False, font=dict(size=10, color="gray"),
     )
     fig.update_xaxes(showgrid=True, gridcolor="#eee", range=[-1, n])
     # Skalę Y ustawia skrypt poniżej, więc zoom działa tylko w poziomie.
@@ -353,7 +380,9 @@ def _json_floats(values: np.ndarray) -> list:
     return [None if np.isnan(v) else round(float(v), 6) for v in values]
 
 
-def _stats_line(stats: dict) -> str:
+def _stats_items(stats: dict) -> list[tuple[str, str, str]]:
+    """(etykieta, wartość, kolor) — zielony zysk, czerwony strata."""
+
     def pct(value):
         return "–" if value is None else f"{value * 100:.2f}%"
 
@@ -362,19 +391,40 @@ def _stats_line(stats: dict) -> str:
             return "–"
         return "∞" if value == float("inf") else f"{value:.2f}"
 
-    return (
-        f"Start ${stats['start_capital']:,.0f} → "
-        f"${stats['final_capital']:,.0f} | "
-        f"Return {pct(stats['return'])} | "
-        f"CAGR {pct(stats['cagr'])} | "
-        f"Max DD {pct(stats['max_drawdown'])} | "
-        f"Trades {stats['trades']} | "
-        f"Win rate {pct(stats['win_rate'])} | "
-        f"PF {pf(stats['profit_factor'])} "
-        f"({pf(stats['profit_factor_gross'])}) | "
-        f"Avg trade {pct(stats['avg_trade'])} "
-        f"({pct(stats['avg_trade_gross'])})"
-    )
+    def sign_color(value):
+        if value is None or value == 0:
+            return "black"
+        return "green" if value > 0 else "red"
+
+    start = stats["start_capital"]
+    final = stats["final_capital"]
+    profit_factor = stats["profit_factor"]
+
+    return [
+        ("START CAPITAL", f"${start:,.0f}", "black"),
+        ("FINAL CAPITAL", f"${final:,.0f}", sign_color(final - start)),
+        ("RETURN", pct(stats["return"]), sign_color(stats["return"])),
+        ("CAGR", pct(stats["cagr"]), sign_color(stats["cagr"])),
+        (
+            "MAX DRAWDOWN",
+            pct(stats["max_drawdown"]),
+            "red" if stats["max_drawdown"] < 0 else "black",
+        ),
+        ("TRADES", str(stats["trades"]), "black"),
+        ("WIN RATE", pct(stats["win_rate"]), "black"),
+        (
+            "PROFIT FACTOR",
+            f"{pf(profit_factor)} ({pf(stats['profit_factor_gross'])})",
+            "black"
+            if profit_factor is None
+            else ("green" if profit_factor >= 1 else "red"),
+        ),
+        (
+            "AVG TRADE",
+            f"{pct(stats['avg_trade'])} ({pct(stats['avg_trade_gross'])})",
+            sign_color(stats["avg_trade"]),
+        ),
+    ]
 
 
 # Po każdym przybliżeniu lub przesunięciu: daty na osi X

@@ -15,7 +15,7 @@ import plot_tick_backtest_xauusd as single
 # KONFIGURACJA
 # ============================================================
 
-TIMEFRAME = "5min"
+TIMEFRAME = "1h"
 
 START_DATE = "2014-01-01"
 END_DATE = "2014-12-31"

@@ -272,6 +272,8 @@ def main():
         slippage_ticks=SLIPPAGE_TICKS,
         tick_size=TICK_SIZE,
         risk_per_trade=RISK_PER_TRADE,
+        # Świece rozgrzewki liczą wskaźniki, ale nie handlują.
+        trade_start=start_time,
     )
 
     bars_all = result["bars"].copy()

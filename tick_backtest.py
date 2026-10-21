@@ -80,6 +80,7 @@ def run_backtest(
     tick_size: float = 0.01,
     risk_per_trade: float = 0.01,
     fixed_quantity: float = 1.0,
+    trade_start=None,
 ) -> dict:
     """
     Backtest strategii na tickach Bid/Ask.
@@ -92,6 +93,10 @@ def run_backtest(
 
     Sygnał jest wykonywany na pierwszym dostępnym ticku
     po zamknięciu świecy sygnałowej.
+
+    trade_start: opcjonalny początek handlu, np. START_DATE.
+    Ticki i świece wcześniejsze służą tylko do rozgrzania
+    wskaźników — przed tą chwilą nie otwieramy pozycji.
 
     Zamiast przechodzić w Pythonie przez każdy tick, silnik
     wyszukuje na tablicach numpy tylko ticki, na których coś
@@ -188,6 +193,13 @@ def run_backtest(
     ticks = ticks.loc[valid].reset_index(drop=True)
 
     timestamps = ticks["timestamp"].to_numpy()
+
+    if trade_start is not None:
+        trade_start = (
+            pd.Timestamp(trade_start)
+            .to_datetime64()
+            .astype(timestamps.dtype)
+        )
     bids = ticks["bid"].to_numpy(dtype=float)
     asks = ticks["ask"].to_numpy(dtype=float)
     n_ticks = len(ticks)
@@ -231,6 +243,10 @@ def run_backtest(
 
         if i >= n_ticks:
             break
+
+        # W okresie rozgrzewki nie otwieramy pozycji.
+        if trade_start is not None and timestamps[i] < trade_start:
+            continue
 
         # SL/TP sprawdzane są przed sygnałami na tym samym ticku,
         # więc pozycja zamknięta na ticku i zwalnia miejsce.

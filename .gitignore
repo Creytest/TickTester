@@ -5,3 +5,6 @@ cache/
 __pycache__/
 *.pyc
 .venv/
+
+# Wykresy i tabele z run_all_assets.py
+wyniki/

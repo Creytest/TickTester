@@ -11,6 +11,7 @@ from tick_config import (
     COMMISSION,
     SLIPPAGE_TICKS,
     RISK_PER_TRADE,
+    TICK_SIZE,
 )
 from tick_data import load_ticks_cached
 from tick_backtest import run_backtest
@@ -27,8 +28,6 @@ TIMEFRAME = "5min"
 START_DATE = "2014-01-01"
 END_DATE = "2014-12-31"
 
-TICK_SIZE = 0.01
-
 # Liczba świec przed początkiem wybranego okresu,
 # które służą do rozgrzania wskaźników.
 WARMUP_BARS = 300
@@ -38,7 +37,12 @@ WARMUP_BARS = 300
 # DANE TICKOWE
 # ============================================================
 
-def load_period_ticks() -> pd.DataFrame:
+def load_period_ticks(
+    asset: str,
+    timeframe: str,
+    start_date: str,
+    end_date: str,
+) -> pd.DataFrame:
     """
     Wczytuje ticki od początku rozgrzewki do końca okresu.
 
@@ -46,15 +50,15 @@ def load_period_ticks() -> pd.DataFrame:
     podręczną w folderze cache, kolejne uruchomienia są szybkie.
     """
     start = (
-        pd.Timestamp(START_DATE)
-        - pd.Timedelta(TIMEFRAME) * WARMUP_BARS
+        pd.Timestamp(start_date)
+        - pd.Timedelta(timeframe) * WARMUP_BARS
     )
 
-    end = pd.Timestamp(END_DATE) + pd.Timedelta(days=1)
+    end = pd.Timestamp(end_date) + pd.Timedelta(days=1)
 
     return load_ticks_cached(
-        ASSETS[ASSET],
-        reverse_bid_ask=REVERSE_BID_ASK[ASSET],
+        ASSETS[asset],
+        reverse_bid_ask=REVERSE_BID_ASK[asset],
         start_date=start.strftime("%Y-%m-%d"),
         end_date=end.strftime("%Y-%m-%d"),
     )
@@ -205,9 +209,23 @@ def nearest_bar_index(index: pd.DatetimeIndex, timestamp) -> int:
     return max(0, min(int(pos), len(index) - 1))
 
 
-def main():
-    start_time = pd.Timestamp(START_DATE)
-    end_time = pd.Timestamp(END_DATE) + pd.Timedelta(days=1)
+def main(
+    asset: str = ASSET,
+    timeframe: str = TIMEFRAME,
+    start_date: str = START_DATE,
+    end_date: str = END_DATE,
+    show: bool = True,
+    save_path=None,
+) -> dict:
+    """
+    Backtest jednego aktywa z wykresem.
+
+    show=False i save_path pozwalają zapisać wykres do pliku
+    bez otwierania okna (używa tego run_all_assets.py).
+    Zwraca statystyki wybranego okresu.
+    """
+    start_time = pd.Timestamp(start_date)
+    end_time = pd.Timestamp(end_date) + pd.Timedelta(days=1)
 
     if end_time <= start_time:
         raise ValueError("END_DATE musi być późniejsza niż START_DATE.")
@@ -218,7 +236,9 @@ def main():
 
     print("Wczytywanie danych tickowych...")
 
-    all_ticks = load_period_ticks()
+    all_ticks = load_period_ticks(
+        asset, timeframe, start_date, end_date
+    )
 
     if all_ticks.empty:
         raise RuntimeError("Nie znaleziono danych tickowych.")
@@ -232,21 +252,21 @@ def main():
 
     if selected_ticks.empty:
         raise RuntimeError(
-            f"Brak ticków w okresie {START_DATE} – {END_DATE}. "
+            f"Brak ticków w okresie {start_date} – {end_date}. "
             "Sprawdź zakres dat i ścieżkę w tick_config.py."
         )
 
     first_selected_tick = selected_ticks["timestamp"].iloc[0]
 
     # Początek świecy, na której znajduje się pierwszy tick okresu.
-    first_selected_bar = first_selected_tick.floor(TIMEFRAME)
+    first_selected_bar = first_selected_tick.floor(timeframe)
 
     # Potrzebujemy świec poprzedzających wybrany okres.
     warmup_start = first_selected_bar - pd.Timedelta(
-        TIMEFRAME
+        timeframe
     ) * WARMUP_BARS
 
-    print(f"Okres backtestu: {START_DATE} – {END_DATE}")
+    print(f"Okres backtestu: {start_date} – {end_date}")
     print(f"Pierwszy tick w okresie: {first_selected_tick}")
     print(f"Rozgrzewka od: {warmup_start}")
 
@@ -266,11 +286,11 @@ def main():
     result = run_backtest(
         tick_source=backtest_tick_source,
         strategy=generate_signals,
-        timeframe=TIMEFRAME,
+        timeframe=timeframe,
         initial_capital=INITIAL_CAPITAL,
-        commission=COMMISSION,
+        commission=COMMISSION[asset],
         slippage_ticks=SLIPPAGE_TICKS,
-        tick_size=TICK_SIZE,
+        tick_size=TICK_SIZE[asset],
         risk_per_trade=RISK_PER_TRADE,
         # Świece rozgrzewki liczą wskaźniki, ale nie handlują.
         trade_start=start_time,
@@ -487,14 +507,14 @@ def main():
         panel_ratios=(5, 2),
         figsize=(18, 12),
         title=(
-            f"{ASSET} | {TIMEFRAME} | TickTester\n"
-            f"{START_DATE} – {END_DATE}"
+            f"{asset} | {timeframe} | TickTester\n"
+            f"{start_date} – {end_date}"
         ),
         ylabel="Cena Bid",
         datetime_format="%Y-%m-%d %H:%M",
         xrotation=15,
         returnfig=True,
-        warn_too_much_data=10000,
+        warn_too_much_data=len(bars) + 1,
     )
 
     price_ax = axes[0]
@@ -727,7 +747,15 @@ def main():
     for key, value in stats.items():
         print(f"{key}: {value}")
 
-    plt.show()
+    if save_path is not None:
+        fig.savefig(save_path, dpi=100)
+
+    if show:
+        plt.show()
+    else:
+        plt.close(fig)
+
+    return stats
 
 
 if __name__ == "__main__":

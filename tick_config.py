@@ -41,5 +41,24 @@ TIMEFRAMES = {
 
 INITIAL_CAPITAL = 10_000.0
 RISK_PER_TRADE = 0.01
-COMMISSION = 0.0001
 SLIPPAGE_TICKS = 1
+
+# Prowizja jako ułamek wartości pozycji, pobierana przy wejściu
+# i przy wyjściu (0.0001 = 0,01% za stronę). Spread jest już
+# w danych Bid/Ask, więc wpisujemy tylko koszt ponad spread.
+COMMISSION = {
+    "USA 100": 0.00006,  # dane bez spreadu (Bid = Ask) — prowizja go zastępuje
+    "XAUUSD": 0.0001,
+    "Bitcoin": 0.0002,
+    "EURUSD": 0.00003,
+    "Brent": 0.00002,
+}
+
+# Najmniejsza zmiana ceny; poślizg = SLIPPAGE_TICKS * TICK_SIZE.
+TICK_SIZE = {
+    "USA 100": 0.01,
+    "XAUUSD": 0.01,
+    "Bitcoin": 0.01,
+    "EURUSD": 0.00001,
+    "Brent": 0.001,
+}

@@ -17,8 +17,8 @@ import plot_tick_backtest_xauusd as single
 
 TIMEFRAME = "1h"
 
-START_DATE = "2014-01-01"
-END_DATE = "2014-12-31"
+START_DATE = "2018-01-01"
+END_DATE = "2020-12-31"
 
 # Domyślnie wszystkie aktywa z tick_config.py.
 # Można zawęzić, np. ["XAUUSD", "EURUSD"].

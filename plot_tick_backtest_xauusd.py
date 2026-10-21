@@ -60,6 +60,145 @@ def load_period_ticks() -> pd.DataFrame:
     )
 
 
+def period_stats(
+    trades: pd.DataFrame,
+    equity: pd.DataFrame,
+    initial_capital: float,
+) -> dict:
+    """
+    Statystyki wyłącznie dla wybranego okresu (bez rozgrzewki).
+
+    Kapitał początkowy i końcowy to pierwszy i ostatni punkt
+    krzywej kapitału w okresie. Wartości „gross” pomijają prowizje.
+    """
+    if not equity.empty:
+        values = equity.sort_values("timestamp")["equity"].astype(float)
+        times = pd.to_datetime(equity.sort_values("timestamp")["timestamp"])
+        start_capital = float(values.iloc[0])
+        final_capital = float(values.iloc[-1])
+        years = (times.iloc[-1] - times.iloc[0]).days / 365.25
+    else:
+        values = pd.Series([initial_capital], dtype=float)
+        start_capital = final_capital = float(initial_capital)
+        years = 0.0
+
+    total_return = final_capital / start_capital - 1
+
+    cagr = (
+        (final_capital / start_capital) ** (1 / years) - 1
+        if years > 0 and final_capital > 0
+        else None
+    )
+
+    peaks = values.cummax()
+    max_drawdown = float((values / peaks - 1).min())
+
+    stats = {
+        "start_capital": start_capital,
+        "final_capital": final_capital,
+        "return": total_return,
+        "cagr": cagr,
+        "max_drawdown": max_drawdown,
+        "trades": len(trades),
+        "win_rate": None,
+        "profit_factor": None,
+        "profit_factor_gross": None,
+        "avg_trade": None,
+        "avg_trade_gross": None,
+    }
+
+    if trades.empty:
+        return stats
+
+    def profit_factor(pnl: pd.Series):
+        wins = pnl[pnl > 0].sum()
+        losses = pnl[pnl < 0].sum()
+        if losses < 0:
+            return float(wins / abs(losses))
+        return float("inf") if wins > 0 else None
+
+    # Kapitał przed transakcją: po zamknięciu silnik zapisuje
+    # kapitał powiększony o net_pnl.
+    capital_before = trades["capital"] - trades["net_pnl"]
+
+    stats["win_rate"] = float(trades["net_pnl"].gt(0).mean())
+    stats["profit_factor"] = profit_factor(trades["net_pnl"])
+    stats["profit_factor_gross"] = profit_factor(trades["gross_pnl"])
+    stats["avg_trade"] = float((trades["net_pnl"] / capital_before).mean())
+    stats["avg_trade_gross"] = float(
+        (trades["gross_pnl"] / capital_before).mean()
+    )
+
+    return stats
+
+
+def draw_stats(fig, stats: dict, left: float, right: float) -> None:
+    """Rysuje rząd statystyk nad wykresem ceny."""
+
+    def pct(value):
+        return "–" if value is None else f"{value * 100:.2f}%"
+
+    def pf(value):
+        if value is None:
+            return "–"
+        return "∞" if value == float("inf") else f"{value:.2f}"
+
+    def sign_color(value):
+        if value is None or value == 0:
+            return "black"
+        return "green" if value > 0 else "red"
+
+    start = stats["start_capital"]
+    final = stats["final_capital"]
+
+    items = [
+        ("START CAPITAL", f"${start:,.0f}", "black"),
+        ("FINAL CAPITAL", f"${final:,.0f}", sign_color(final - start)),
+        ("RETURN", pct(stats["return"]), sign_color(stats["return"])),
+        ("CAGR", pct(stats["cagr"]), sign_color(stats["cagr"])),
+        (
+            "MAX DRAWDOWN",
+            pct(stats["max_drawdown"]),
+            "red" if stats["max_drawdown"] < 0 else "black",
+        ),
+        ("TRADES", str(stats["trades"]), "black"),
+        ("WIN RATE", pct(stats["win_rate"]), "black"),
+        (
+            "PROFIT FACTOR",
+            f"{pf(stats['profit_factor'])} "
+            f"({pf(stats['profit_factor_gross'])})",
+            "black"
+            if stats["profit_factor"] is None
+            else ("green" if stats["profit_factor"] >= 1 else "red"),
+        ),
+        (
+            "AVG TRADE",
+            f"{pct(stats['avg_trade'])} ({pct(stats['avg_trade_gross'])})",
+            sign_color(stats["avg_trade"]),
+        ),
+    ]
+
+    width = (right - left) / len(items)
+
+    for i, (label, value, color) in enumerate(items):
+        x = left + width * (i + 0.5)
+        fig.text(
+            x, 0.905, label,
+            ha="center", va="center", fontsize=9, color="gray",
+        )
+        fig.text(
+            x, 0.885, value,
+            ha="center", va="center", fontsize=13,
+            fontweight="bold", color=color,
+        )
+
+    fig.text(
+        right, 0.93,
+        "W nawiasach: bez prowizji (gross). Avg trade: % kapitału.",
+        ha="right", va="center", fontsize=7, color="gray",
+    )
+
+
 def nearest_bar_index(index: pd.DatetimeIndex, timestamp) -> int:
     timestamp = pd.Timestamp(timestamp)
     pos = index.searchsorted(timestamp, side="right") - 1
@@ -548,6 +687,10 @@ def main():
         hspace=0.05,
     )
 
+    # Statystyki okresu nad wykresem ceny.
+    stats = period_stats(trades, equity, INITIAL_CAPITAL)
+    draw_stats(fig, stats, 0.04, 0.96)
+
     # ========================================================
     # 11. WYNIKI
     # ========================================================
@@ -575,12 +718,11 @@ def main():
     else:
         print("Brak zamkniętych transakcji w wybranym okresie.")
 
-    print("\n=== PODSUMOWANIE ===")
+    print("\n=== PODSUMOWANIE OKRESU ===")
 
-    # Uwaga: stats z run_backtest obejmuje cały przebieg, w tym
-    # ewentualne transakcje z okresu rozgrzewki. Nie należy ich
-    # traktować jako statystyk wybranego zakresu.
-    for key, value in result["stats"].items():
+    # Statystyki tylko dla wybranego okresu, bez rozgrzewki —
+    # te same, które są pokazane nad wykresem.
+    for key, value in stats.items():
         print(f"{key}: {value}")
 
     plt.show()

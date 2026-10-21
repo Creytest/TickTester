@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import matplotlib.pyplot as plt
 import mplfinance as mpf
 import pandas as pd
@@ -15,6 +17,7 @@ from tick_config import (
 )
 from tick_data import load_ticks_cached
 from tick_backtest import run_backtest
+from interactive_chart import save_interactive_chart
 from strategies.tick_BigBeluga_Stoch_80percent import generate_signals
 
 
@@ -216,13 +219,17 @@ def main(
     end_date: str = END_DATE,
     show: bool = True,
     save_path=None,
+    html_path=None,
+    trades_path=None,
+    print_trades: bool = True,
 ) -> dict:
     """
     Backtest jednego aktywa z wykresem.
 
     show=False i save_path pozwalają zapisać wykres do pliku
     bez otwierania okna (używa tego run_all_assets.py).
-    Zwraca statystyki wybranego okresu.
+    html_path zapisuje interaktywny wykres HTML, trades_path
+    listę transakcji do CSV. Zwraca statystyki wybranego okresu.
     """
     start_time = pd.Timestamp(start_date)
     end_time = pd.Timestamp(end_date) + pd.Timedelta(days=1)
@@ -717,28 +724,53 @@ def main(
     # 11. WYNIKI
     # ========================================================
 
-    print("\n=== TRANSAKCJE DO KONTROLI ===")
+    if trades_path is not None and not trades.empty:
+        trades.to_csv(trades_path, index=False, sep=";", decimal=",")
 
-    if not trades.empty:
-        columns = [
-            "side",
-            "entry_time",
-            "exit_time",
-            "entry_price",
-            "exit_price",
-            "stop_loss",
-            "take_profit",
-            "reason",
-            "net_pnl",
-        ]
+    if html_path is not None:
+        try:
+            save_interactive_chart(
+                html_path,
+                title=f"{asset} | {timeframe} | {start_date} – {end_date}",
+                bars=bars,
+                signals=signals,
+                trades=trades,
+                trend=trend,
+                k=k,
+                d=d,
+                equity=equity,
+                stats=stats,
+                initial_capital=INITIAL_CAPITAL,
+            )
+        except ImportError:
+            print(
+                "Brak biblioteki plotly — wykres HTML pominięty. "
+                "Zainstaluj ją komendą: pip install plotly"
+            )
 
-        available_columns = [
-            column for column in columns if column in trades.columns
-        ]
+    if print_trades:
+        print("\n=== TRANSAKCJE DO KONTROLI ===")
 
-        print(trades[available_columns].to_string(index=False))
-    else:
-        print("Brak zamkniętych transakcji w wybranym okresie.")
+        if not trades.empty:
+            columns = [
+                "side",
+                "entry_time",
+                "exit_time",
+                "entry_price",
+                "exit_price",
+                "stop_loss",
+                "take_profit",
+                "reason",
+                "net_pnl",
+            ]
+
+            available_columns = [
+                column for column in columns if column in trades.columns
+            ]
+
+            print(trades[available_columns].to_string(index=False))
+        else:
+            print("Brak zamkniętych transakcji w wybranym okresie.")
 
     print("\n=== PODSUMOWANIE OKRESU ===")
 
@@ -759,4 +791,13 @@ def main(
 
 
 if __name__ == "__main__":
-    main()
+    # Obok okna matplotlib zapisujemy interaktywny wykres HTML.
+    output_dir = Path(__file__).resolve().parent / "wyniki"
+    output_dir.mkdir(exist_ok=True)
+
+    main(
+        html_path=output_dir / (
+            f"{ASSET.replace(' ', '_')}_{TIMEFRAME}"
+            f"_{START_DATE}_{END_DATE}.html"
+        )
+    )

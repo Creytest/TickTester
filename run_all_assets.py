@@ -24,7 +24,12 @@ END_DATE = "2014-12-31"
 # Można zawęzić, np. ["XAUUSD", "EURUSD"].
 ASSETS_TO_TEST = list(ASSETS)
 
-# Folder na wykresy i tabelę wyników.
+# Interaktywny wykres HTML (otwierany w przeglądarce)
+# i/lub statyczny obrazek PNG dla każdego aktywa.
+SAVE_HTML = True
+SAVE_PNG = False
+
+# Folder na wykresy, transakcje i tabelę wyników.
 OUTPUT_DIR = Path(__file__).resolve().parent / "wyniki"
 
 
@@ -38,10 +43,13 @@ def main():
         print(f"{asset} | {TIMEFRAME} | {START_DATE} – {END_DATE}")
         print("=" * 60)
 
-        chart = OUTPUT_DIR / (
+        name = (
             f"{asset.replace(' ', '_')}_{TIMEFRAME}"
-            f"_{START_DATE}_{END_DATE}.png"
+            f"_{START_DATE}_{END_DATE}"
         )
+        png = OUTPUT_DIR / f"{name}.png"
+        html = OUTPUT_DIR / f"{name}.html"
+        trades_csv = OUTPUT_DIR / f"{name}_transakcje.csv"
 
         try:
             stats = single.main(
@@ -50,7 +58,10 @@ def main():
                 start_date=START_DATE,
                 end_date=END_DATE,
                 show=False,
-                save_path=chart,
+                save_path=png if SAVE_PNG else None,
+                html_path=html if SAVE_HTML else None,
+                trades_path=trades_csv,
+                print_trades=False,
             )
         except (FileNotFoundError, RuntimeError, ValueError) as error:
             # Brak pliku lub danych w okresie — przechodzimy dalej.
@@ -76,7 +87,7 @@ def main():
                 "max_drawdown_%": _pct(stats["max_drawdown"]),
                 "avg_trade_%": _pct(stats["avg_trade"]),
                 "final_capital": round(stats["final_capital"], 2),
-                "uwagi": f"wykres: {chart.name}",
+                "uwagi": f"pliki: {name}.*",
             }
         )
 

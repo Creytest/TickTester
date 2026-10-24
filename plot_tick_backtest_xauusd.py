@@ -222,6 +222,7 @@ def main(
     html_path=None,
     trades_path=None,
     print_trades: bool = True,
+    ticks: pd.DataFrame | None = None,
 ) -> dict:
     """
     Backtest jednego aktywa z wykresem.
@@ -230,6 +231,9 @@ def main(
     bez otwierania okna (używa tego run_all_assets.py).
     html_path zapisuje interaktywny wykres HTML, trades_path
     listę transakcji do CSV. Zwraca statystyki wybranego okresu.
+
+    ticks pozwala podać ticki wczytane wcześniej (posortowane,
+    z zapasem na rozgrzewkę), np. raz dla kilku interwałów.
     """
     start_time = pd.Timestamp(start_date)
     end_time = pd.Timestamp(end_date) + pd.Timedelta(days=1)
@@ -241,16 +245,20 @@ def main(
     # 1. USTALENIE ZAKRESU DANYCH I ROZGRZEWKI
     # ========================================================
 
-    print("Wczytywanie danych tickowych...")
+    if ticks is None:
+        print("Wczytywanie danych tickowych...")
 
-    all_ticks = load_period_ticks(
-        asset, timeframe, start_date, end_date
-    )
+        all_ticks = load_period_ticks(
+            asset, timeframe, start_date, end_date
+        )
+        all_ticks = all_ticks.sort_values("timestamp").reset_index(
+            drop=True
+        )
+    else:
+        all_ticks = ticks
 
     if all_ticks.empty:
         raise RuntimeError("Nie znaleziono danych tickowych.")
-
-    all_ticks = all_ticks.sort_values("timestamp").reset_index(drop=True)
 
     selected_ticks = all_ticks[
         (all_ticks["timestamp"] >= start_time)

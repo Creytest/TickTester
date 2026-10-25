@@ -131,8 +131,16 @@ def run_backtest(
     if not chunks:
         raise ValueError("Nie udało się utworzyć świec z ticków.")
 
-    ticks = pd.concat(chunks, ignore_index=True)
-    ticks = ticks.sort_values("timestamp", kind="stable")
+    # Przy jednej, już posortowanej partii unikamy kopii całej
+    # tabeli — dla kilku lat ticków BTC to kilka GB pamięci.
+    if len(chunks) == 1:
+        ticks = chunks[0]
+    else:
+        ticks = pd.concat(chunks, ignore_index=True)
+
+    if not ticks["timestamp"].is_monotonic_increasing:
+        ticks = ticks.sort_values("timestamp", kind="stable")
+
     ticks = ticks.reset_index(drop=True)
 
     # ========================================================
@@ -200,7 +208,9 @@ def run_backtest(
     # ========================================================
 
     valid = (ticks["bid"] > 0) & (ticks["ask"] >= ticks["bid"])
-    ticks = ticks.loc[valid].reset_index(drop=True)
+
+    if not valid.all():
+        ticks = ticks.loc[valid].reset_index(drop=True)
 
     timestamps = ticks["timestamp"].to_numpy()
 

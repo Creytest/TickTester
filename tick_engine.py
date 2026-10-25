@@ -26,13 +26,21 @@ def build_bars(tick_chunks, timeframe: str) -> pd.DataFrame:
         if chunk.empty:
             continue
 
-        chunk = chunk.sort_values("timestamp")
-
         if pending is not None:
             chunk = pd.concat([pending, chunk], ignore_index=True)
 
-        chunk = chunk.sort_values("timestamp").set_index("timestamp")
-        grouped = chunk["bid"].resample(timeframe).ohlc().dropna()
+        # Sortujemy tylko w razie potrzeby i budujemy indeks z samej
+        # kolumny bid — przy setkach milionów ticków każda kopia
+        # całej tabeli to kilka GB pamięci.
+        if not chunk["timestamp"].is_monotonic_increasing:
+            chunk = chunk.sort_values("timestamp", kind="stable")
+
+        chunk = pd.Series(
+            chunk["bid"].to_numpy(),
+            index=pd.DatetimeIndex(chunk["timestamp"]),
+            name="bid",
+        ).rename_axis("timestamp")
+        grouped = chunk.resample(timeframe).ohlc().dropna()
 
         if grouped.empty:
             pending = chunk.reset_index()

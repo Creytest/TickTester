@@ -16,6 +16,9 @@ from summary_chart import save_summary_chart
 # KONFIGURACJA
 # ============================================================
 
+# Plik strategii z folderu strategies (bez .py).
+STRATEGY = "tick_RSI6_80_20"
+
 # Każde aktywo jest testowane na każdym z tych interwałów.
 TIMEFRAMES_TO_TEST = ["15min", "1h", "4h"]
 
@@ -39,6 +42,9 @@ def main():
     OUTPUT_DIR.mkdir(exist_ok=True)
 
     rows = []
+
+    strategy_name = single.load_strategy(STRATEGY).NAME
+    print(f"Strategia: {strategy_name}")
 
     # Najdłuższy interwał wyznacza zapas ticków na rozgrzewkę.
     longest = max(TIMEFRAMES_TO_TEST, key=pd.Timedelta)
@@ -65,7 +71,7 @@ def main():
             print(f"\n--- {asset} | {timeframe} ---")
 
             name = (
-                f"{asset.replace(' ', '_')}_{timeframe}"
+                f"{STRATEGY}_{asset.replace(' ', '_')}_{timeframe}"
                 f"_{START_DATE}_{END_DATE}"
             )
             png = OUTPUT_DIR / f"{name}.png"
@@ -84,6 +90,7 @@ def main():
                     trades_path=trades_csv,
                     print_trades=False,
                     ticks=ticks,
+                    strategy=STRATEGY,
                 )
             except (RuntimeError, ValueError) as error:
                 # Brak danych w okresie — przechodzimy dalej.
@@ -120,7 +127,7 @@ def main():
     if "trades" in summary.columns:
         summary["trades"] = summary["trades"].astype("Int64")
 
-    name = f"podsumowanie_{START_DATE}_{END_DATE}"
+    name = f"podsumowanie_{STRATEGY}_{START_DATE}_{END_DATE}"
     table = OUTPUT_DIR / f"{name}.csv"
     summary.to_csv(table, index=False, sep=";", decimal=",")
 
@@ -135,12 +142,12 @@ def main():
         save_summary_chart(
             OUTPUT_DIR / f"{name}.html",
             ok,
-            title=f"Wszystkie kombinacje | {START_DATE} – {END_DATE}",
+            title=f"{strategy_name} | {START_DATE} – {END_DATE}",
             costs=costs,
         )
 
     print("\n" + "=" * 60)
-    print(f"PODSUMOWANIE | {START_DATE} – {END_DATE} | {costs}")
+    print(f"PODSUMOWANIE | {strategy_name} | {START_DATE} – {END_DATE} | {costs}")
     print("=" * 60)
     print(
         summary.drop(columns="uwagi")

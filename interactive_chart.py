@@ -26,9 +26,8 @@ def save_interactive_chart(
     bars: pd.DataFrame,
     signals: pd.DataFrame,
     trades: pd.DataFrame,
-    trend: pd.Series,
-    k: pd.Series,
-    d: pd.Series,
+    trend: pd.Series | None,
+    panel: dict,
     equity: pd.DataFrame,
     stats: dict,
     initial_capital: float,
@@ -119,13 +118,23 @@ def save_interactive_chart(
     # zielony, spadek czerwony, brak zmiany żółty. Każdy kolor
     # to osobna linia; na granicy zostawiamy wspólny punkt,
     # aby linia była ciągła.
-    trend_values = trend.to_numpy(dtype=float)
-    direction = np.sign(trend.diff(2).to_numpy(dtype=float))
+    trend_values = (
+        trend.to_numpy(dtype=float) if trend is not None else None
+    )
+    direction = (
+        np.sign(trend.diff(2).to_numpy(dtype=float))
+        if trend is not None
+        else None
+    )
 
     for value, color, name in (
-        (1, "lime", "Trend ↑"),
-        (-1, "red", "Trend ↓"),
-        (0, "gold", "Trend ="),
+        ()
+        if trend is None
+        else (
+            (1, "lime", "Trend ↑"),
+            (-1, "red", "Trend ↓"),
+            (0, "gold", "Trend ="),
+        )
     ):
         mask = direction == value
         visible = mask | np.append(mask[1:], False)
@@ -248,10 +257,10 @@ def save_interactive_chart(
             )
 
     # ========================================================
-    # 4. STOCHASTIC
+    # 4. OSCYLATOR STRATEGII (np. Stochastic, RSI)
     # ========================================================
 
-    for series, color, name in ((k, "blue", "%K"), (d, "darkorange", "%D")):
+    for name, series, color in panel["lines"]:
         fig.add_trace(
             go.Scattergl(
                 x=x,
@@ -265,7 +274,7 @@ def save_interactive_chart(
             col=1,
         )
 
-    for level in (20, 80):
+    for level in panel["levels"]:
         fig.add_hline(
             y=level, row=2, col=1,
             line=dict(color="gray", width=1, dash="dot"),
@@ -348,7 +357,9 @@ def save_interactive_chart(
     # Skalę Y ustawia skrypt poniżej, więc zoom działa tylko w poziomie.
     fig.update_yaxes(showgrid=True, gridcolor="#eee", fixedrange=True)
     fig.update_yaxes(title_text="Cena Bid", row=1, col=1)
-    fig.update_yaxes(title_text="Stochastic", range=[0, 100], row=2, col=1)
+    fig.update_yaxes(
+        title_text=panel["title"], range=[0, 100], row=2, col=1
+    )
     fig.update_yaxes(title_text="Kapitał ($)", row=3, col=1)
 
     data = {

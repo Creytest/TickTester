@@ -3,6 +3,13 @@ import numpy as np
 import pandas as pd
 
 
+NAME = "BigBeluga Two-Pole + Stochastic 7,3,3"
+
+# Sygnały przy otwartej pozycji są pomijane.
+OPPOSITE_SIGNAL = "ignore"
+SAME_SIGNAL = "ignore"
+
+
 def generate_signals(
     bars: pd.DataFrame,
     length: int = 34,
@@ -112,3 +119,46 @@ def generate_signals(
     result.loc[invalid_long | invalid_short, ["buy", "sell"]] = False
 
     return result
+
+
+def indicators(bars: pd.DataFrame) -> dict:
+    """Linie do wykresów: Two-Pole na cenie, Stochastic w panelu."""
+    close = bars["close"].astype(float).to_numpy()
+
+    length = 34
+    damping = 0.9
+
+    omega = 2.0 * np.pi / length
+    alpha = damping * omega
+    beta = omega ** 2
+
+    f1 = 0.0
+    f2 = 0.0
+    f2_values = []
+
+    for price in close:
+        f1 = f1 + alpha * (price - f1)
+        f2 = f2 + beta * (f1 - f2)
+        f2_values.append(f2)
+
+    trend = pd.Series(f2_values, index=bars.index, name="Two-Pole Filter")
+
+    lowest_low = bars["low"].rolling(7, min_periods=7).min()
+    highest_high = bars["high"].rolling(7, min_periods=7).max()
+    price_range = highest_high - lowest_low
+
+    raw_k = (
+        100.0 * (bars["close"] - lowest_low) / price_range
+    ).where(price_range != 0)
+
+    k = raw_k.rolling(3, min_periods=3).mean()
+    d = k.rolling(3, min_periods=3).mean()
+
+    return {
+        "trend": trend,
+        "panel": {
+            "title": "Stochastic",
+            "lines": [("%K", k, "blue"), ("%D", d, "darkorange")],
+            "levels": (20, 80),
+        },
+    }

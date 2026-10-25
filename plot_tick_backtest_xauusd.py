@@ -18,12 +18,15 @@ from tick_config import (
 from tick_data import load_ticks_cached
 from tick_backtest import run_backtest
 from interactive_chart import save_interactive_chart
-from strategies.tick_BigBeluga_Stoch_80percent import generate_signals
+import importlib
 
 
 # ============================================================
 # KONFIGURACJA
 # ============================================================
+
+# Plik strategii z folderu strategies (bez .py).
+STRATEGY = "tick_RSI6_80_20"
 
 ASSET = "XAUUSD"
 TIMEFRAME = "5min"
@@ -206,6 +209,11 @@ def draw_stats(fig, stats: dict, left: float, right: float) -> None:
     )
 
 
+def load_strategy(name: str):
+    """Moduł strategii z folderu strategies, np. "tick_RSI6_80_20"."""
+    return importlib.import_module(f"strategies.{name}")
+
+
 def nearest_bar_index(index: pd.DatetimeIndex, timestamp) -> int:
     timestamp = pd.Timestamp(timestamp)
     pos = index.searchsorted(timestamp, side="right") - 1
@@ -223,6 +231,7 @@ def main(
     trades_path=None,
     print_trades: bool = True,
     ticks: pd.DataFrame | None = None,
+    strategy: str = STRATEGY,
 ) -> dict:
     """
     Backtest jednego aktywa z wykresem.
@@ -235,6 +244,8 @@ def main(
     ticks pozwala podać ticki wczytane wcześniej (posortowane,
     z zapasem na rozgrzewkę), np. raz dla kilku interwałów.
     """
+    strategy_module = load_strategy(strategy)
+
     start_time = pd.Timestamp(start_date)
     end_time = pd.Timestamp(end_date) + pd.Timedelta(days=1)
 
@@ -300,7 +311,7 @@ def main(
 
     result = run_backtest(
         tick_source=backtest_tick_source,
-        strategy=generate_signals,
+        strategy=strategy_module.generate_signals,
         timeframe=timeframe,
         initial_capital=INITIAL_CAPITAL,
         commission=COMMISSION[asset],
@@ -309,6 +320,8 @@ def main(
         risk_per_trade=RISK_PER_TRADE,
         # Świece rozgrzewki liczą wskaźniki, ale nie handlują.
         trade_start=start_time,
+        opposite_signal=strategy_module.OPPOSITE_SIGNAL,
+        same_signal=strategy_module.SAME_SIGNAL,
     )
 
     bars_all = result["bars"].copy()
@@ -354,7 +367,7 @@ def main(
     else:
         equity = equity_all.copy()
 
-    signals = generate_signals(bars_all.copy())
+    signals = strategy_module.generate_signals(bars_all.copy())
     signals = signals.reindex(bars.index)
 
     # ========================================================
@@ -395,69 +408,26 @@ def main(
             exits.iloc[exit_idx] = float(trade["exit_price"])
 
     # ========================================================
-    # 5. TWO-POLE FILTER
+    # 5. WSKAŹNIKI STRATEGII DO WYKRESU
     # ========================================================
 
-    close_all = bars_all["close"].astype(float)
+    # Liczone na świecach z rozgrzewką, pokazywane tylko w okresie.
+    indicators = strategy_module.indicators(bars_all.copy())
 
-    length = 34
-    damping = 0.9
+    trend = indicators.get("trend")
 
-    omega = 2.0 * np.pi / length
-    alpha = damping * omega
-    beta = omega ** 2
+    if trend is not None:
+        trend = trend.reindex(bars.index).copy()
 
-    f1 = 0.0
-    f2 = 0.0
-    f2_values = []
+        # Ukrycie początkowych 300 świec dotyczy tylko wizualizacji.
+        # Nie zmienia obliczeń filtra ani sygnałów.
+        trend.iloc[:min(300, len(trend))] = np.nan
 
-    for price in close_all:
-        f1 = f1 + alpha * (price - f1)
-        f2 = f2 + beta * (f1 - f2)
-        f2_values.append(f2)
-
-    trend_all = pd.Series(
-        f2_values,
-        index=bars_all.index,
-        name="Two-Pole Filter",
-    )
-
-    trend = trend_all.reindex(bars.index).copy()
-
-    # Ukrycie początkowych 300 świec dotyczy tylko wizualizacji.
-    # Nie zmienia obliczeń filtra ani sygnałów.
-    trend.iloc[:min(300, len(trend))] = np.nan
-
-    # ========================================================
-    # 6. STOCHASTIC 7, 3, 3
-    # ========================================================
-
-    lowest_low = bars_all["low"].rolling(
-        7, min_periods=7
-    ).min()
-
-    highest_high = bars_all["high"].rolling(
-        7, min_periods=7
-    ).max()
-
-    price_range = highest_high - lowest_low
-
-    raw_k_all = (
-        100.0
-        * (bars_all["close"] - lowest_low)
-        / price_range
-    ).where(price_range != 0)
-
-    k_all = raw_k_all.rolling(
-        3, min_periods=3
-    ).mean()
-
-    d_all = k_all.rolling(
-        3, min_periods=3
-    ).mean()
-
-    k = k_all.reindex(bars.index)
-    d = d_all.reindex(bars.index)
+    panel = dict(indicators["panel"])
+    panel["lines"] = [
+        (name, series.reindex(bars.index), color)
+        for name, series, color in panel["lines"]
+    ]
 
     # ========================================================
     # 7. WYKRES CENY I WSKAŹNIKÓW
@@ -499,19 +469,18 @@ def main(
             markersize=75,
             color="black",
         ),
-        mpf.make_addplot(
-            k,
-            panel=1,
-            color="blue",
-            ylabel="Stochastic",
-            ylim=(0, 100),
-        ),
-        mpf.make_addplot(
-            d,
-            panel=1,
-            color="darkorange",
-        ),
     ]
+
+    for number, (_, series, color) in enumerate(panel["lines"]):
+        addplots.append(
+            mpf.make_addplot(
+                series,
+                panel=1,
+                color=color,
+                ylabel=panel["title"] if number == 0 else "",
+                ylim=(0, 100),
+            )
+        )
 
     fig, axes = mpf.plot(
         bars,
@@ -522,7 +491,7 @@ def main(
         panel_ratios=(5, 2),
         figsize=(18, 12),
         title=(
-            f"{asset} | {timeframe} | TickTester\n"
+            f"{asset} | {timeframe} | {strategy_module.NAME}\n"
             f"{start_date} – {end_date}"
         ),
         ylabel="Cena Bid",
@@ -538,8 +507,12 @@ def main(
     # 8. TWO-POLE FILTER W KOLORACH
     # ========================================================
 
-    x = np.arange(len(trend))
-    y = trend.to_numpy(dtype=float)
+    x = np.arange(len(bars))
+    y = (
+        trend.to_numpy(dtype=float)
+        if trend is not None
+        else np.full(len(bars), np.nan)
+    )
 
     valid = np.isfinite(y)
 
@@ -739,13 +712,15 @@ def main(
         try:
             save_interactive_chart(
                 html_path,
-                title=f"{asset} | {timeframe} | {start_date} – {end_date}",
+                title=(
+                    f"{asset} | {timeframe} | {start_date} – {end_date}"
+                    f" | {strategy_module.NAME}"
+                ),
                 bars=bars,
                 signals=signals,
                 trades=trades,
                 trend=trend,
-                k=k,
-                d=d,
+                panel=panel,
                 equity=equity,
                 stats=stats,
                 initial_capital=INITIAL_CAPITAL,
@@ -805,7 +780,7 @@ if __name__ == "__main__":
 
     main(
         html_path=output_dir / (
-            f"{ASSET.replace(' ', '_')}_{TIMEFRAME}"
+            f"{STRATEGY}_{ASSET.replace(' ', '_')}_{TIMEFRAME}"
             f"_{START_DATE}_{END_DATE}.html"
         )
     )

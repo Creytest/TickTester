@@ -81,6 +81,8 @@ def run_backtest(
     risk_per_trade: float = 0.01,
     fixed_quantity: float = 1.0,
     trade_start=None,
+    opposite_signal: str = "ignore",
+    same_signal: str = "ignore",
 ) -> dict:
     """
     Backtest strategii na tickach Bid/Ask.
@@ -97,6 +99,14 @@ def run_backtest(
     trade_start: opcjonalny początek handlu, np. START_DATE.
     Ticki i świece wcześniejsze służą tylko do rozgrzania
     wskaźników — przed tą chwilą nie otwieramy pozycji.
+
+    Sygnał przy otwartej pozycji (odpowiedniki Pine Script):
+    opposite_signal="reverse" — przeciwny sygnał zamyka pozycję
+        i otwiera odwrotną (strategy.entry w drugą stronę),
+    same_signal="update_exits" — sygnał w tę samą stronę nie
+        dokłada pozycji, ale przestawia jej SL i TP (ponowne
+        strategy.exit z tym samym id),
+    "ignore" — sygnał jest pomijany.
 
     Zamiast przechodzić w Pythonie przez każdy tick, silnik
     wyszukuje na tablicach numpy tylko ticki, na których coś
@@ -248,16 +258,6 @@ def run_backtest(
         if trade_start is not None and timestamps[i] < trade_start:
             continue
 
-        # SL/TP sprawdzane są przed sygnałami na tym samym ticku,
-        # więc pozycja zamknięta na ticku i zwalnia miejsce.
-        if engine.position is not None:
-            if exit_index != -1 and exit_index <= i:
-                close_at_exit()
-            else:
-                # Zgodnie z Pine Script wchodzimy tylko bez pozycji.
-                continue
-
-        timestamp, bid, ask = tick_at(i)
         desired_side = "long" if event["buy"] else "short"
 
         sl = event["stop_loss"]
@@ -273,6 +273,30 @@ def run_backtest(
             if tp is None or pd.isna(tp)
             else float(tp)
         )
+
+        # SL/TP sprawdzane są przed sygnałami na tym samym ticku,
+        # więc pozycja zamknięta na ticku i zwalnia miejsce.
+        if engine.position is not None:
+            if exit_index != -1 and exit_index <= i:
+                close_at_exit()
+            elif engine.position.side == desired_side:
+                if same_signal == "update_exits":
+                    # Nowe poziomy działają od tego ticku; jeśli są
+                    # już przekroczone, pozycja zamyka się od razu.
+                    engine.position.stop_loss = sl
+                    engine.position.take_profit = tp
+                    exit_index, exit_reason = _find_exit(
+                        desired_side, sl, tp, bids, asks, i
+                    )
+                continue
+            elif opposite_signal == "reverse":
+                engine.close_position(*tick_at(i), "reverse")
+                trade_spans[-1][1] = i
+            else:
+                # Zgodnie z Pine Script wchodzimy tylko bez pozycji.
+                continue
+
+        timestamp, bid, ask = tick_at(i)
 
         # Weryfikujemy SL i TP względem oczekiwanej ceny wejścia.
         if desired_side == "long":

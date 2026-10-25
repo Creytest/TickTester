@@ -17,6 +17,9 @@ from summary_chart import save_summary_chart
 # ============================================================
 
 # Plik strategii z folderu strategies (bez .py).
+# Dostępne strategie:
+#   "tick_BigBeluga_Stoch_80percent" — BigBeluga Two-Pole + Stochastic 7,3,3
+#   "tick_RSI6_80_20"                — RSI 6 (80/20) RR 2:1
 STRATEGY = "tick_RSI6_80_20"
 
 # Każde aktywo jest testowane na każdym z tych interwałów.

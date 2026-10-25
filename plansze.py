@@ -1,0 +1,327 @@
+"""
+Plansze wyników do filmu (PNG 1920×1080, kolory kanału).
+
+1_wykres_kapitalu.png — krzywe kapitału wszystkich kombinacji
+    aktywo × interwał na szaro, mediana grubą linią (zielona
+    na plusie, czerwona na minusie).
+2_mediany.png — trzy duże liczby: ile kombinacji na plusie,
+    mediana wyniku netto i mediana Win Rate (gdy autor obiecuje
+    Win Rate) albo mediana Profit Factor.
+3_tabela.png — pełna tabela wyników do pobrania z opisu.
+
+Fonty: Anton (nagłówki, liczby) i Inter (reszta). Jeśli nie są
+zainstalowane w systemie, używany jest font zastępczy.
+"""
+
+from pathlib import Path
+
+import matplotlib.pyplot as plt
+import pandas as pd
+from matplotlib import font_manager
+
+
+BLACK = "#0B0D10"
+WHITE = "#F2F2F2"
+GREEN = "#00D084"
+RED = "#FF3B30"
+GRAY = "#8A8F98"
+
+# 1920×1080 przy dpi=100.
+SIZE = (19.2, 10.8)
+DPI = 100
+
+
+def save_plansze(
+    folder,
+    summary: pd.DataFrame,
+    equities: dict,
+    title: str,
+    period: str,
+    costs: str,
+    claim_win_rate=None,
+) -> list[Path]:
+    """
+    Zapisuje trzy plansze do folderu i zwraca ich ścieżki.
+
+    summary — wiersze ze statusem OK z run_all_assets.py.
+    equities — {(aktywo, interwał): DataFrame z kolumnami
+    timestamp i equity}.
+    claim_win_rate — Win Rate obiecany przez autora w procentach
+    (np. 90) albo None.
+    """
+    folder = Path(folder)
+    folder.mkdir(parents=True, exist_ok=True)
+
+    data = summary.reset_index(drop=True)
+    subtitle = (
+        f"{data['asset'].nunique()} aktywa × "
+        f"{data['timeframe'].nunique()} interwały  |  {period}  |  po kosztach"
+    )
+
+    paths = [
+        folder / "1_wykres_kapitalu.png",
+        folder / "2_mediany.png",
+        folder / "3_tabela.png",
+    ]
+
+    _equity_chart(paths[0], data, equities, title, subtitle)
+    _medians(paths[1], data, title, subtitle, claim_win_rate)
+    _table(paths[2], data, title, subtitle, costs)
+
+    return paths
+
+
+# ============================================================
+# 1. WYKRES KAPITAŁU
+# ============================================================
+
+def _equity_chart(path, data, equities, title, subtitle):
+    curves = {}
+
+    for _, row in data.iterrows():
+        equity = equities.get((row["asset"], row["timeframe"]))
+
+        if equity is None or equity.empty:
+            continue
+
+        values = (
+            equity.assign(timestamp=pd.to_datetime(equity["timestamp"]))
+            .set_index("timestamp")["equity"]
+            .astype(float)
+            .sort_index()
+        )
+        start = values.iloc[0]
+        # Dzienny krok wystarcza do wykresu i wyrównuje osie czasu.
+        values = values.resample("1D").last().dropna()
+        curves[_label(row)] = (values / start - 1) * 100
+
+    fig, ax = _figure()
+
+    if curves:
+        frame = pd.DataFrame(curves).sort_index().ffill().fillna(0.0)
+        median = frame.median(axis=1)
+
+        for column in frame.columns:
+            ax.plot(frame.index, frame[column], color=WHITE,
+                    alpha=0.22, linewidth=1.6)
+
+        color = _sign_color(median.iloc[-1])
+        ax.plot(median.index, median, color=color, linewidth=5)
+
+        ax.axhline(0, color=GRAY, linewidth=1.2, linestyle="--")
+
+        # Podpisy na prawym końcu: mediana oraz najlepsza
+        # i najgorsza kombinacja, jeśli nie nachodzą na medianę.
+        end = frame.index[-1]
+        last = frame.iloc[-1]
+        gap = (frame.max().max() - frame.min().min()) * 0.06
+        labels = [
+            (median.iloc[-1], f"mediana {_pct(median.iloc[-1])}", color, 26),
+        ]
+        for y, name in ((last.max(), last.idxmax()), (last.min(), last.idxmin())):
+            if all(abs(y - other) > gap for other, *_ in labels):
+                labels.append((y, f"{name} {_pct(y)}", GRAY, 18))
+
+        for y, text, text_color, size in labels:
+            ax.annotate(
+                text, (end, y), xytext=(14, 0), textcoords="offset points",
+                va="center", color=text_color, fontsize=size,
+                fontfamily=_body_font(),
+                fontweight="bold" if text_color != GRAY else "normal",
+                annotation_clip=False,
+            )
+
+    ax.set_ylabel("Zmiana kapitału", color=GRAY, fontsize=18,
+                  fontfamily=_body_font())
+    ax.yaxis.set_major_formatter(lambda value, _: _pct(value, 0))
+    ax.tick_params(colors=GRAY, labelsize=18)
+    for label in ax.get_xticklabels() + ax.get_yticklabels():
+        label.set_fontfamily(_body_font())
+    for side in ("top", "right"):
+        ax.spines[side].set_visible(False)
+    for side in ("left", "bottom"):
+        ax.spines[side].set_color("#2A2E35")
+    ax.grid(axis="y", color="#1C2026", linewidth=1)
+
+    _header(fig, title, subtitle)
+    fig.subplots_adjust(left=0.08, right=0.80, top=0.80, bottom=0.08)
+    _save(fig, path)
+
+
+# ============================================================
+# 2. MEDIANY
+# ============================================================
+
+def _medians(path, data, title, subtitle, claim_win_rate):
+    returns = data["return_%"].astype(float)
+    profitable = int((returns > 0).sum())
+    median_return = float(returns.median())
+
+    items = [
+        (
+            f"{profitable}/{len(data)}",
+            "kombinacji na plusie\npo kosztach",
+            GREEN if profitable > len(data) / 2 else RED,
+        ),
+        (
+            _pct(median_return),
+            "mediana\nwyniku netto",
+            _sign_color(median_return),
+        ),
+    ]
+
+    if claim_win_rate is not None:
+        win_rate = float(data["win_rate_%"].astype(float).median())
+        items.append((
+            _pct(win_rate, 0, sign=False),
+            f"mediana Win Rate\nobiecane: {_num(claim_win_rate, 0)}%",
+            GREEN if win_rate >= claim_win_rate else RED,
+        ))
+    else:
+        profit_factor = float(data["profit_factor"].astype(float).median())
+        items.append((
+            _num(profit_factor, 2),
+            "mediana\nProfit Factor",
+            GREEN if profit_factor >= 1 else RED,
+        ))
+
+    fig = plt.figure(figsize=SIZE, dpi=DPI, facecolor=BLACK)
+    _header(fig, title, subtitle)
+
+    width = 1 / len(items)
+    for i, (value, label, color) in enumerate(items):
+        x = width * (i + 0.5)
+        fig.text(x, 0.52, value, ha="center", va="center", color=color,
+                 fontsize=120, fontfamily=_heading_font(),
+                 fontweight=_heading_weight())
+        fig.text(x, 0.32, label, ha="center", va="center", color=WHITE,
+                 fontsize=30, fontfamily=_body_font(), linespacing=1.3)
+
+    _save(fig, path)
+
+
+# ============================================================
+# 3. TABELA
+# ============================================================
+
+def _table(path, data, title, subtitle, costs):
+    columns = [
+        ("Aktywo", 0.06, "left"),
+        ("Interwał", 0.25, "left"),
+        ("Wynik netto", 0.45, "right"),
+        ("Profit Factor", 0.60, "right"),
+        ("Win Rate", 0.73, "right"),
+        ("Max Drawdown", 0.87, "right"),
+        ("Transakcje", 0.96, "right"),
+    ]
+
+    fig = plt.figure(figsize=SIZE, dpi=DPI, facecolor=BLACK)
+    _header(fig, title, subtitle)
+
+    top, bottom = 0.76, 0.10
+    row_height = min(0.055, (top - bottom) / (len(data) + 1))
+    font_size = 24 if row_height >= 0.05 else 18
+
+    for name, x, align in columns:
+        fig.text(x, top, name, ha=align, va="center", color=GRAY,
+                 fontsize=font_size - 4, fontfamily=_body_font())
+
+    for i, (_, row) in enumerate(data.iterrows()):
+        y = top - row_height * (i + 1)
+
+        if i % 2 == 0:
+            fig.patches.append(plt.Rectangle(
+                (0.04, y - row_height / 2), 0.94, row_height,
+                transform=fig.transFigure, color="#14171C", zorder=0,
+            ))
+
+        result = float(row["return_%"])
+        cells = [
+            (row["asset"], WHITE),
+            (_timeframe(row["timeframe"]), WHITE),
+            (_pct(result), _sign_color(result)),
+            (_num(row["profit_factor"], 2), WHITE),
+            (_pct(row["win_rate_%"], 1, sign=False), WHITE),
+            (_pct(row["max_drawdown_%"], 1, sign=False), WHITE),
+            (str(row["trades"]), WHITE),
+        ]
+        for (_, x, align), (text, color) in zip(columns, cells):
+            fig.text(x, y, text, ha=align, va="center", color=color,
+                     fontsize=font_size, fontfamily=_body_font())
+
+    fig.text(0.04, 0.04, f"Koszty: {costs}.", ha="left", va="center",
+             color=GRAY, fontsize=14, fontfamily=_body_font())
+
+    _save(fig, path)
+
+
+# ============================================================
+# POMOCNICZE
+# ============================================================
+
+def _figure():
+    fig, ax = plt.subplots(figsize=SIZE, dpi=DPI, facecolor=BLACK)
+    ax.set_facecolor(BLACK)
+    return fig, ax
+
+
+def _header(fig, title, subtitle):
+    fig.text(0.04, 0.92, title.upper(), ha="left", va="center",
+             color=WHITE, fontsize=48, fontfamily=_heading_font(),
+             fontweight=_heading_weight())
+    fig.text(0.04, 0.855, subtitle, ha="left", va="center",
+             color=GRAY, fontsize=22, fontfamily=_body_font())
+
+
+def _save(fig, path):
+    fig.savefig(path, dpi=DPI, facecolor=BLACK)
+    plt.close(fig)
+
+
+def _installed(family: str) -> bool:
+    return any(f.name == family for f in font_manager.fontManager.ttflist)
+
+
+def _heading_font() -> str:
+    if _installed("Anton"):
+        return "Anton"
+    return _body_font()
+
+
+def _heading_weight() -> str:
+    # Anton ma jedną grubość; zastępczy font pogrubiamy.
+    return "normal" if _installed("Anton") else "bold"
+
+
+def _body_font() -> str:
+    return "Inter" if _installed("Inter") else "DejaVu Sans"
+
+
+def _label(row) -> str:
+    return f"{row['asset']} {_timeframe(row['timeframe'])}"
+
+
+def _timeframe(value: str) -> str:
+    return value.replace("min", "m")
+
+
+def _num(value, decimals: int) -> str:
+    if value is None or pd.isna(value):
+        return "–"
+    if value == float("inf"):
+        return "∞"
+    # Polski zapis: przecinek dziesiętny.
+    return f"{value:.{decimals}f}".replace(".", ",")
+
+
+def _pct(value, decimals: int = 1, sign: bool = True) -> str:
+    if value is None or pd.isna(value):
+        return "–"
+    text = f"{value:+.{decimals}f}" if sign else f"{value:.{decimals}f}"
+    return text.replace(".", ",").replace("-", "−") + "%"
+
+
+def _sign_color(value) -> str:
+    if value == 0:
+        return WHITE
+    return GREEN if value > 0 else RED

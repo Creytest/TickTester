@@ -304,13 +304,14 @@ def main(
     # ========================================================
 
     def backtest_tick_source():
-        mask = (
-            (all_ticks["timestamp"] >= warmup_start)
-            & (all_ticks["timestamp"] < end_time)
-        )
+        # Ticki są posortowane, więc wycinamy zakres po pozycjach
+        # zamiast maską — bez kopii całej tabeli w pamięci.
+        times = all_ticks["timestamp"]
+        first = times.searchsorted(warmup_start, side="left")
+        last = times.searchsorted(end_time, side="left")
 
         # Silnik oczekuje iteratora DataFrame'ów.
-        yield all_ticks.loc[mask].reset_index(drop=True)
+        yield all_ticks.iloc[first:last].reset_index(drop=True)
 
     result = run_backtest(
         tick_source=backtest_tick_source,

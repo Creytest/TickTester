@@ -10,6 +10,7 @@ import pandas as pd
 from tick_config import ASSETS, COMMISSION
 import plot_tick_backtest_xauusd as single
 from summary_chart import save_summary_chart
+from plansze import save_plansze
 
 
 # ============================================================
@@ -37,6 +38,13 @@ ASSETS_TO_TEST = ["XAUUSD", "Bitcoin", "EURUSD", "Brent"]
 SAVE_HTML = True
 SAVE_PNG = False
 
+# Plansze PNG do filmu (1 wykres kapitału, 2 mediany, 3 tabela).
+SAVE_PLANSZE = True
+
+# Win Rate obiecany przez autora w procentach, np. 90.
+# None: na planszy 2 zamiast Win Rate jest Profit Factor.
+CLAIM_WIN_RATE = None
+
 # Folder na wykresy, transakcje i tabelę wyników.
 OUTPUT_DIR = Path(__file__).resolve().parent / "wyniki"
 
@@ -45,6 +53,7 @@ def main():
     OUTPUT_DIR.mkdir(exist_ok=True)
 
     rows = []
+    equities = {}
 
     strategy_name = single.load_strategy(STRATEGY).NAME
     print(f"Strategia: {strategy_name}")
@@ -101,6 +110,8 @@ def main():
                 rows.append(_skipped(asset, timeframe, error))
                 continue
 
+            equities[(asset, timeframe)] = stats.pop("equity")
+
             rows.append(
                 {
                     "asset": asset,
@@ -147,6 +158,17 @@ def main():
             ok,
             title=f"{strategy_name} | {START_DATE} – {END_DATE}",
             costs=costs,
+        )
+
+    if SAVE_PLANSZE and not ok.empty:
+        save_plansze(
+            OUTPUT_DIR / f"plansze_{STRATEGY}_{START_DATE}_{END_DATE}",
+            ok,
+            equities,
+            title=strategy_name,
+            period=f"{START_DATE[:4]}–{END_DATE[:4]}",
+            costs=costs,
+            claim_win_rate=CLAIM_WIN_RATE,
         )
 
     print("\n" + "=" * 60)

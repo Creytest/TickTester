@@ -773,6 +773,10 @@ def main(
     else:
         plt.close(fig)
 
+    # Krzywa kapitału okresu dla plansz w run_all_assets.py.
+    if not equity.empty:
+        equity = equity[["timestamp", "equity"]]
+    stats["equity"] = equity
     return stats
 
 

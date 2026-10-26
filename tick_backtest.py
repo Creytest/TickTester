@@ -70,6 +70,55 @@ def _find_exit(
     return -1, None
 
 
+def _find_trailing_exit(
+    side: str,
+    levels: np.ndarray,
+    bar_starts: np.ndarray,
+    timestamps: np.ndarray,
+    bid: np.ndarray,
+    ask: np.ndarray,
+    start: int,
+) -> tuple[int, str | None, float | None]:
+    """
+    Wyjście na stopie przesuwanym co świecę (trailing stop).
+
+    levels[j] to poziom stopu ustawiony na zamknięciu świecy j,
+    więc w świecy b obowiązuje levels[b - 1] — jak strategy.exit
+    wywoływane w Pine Script na każdej świecy. NaN: brak stopu.
+
+    Zwraca indeks ticku, powód zamknięcia i poziom stopu, który
+    zadziałał, albo (-1, None, None).
+    """
+    n = len(bid)
+    pos = start
+    window = 4096
+
+    while pos < n:
+        stop = min(n, pos + window)
+
+        # Numer świecy dla każdego ticku liczymy tylko w oknie,
+        # aby nie trzymać w pamięci tablicy dla wszystkich ticków.
+        bar = np.searchsorted(
+            bar_starts, timestamps[pos:stop], side="right"
+        ) - 1
+        stop_levels = levels[np.maximum(bar - 1, 0)]
+        stop_levels = np.where(bar >= 1, stop_levels, np.nan)
+
+        if side == "long":
+            hit = bid[pos:stop] <= stop_levels
+        else:
+            hit = ask[pos:stop] >= stop_levels
+
+        if hit.any():
+            k = int(hit.argmax())
+            return pos + k, "trailing_stop", float(stop_levels[k])
+
+        pos = stop
+        window *= 2
+
+    return -1, None, None
+
+
 def run_backtest(
     tick_source: Callable,
     strategy: Callable[[pd.DataFrame], pd.DataFrame],
@@ -90,8 +139,15 @@ def run_backtest(
     tick_source() musi zwracać nowy iterator ticków przy każdym
     wywołaniu.
 
-    Strategia otrzymuje świece Bid OHLC i zwraca kolumny:
-    buy, sell oraz opcjonalnie stop_loss i take_profit.
+    Strategia otrzymuje świece Bid OHLC z kolumną volume (liczba
+    ticków) i zwraca kolumny: buy, sell oraz opcjonalnie stop_loss
+    i take_profit.
+
+    Opcjonalne kolumny trail_long / trail_short włączają stop
+    przesuwany co świecę: poziom z zamknięcia świecy obowiązuje
+    od następnej świecy dla otwartej pozycji long / short.
+    stop_loss przy sygnale służy wtedy do wielkości pozycji
+    i powinien być równy poziomowi trailing stopu tej świecy.
 
     Sygnał jest wykonywany na pierwszym dostępnym ticku
     po zamknięciu świecy sygnałowej.
@@ -203,6 +259,18 @@ def run_backtest(
 
     signal_events.sort(key=lambda event: event["time"])
 
+    trail_levels = {
+        side: (
+            signals[column].to_numpy(dtype=float)
+            if column in signals.columns
+            else None
+        )
+        for side, column in (
+            ("long", "trail_long"),
+            ("short", "trail_short"),
+        )
+    }
+
     # ========================================================
     # 3. Egzekucja na tickach
     # ========================================================
@@ -220,6 +288,7 @@ def run_backtest(
             .to_datetime64()
             .astype(timestamps.dtype)
         )
+    bar_starts = bars.index.to_numpy().astype(timestamps.dtype)
     bids = ticks["bid"].to_numpy(dtype=float)
     asks = ticks["ask"].to_numpy(dtype=float)
     n_ticks = len(ticks)
@@ -235,12 +304,26 @@ def run_backtest(
     # przez SL/TP (-1: do końca danych).
     exit_index = -1
     exit_reason = None
+    exit_stop = None
+
+    def find_exit(side, sl, tp, start):
+        """SL/TP stałe albo trailing stop, jeśli strategia go podaje."""
+        if trail_levels[side] is not None:
+            return _find_trailing_exit(
+                side, trail_levels[side], bar_starts,
+                timestamps, bids, asks, start,
+            )
+        index, reason = _find_exit(side, sl, tp, bids, asks, start)
+        return index, reason, None
 
     # Dla krzywej kapitału: (indeks wejścia, indeks wyjścia).
     # Wyjście na końcu danych zapisujemy jako n_ticks.
     trade_spans = []
 
     def close_at_exit():
+        # Przy trailing stopie zapisujemy poziom, który zadziałał.
+        if exit_stop is not None:
+            engine.position.stop_loss = exit_stop
         engine.close_position(*tick_at(exit_index), exit_reason)
         trade_spans[-1][1] = exit_index
 
@@ -295,8 +378,8 @@ def run_backtest(
                     # już przekroczone, pozycja zamyka się od razu.
                     engine.position.stop_loss = sl
                     engine.position.take_profit = tp
-                    exit_index, exit_reason = _find_exit(
-                        desired_side, sl, tp, bids, asks, i
+                    exit_index, exit_reason, exit_stop = find_exit(
+                        desired_side, sl, tp, i
                     )
                 continue
             elif opposite_signal == "reverse":
@@ -366,8 +449,8 @@ def run_backtest(
         trade_spans.append([i, n_ticks])
 
         # SL/TP sprawdzamy od następnego ticku po wejściu.
-        exit_index, exit_reason = _find_exit(
-            desired_side, sl, tp, bids, asks, i + 1
+        exit_index, exit_reason, exit_stop = find_exit(
+            desired_side, sl, tp, i + 1
         )
 
     # ========================================================

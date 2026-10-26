@@ -22,7 +22,8 @@ from plansze import save_plansze
 #   "tick_BigBeluga_Stoch_80percent" — BigBeluga Two-Pole + Stochastic 7,3,3
 #   "tick_RSI6_80_20"                — RSI 6 (80/20) RR 2:1
 #   "tick_LuxAlgo_SR_Breaks_MSTS"    — LuxAlgo S/R Breaks + Market Structure Trailing Stop
-STRATEGY = "tick_LuxAlgo_SR_Breaks_MSTS"
+#   "tick_CloudMA_EMA30_74"          — Cloud MA EMA 30/74 + SL na swingu
+STRATEGY = "tick_CloudMA_EMA30_74"
 
 # Każde aktywo jest testowane na każdym z tych interwałów.
 TIMEFRAMES_TO_TEST = ["15min", "1h", "4h"]

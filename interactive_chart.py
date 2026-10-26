@@ -32,6 +32,7 @@ def save_interactive_chart(
     stats: dict,
     initial_capital: float,
     labels: list | None = None,
+    overlays: list | None = None,
 ) -> None:
     # Import tutaj, aby brak plotly nie blokował reszty programu.
     import plotly.graph_objects as go
@@ -184,6 +185,21 @@ def save_interactive_chart(
         row=1,
         col=1,
     )
+
+    # Dodatkowe linie na cenie, np. średnie kroczące.
+    for name, series, color in overlays or []:
+        fig.add_trace(
+            go.Scattergl(
+                x=x,
+                y=series.reindex(bars.index).to_numpy(dtype=float),
+                mode="lines",
+                line=dict(color=color, width=1.5),
+                name=name,
+                hoverinfo="skip",
+            ),
+            row=1,
+            col=1,
+        )
 
     # Etykiety wskaźnika jak w TradingView, np. „B” LuxAlgo.
     # Rysowane jako SVG — WebGL nie obsługuje tekstu na znacznikach.
@@ -384,7 +400,10 @@ def save_interactive_chart(
     fig.update_yaxes(showgrid=True, gridcolor="#eee", fixedrange=True)
     fig.update_yaxes(title_text="Cena Bid", row=1, col=1)
     fig.update_yaxes(
-        title_text=panel["title"], range=[0, 100], row=2, col=1
+        title_text=panel["title"],
+        range=list(panel.get("range", (0, 100))),
+        row=2,
+        col=1,
     )
     fig.update_yaxes(title_text="Kapitał ($)", row=3, col=1)
 

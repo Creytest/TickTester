@@ -431,6 +431,13 @@ def main(
     # "above"/"below"), np. zielone i czerwone „B” LuxAlgo.
     bar_labels = indicators.get("labels") or []
 
+    # Opcjonalne dodatkowe linie na cenie: (nazwa, seria, kolor),
+    # np. dwie średnie kroczące.
+    overlays = [
+        (name, series.reindex(bars.index), color)
+        for name, series, color in indicators.get("overlays") or []
+    ]
+
     panel = dict(indicators["panel"])
     panel["lines"] = [
         (name, series.reindex(bars.index), color)
@@ -479,6 +486,11 @@ def main(
         ),
     ]
 
+    for _, series, color in overlays:
+        addplots.append(
+            mpf.make_addplot(series, color=color, width=1.5)
+        )
+
     for number, (_, series, color) in enumerate(panel["lines"]):
         addplots.append(
             mpf.make_addplot(
@@ -486,9 +498,17 @@ def main(
                 panel=1,
                 color=color,
                 ylabel=panel["title"] if number == 0 else "",
-                ylim=(0, 100),
+                ylim=panel.get("range", (0, 100)),
             )
         )
+
+    # mplfinance nie rysuje pustej serii punktów (np. strategia
+    # bez ani jednego sygnału short w danym okresie) — pomijamy ją.
+    addplots = [
+        plot
+        for plot in addplots
+        if plot["type"] != "scatter" or pd.Series(plot["data"]).notna().any()
+    ]
 
     fig, axes = mpf.plot(
         bars,
@@ -754,6 +774,7 @@ def main(
                 stats=stats,
                 initial_capital=INITIAL_CAPITAL,
                 labels=bar_labels,
+                overlays=overlays,
             )
         except ImportError:
             print(

@@ -260,7 +260,11 @@ def generate_signals(bars: pd.DataFrame) -> pd.DataFrame:
 
 
 def indicators(bars: pd.DataFrame) -> dict:
-    """Linie do wykresów: trailing stop na cenie, oscylator wolumenu."""
+    """
+    Linie do wykresów: trailing stop na cenie, oscylator wolumenu
+    i wszystkie etykiety B jak w TradingView (również te, przy
+    których linia trailing stopu była po złej stronie ceny).
+    """
     breaks = support_resistance_breaks(bars)
 
     return {
@@ -270,4 +274,8 @@ def indicators(bars: pd.DataFrame) -> dict:
             "lines": [("Volume osc", breaks["volume_osc"], "#7E57C2")],
             "levels": (20,),
         },
+        "labels": [
+            ("B long", breaks["bull_break"], "B", "#089981", "below"),
+            ("B short", breaks["bear_break"], "B", "#F23645", "above"),
+        ],
     }

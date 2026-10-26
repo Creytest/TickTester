@@ -427,6 +427,10 @@ def main(
         # Nie zmienia obliczeń filtra ani sygnałów.
         trend.iloc[:min(300, len(trend))] = np.nan
 
+    # Opcjonalne etykiety: (nazwa, maska świec, tekst, kolor,
+    # "above"/"below"), np. zielone i czerwone „B” LuxAlgo.
+    bar_labels = indicators.get("labels") or []
+
     panel = dict(indicators["panel"])
     panel["lines"] = [
         (name, series.reindex(bars.index), color)
@@ -555,6 +559,27 @@ def main(
         )
 
         price_ax.add_collection(line)
+
+    # Etykiety wskaźnika jak w TradingView.
+    for _, mask, text, color, location in bar_labels:
+        mask = mask.reindex(bars.index).fillna(False).to_numpy(dtype=bool)
+        above = location == "above"
+
+        for i in np.flatnonzero(mask):
+            price_ax.text(
+                i,
+                bars["high"].iloc[i] * 1.0015
+                if above
+                else bars["low"].iloc[i] * 0.9985,
+                text,
+                color="white",
+                fontsize=7,
+                fontweight="bold",
+                ha="center",
+                va="bottom" if above else "top",
+                bbox=dict(boxstyle="square,pad=0.2", fc=color, ec="none"),
+                zorder=6,
+            )
 
     # ========================================================
     # 9. POZIOMY SL I TP
@@ -728,6 +753,7 @@ def main(
                 equity=equity,
                 stats=stats,
                 initial_capital=INITIAL_CAPITAL,
+                labels=bar_labels,
             )
         except ImportError:
             print(

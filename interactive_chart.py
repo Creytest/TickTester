@@ -31,6 +31,7 @@ def save_interactive_chart(
     equity: pd.DataFrame,
     stats: dict,
     initial_capital: float,
+    labels: list | None = None,
 ) -> None:
     # Import tutaj, aby brak plotly nie blokował reszty programu.
     import plotly.graph_objects as go
@@ -38,6 +39,7 @@ def save_interactive_chart(
 
     n = len(bars)
     x = np.arange(n, dtype=float)
+    bar_labels = labels
     labels = bars.index.strftime("%Y-%m-%d %H:%M")
 
     def bar_position(times) -> np.ndarray:
@@ -182,6 +184,30 @@ def save_interactive_chart(
         row=1,
         col=1,
     )
+
+    # Etykiety wskaźnika jak w TradingView, np. „B” LuxAlgo.
+    # Rysowane jako SVG — WebGL nie obsługuje tekstu na znacznikach.
+    for name, mask, text, color, location in bar_labels or []:
+        mask = mask.reindex(bars.index).fillna(False).to_numpy(dtype=bool)
+        above = location == "above"
+        fig.add_trace(
+            go.Scatter(
+                x=x[mask],
+                y=h[mask] * 1.0015 if above else lo[mask] * 0.9985,
+                mode="markers+text",
+                marker=dict(
+                    symbol="square", size=15, color=color,
+                    line=dict(width=0),
+                ),
+                text=[text] * int(mask.sum()),
+                textposition="middle center",
+                textfont=dict(color="white", size=10),
+                name=name,
+                hoverinfo="skip",
+            ),
+            row=1,
+            col=1,
+        )
 
     if not trades.empty:
         entry_x = bar_position(trades["entry_time"])

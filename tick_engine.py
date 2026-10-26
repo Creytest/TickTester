@@ -11,7 +11,9 @@ from typing import Literal
 
 def build_bars(tick_chunks, timeframe: str) -> pd.DataFrame:
     """
-    Generuje świece OHLC na podstawie cen Bid.
+    Generuje świece OHLC na podstawie cen Bid oraz kolumnę volume:
+    liczbę ticków w świecy (wolumen tickowy, jak w TradingView
+    dla rynków bez wolumenu giełdowego).
 
     tick_chunks: iterator DataFrame z kolumnami timestamp, bid, ask.
     timeframe: np. '1min', '5min', '15min', '30min', '1h'.
@@ -40,7 +42,7 @@ def build_bars(tick_chunks, timeframe: str) -> pd.DataFrame:
             index=pd.DatetimeIndex(chunk["timestamp"]),
             name="bid",
         ).rename_axis("timestamp")
-        grouped = chunk.resample(timeframe).ohlc().dropna()
+        grouped = _ohlc_volume(chunk, timeframe)
 
         if grouped.empty:
             pending = chunk.reset_index()
@@ -54,21 +56,28 @@ def build_bars(tick_chunks, timeframe: str) -> pd.DataFrame:
             completed.append(finished_bars)
 
     if pending is not None and not pending.empty:
-        final = (
-            pending.set_index("timestamp")["bid"]
-            .resample(timeframe)
-            .ohlc()
-            .dropna()
+        final = _ohlc_volume(
+            pending.set_index("timestamp")["bid"], timeframe
         )
         if not final.empty:
             completed.append(final)
 
     if not completed:
-        return pd.DataFrame(columns=["open", "high", "low", "close"])
+        return pd.DataFrame(
+            columns=["open", "high", "low", "close", "volume"]
+        )
 
     result = pd.concat(completed)
     result = result[~result.index.duplicated(keep="last")]
     return result.sort_index()
+
+
+def _ohlc_volume(bid: pd.Series, timeframe: str) -> pd.DataFrame:
+    """Świece OHLC z cen Bid i liczba ticków; bez pustych świec."""
+    resampled = bid.resample(timeframe)
+    bars = resampled.ohlc()
+    bars["volume"] = resampled.count().astype(float)
+    return bars.dropna()
 
 
 # ============================================================

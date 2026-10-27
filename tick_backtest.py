@@ -168,6 +168,10 @@ def run_backtest(
         strategy.exit z tym samym id),
     "ignore" — sygnał jest pomijany.
 
+    Opcjonalne kolumny exit_long / exit_short (odpowiednik
+    strategy.close): zamykają otwartą pozycję long / short na
+    pierwszym ticku po zamknięciu świecy, bez otwierania nowej.
+
     Zamiast przechodzić w Pythonie przez każdy tick, silnik
     wyszukuje na tablicach numpy tylko ticki, na których coś
     się dzieje: wejście po sygnale oraz pierwsze trafienie SL/TP.
@@ -240,14 +244,27 @@ def run_backtest(
         else None
     )
 
+    exit_long = (
+        signals["exit_long"].astype(bool).to_numpy()
+        if "exit_long" in signals.columns
+        else np.zeros(len(bars), dtype=bool)
+    )
+    exit_short = (
+        signals["exit_short"].astype(bool).to_numpy()
+        if "exit_short" in signals.columns
+        else np.zeros(len(bars), dtype=bool)
+    )
+
     signal_events = []
 
-    for i in np.flatnonzero(buy | sell):
+    for i in np.flatnonzero(buy | sell | exit_long | exit_short):
         signal_events.append(
             {
                 "time": close_times[i],
                 "buy": bool(buy[i]),
                 "sell": bool(sell[i]),
+                "exit_long": bool(exit_long[i]),
+                "exit_short": bool(exit_short[i]),
                 "stop_loss": (
                     stop_losses[i]
                     if stop_losses is not None
@@ -332,9 +349,6 @@ def run_backtest(
         trade_spans[-1][1] = exit_index
 
     for event in signal_events:
-        if not (event["buy"] or event["sell"]):
-            continue
-
         # Pomijamy niejednoznaczny sygnał.
         if event["buy"] and event["sell"]:
             continue
@@ -353,6 +367,21 @@ def run_backtest(
 
         # W okresie rozgrzewki nie otwieramy pozycji.
         if trade_start is not None and timestamps[i] < trade_start:
+            continue
+
+        # Sygnał wyjścia zamyka pozycję, jeśli nie zamknął jej
+        # wcześniej SL / TP.
+        if (
+            engine.position is not None
+            and event["exit_" + engine.position.side]
+        ):
+            if exit_index != -1 and exit_index <= i:
+                close_at_exit()
+            else:
+                engine.close_position(*tick_at(i), "exit_signal")
+                trade_spans[-1][1] = i
+
+        if not (event["buy"] or event["sell"]):
             continue
 
         desired_side = "long" if event["buy"] else "short"

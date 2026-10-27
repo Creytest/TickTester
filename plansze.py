@@ -10,7 +10,9 @@ Plansze wyników do filmu (PNG 1920×1080, kolory kanału).
 3_tabela.png — pełna tabela wyników do pobrania z opisu.
 
 Fonty: Anton (nagłówki, liczby) i Inter (reszta). Jeśli nie są
-zainstalowane w systemie, używany jest font zastępczy.
+zainstalowane w systemie, używany jest font zastępczy. Tytuł
+i duże liczby same zmniejszają się, gdy nie mieszczą się
+w szerokości planszy.
 """
 
 from pathlib import Path
@@ -64,9 +66,13 @@ def save_plansze(
         folder / "3_tabela.png",
     ]
 
-    _equity_chart(paths[0], data, equities, title, subtitle)
-    _medians(paths[1], data, title, subtitle, claim_win_rate)
-    _table(paths[2], data, title, subtitle, costs)
+    # mplfinance (wykresy pojedynczych testów) zmienia globalne
+    # ustawienia Matplotlib, np. włącza pionową siatkę. Plansze
+    # rysujemy więc na ustawieniach domyślnych.
+    with plt.style.context("default"):
+        _equity_chart(paths[0], data, equities, title, subtitle)
+        _medians(paths[1], data, title, subtitle, claim_win_rate)
+        _table(paths[2], data, title, subtitle, costs)
 
     return paths
 
@@ -106,7 +112,6 @@ def _equity_chart(path, data, equities, title, subtitle):
                     alpha=0.22, linewidth=1.6)
 
         color = _sign_color(median.iloc[-1])
-        ax.plot(median.index, median, color=color, linewidth=5)
 
         ax.axhline(0, color=GRAY, linewidth=1.2, linestyle="--")
 
@@ -116,18 +121,25 @@ def _equity_chart(path, data, equities, title, subtitle):
         last = frame.iloc[-1]
         gap = (frame.max().max() - frame.min().min()) * 0.06
         labels = [
-            (median.iloc[-1], f"mediana {_pct(median.iloc[-1])}", color, 26),
+            (median.iloc[-1], f"mediana {_pct(median.iloc[-1])}", color,
+             26, "bold"),
         ]
         for y, name in ((last.max(), last.idxmax()), (last.min(), last.idxmin())):
             if all(abs(y - other) > gap for other, *_ in labels):
-                labels.append((y, f"{name} {_pct(y)}", GRAY, 18))
+                labels.append((y, f"{name} {_pct(y)}", _sign_color(y),
+                               22, "normal"))
+                # Podpisana krzywa jaśniejsza, żeby było widać,
+                # do której linii odnosi się podpis.
+                ax.plot(frame.index, frame[name], color=WHITE,
+                        alpha=0.55, linewidth=2)
 
-        for y, text, text_color, size in labels:
+        ax.plot(median.index, median, color=color, linewidth=5)
+
+        for y, text, text_color, size, weight in labels:
             ax.annotate(
                 text, (end, y), xytext=(14, 0), textcoords="offset points",
                 va="center", color=text_color, fontsize=size,
-                fontfamily=_body_font(),
-                fontweight="bold" if text_color != GRAY else "normal",
+                fontfamily=_body_font(), fontweight=weight,
                 annotation_clip=False,
             )
 
@@ -188,14 +200,24 @@ def _medians(path, data, title, subtitle, claim_win_rate):
     fig = plt.figure(figsize=SIZE, dpi=DPI, facecolor=BLACK)
     _header(fig, title, subtitle)
 
+    # Blok liczb i podpisów wyśrodkowany w pionie pod nagłówkiem.
     width = 1 / len(items)
+    values = []
     for i, (value, label, color) in enumerate(items):
         x = width * (i + 0.5)
-        fig.text(x, 0.52, value, ha="center", va="center", color=color,
-                 fontsize=120, fontfamily=_heading_font(),
-                 fontweight=_heading_weight())
-        fig.text(x, 0.32, label, ha="center", va="center", color=WHITE,
-                 fontsize=30, fontfamily=_body_font(), linespacing=1.3)
+        # Liczba stoi na stałej linii nad podpisem — przy
+        # zmniejszonej czcionce odstęp między nimi się nie zmienia.
+        values.append(fig.text(
+            x, 0.45, value, ha="center", va="baseline", color=color,
+            fontsize=150, fontfamily=_heading_font(),
+            fontweight=_heading_weight(),
+        ))
+        fig.text(x, 0.38, label, ha="center", va="top", color=WHITE,
+                 fontsize=32, fontfamily=_body_font(), linespacing=1.3)
+
+    # Wszystkie liczby tej samej wielkości, każda z odstępem od
+    # sąsiednich (najwyżej 80% szerokości swojej kolumny).
+    _fit_width(fig, values, width * 0.8, min_size=60)
 
     _save(fig, path)
 
@@ -266,11 +288,30 @@ def _figure():
 
 
 def _header(fig, title, subtitle):
-    fig.text(0.04, 0.92, title.upper(), ha="left", va="center",
-             color=WHITE, fontsize=48, fontfamily=_heading_font(),
-             fontweight=_heading_weight())
+    heading = fig.text(0.04, 0.92, title.upper(), ha="left", va="center",
+                       color=WHITE, fontsize=48, fontfamily=_heading_font(),
+                       fontweight=_heading_weight())
+    # Długi tytuł zmniejszamy, aby zmieścił się do prawego marginesu.
+    _fit_width(fig, [heading], 0.92, min_size=26)
     fig.text(0.04, 0.855, subtitle, ha="left", va="center",
              color=GRAY, fontsize=22, fontfamily=_body_font())
+
+
+def _fit_width(fig, texts, max_width, min_size):
+    """
+    Zmniejsza czcionkę tekstów (wspólną dla wszystkich), aż każdy
+    zmieści się w max_width (ułamek szerokości planszy).
+    """
+    renderer = fig.canvas.get_renderer()
+    limit = max_width * fig.bbox.width
+    size = texts[0].get_fontsize()
+
+    while size > min_size and any(
+        text.get_window_extent(renderer).width > limit for text in texts
+    ):
+        size -= 2
+        for text in texts:
+            text.set_fontsize(size)
 
 
 def _save(fig, path):

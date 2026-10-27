@@ -176,10 +176,15 @@ def save_interactive_chart(
     buy = signals["buy"].fillna(False).astype(bool).to_numpy()
     sell = signals["sell"].fillna(False).astype(bool).to_numpy()
 
+    # Odstęp znaczników od świecy: ułamek typowej wysokości świecy,
+    # a nie procent ceny — inaczej na EURUSD 30 min znaczniki
+    # wiszą kilka świec nad wykresem.
+    gap = _marker_gap(h, lo)
+
     fig.add_trace(
         go.Scattergl(
             x=x[buy],
-            y=lo[buy] * 0.999,
+            y=lo[buy] - 0.7 * gap,
             mode="markers",
             marker=dict(symbol="triangle-up", size=7, color="deepskyblue"),
             name="Sygnał long",
@@ -191,7 +196,7 @@ def save_interactive_chart(
     fig.add_trace(
         go.Scattergl(
             x=x[sell],
-            y=h[sell] * 1.001,
+            y=h[sell] + 0.7 * gap,
             mode="markers",
             marker=dict(symbol="triangle-down", size=7, color="orange"),
             name="Sygnał short",
@@ -224,7 +229,7 @@ def save_interactive_chart(
         fig.add_trace(
             go.Scatter(
                 x=x[mask],
-                y=h[mask] * 1.0015 if above else lo[mask] * 0.9985,
+                y=h[mask] + 1.5 * gap if above else lo[mask] - 1.5 * gap,
                 mode="markers+text",
                 marker=dict(
                     symbol="square", size=22, color=color,
@@ -582,3 +587,11 @@ def _price(value) -> str:
     value = float(value)
     decimals = 2 if abs(value) >= 1000 else 3 if abs(value) >= 10 else 5
     return f"{value:.{decimals}f}"
+
+
+def _marker_gap(high: np.ndarray, low: np.ndarray) -> float:
+    """Mediana wysokości świecy (zapas: 0,1% ceny przy zerowej)."""
+    gap = float(np.nanmedian(high - low)) if len(high) else 0.0
+    if not np.isfinite(gap) or gap <= 0:
+        gap = float(np.nanmedian(high)) * 0.001 if len(high) else 0.0
+    return gap

@@ -184,15 +184,31 @@ def indicators(bars: pd.DataFrame) -> dict:
     delta = volume_delta(bars)
     norm = 100 * delta / bars["volume"].astype(float)
 
-    # Kolor świecy wg delty, jak wypełnienie w Volume Delta Candles:
-    # zielona przy delcie dodatniej, czerwona przy ujemnej.
-    colors = pd.Series(np.nan, index=bars.index, dtype=object)
-    colors[delta > 0] = "#089981"
-    colors[delta < 0] = "#F23645"
+    # Wypełnienie korpusu jak Volume Delta Candles (full bar):
+    # pasek o wysokości |delta| / wolumen korpusu, zielony przy
+    # delcie dodatniej (od dołu korpusu), czerwony przy ujemnej
+    # (od góry). Ramka i knot zostają w kolorze ceny.
+    open_ = bars["open"].astype(float)
+    close = bars["close"].astype(float)
+    body = (open_ - close).abs()
+    low_body = np.minimum(open_, close)
+    high_body = np.maximum(open_, close)
+    share = (delta / bars["volume"].astype(float)).abs()
+    positive = delta > 0
+
+    fill = {
+        "base": low_body.where(positive, high_body),
+        "value": (low_body + share * body).where(
+            positive, high_body - share * body
+        ),
+        "color": pd.Series(
+            np.where(positive, "#089981", "#F23645"), index=bars.index
+        ),
+    }
 
     return {
         "trend": None,
-        "candle_colors": colors,
+        "candle_fill": fill,
         "overlays": [
             ("Potwierdzenie short", sfp["oppos_bear"], "#F23645"),
             ("Potwierdzenie long", sfp["oppos_bull"], "#089981"),

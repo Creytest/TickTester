@@ -33,7 +33,7 @@ def save_interactive_chart(
     initial_capital: float,
     labels: list | None = None,
     overlays: list | None = None,
-    candle_colors: pd.Series | None = None,
+    candle_fill: dict | None = None,
 ) -> None:
     # Import tutaj, aby brak plotly nie blokował reszty programu.
     import plotly.graph_objects as go
@@ -68,48 +68,46 @@ def save_interactive_chart(
     c = bars["close"].to_numpy(dtype=float)
     rising = c >= o
 
-    # Domyślne kolory świec; strategia może je nadpisać własnymi
-    # (np. kolor delty wolumenu zamiast wzrostu / spadku ceny).
-    groups = [(rising, "#26a69a"), (~rising, "#ef5350")]
-
-    if candle_colors is not None:
-        colors = candle_colors.reindex(bars.index).to_numpy(dtype=object)
-        custom = np.array([color is not None and color == color
-                           for color in colors])
-        groups = [(mask & ~custom, color) for mask, color in groups]
-
-        for color in pd.unique(colors[custom]):
-            groups.append((custom & (colors == color), color))
-
-    for mask, color in groups:
+    def add_segments(mask, y0, y1, color, width):
+        # Odcinki rozdzielone przerwami (NaN) — jeden ślad na kolor.
         if not mask.any():
-            continue
+            return
+        fig.add_trace(
+            go.Scattergl(
+                x=_segments(x[mask], x[mask]),
+                y=_segments(y0[mask], y1[mask]),
+                mode="lines",
+                line=dict(color=color, width=width),
+                hoverinfo="skip",
+                showlegend=False,
+            ),
+            row=1,
+            col=1,
+        )
 
-        # Knoty i korpusy jako odcinki rozdzielone przerwami (NaN).
-        fig.add_trace(
-            go.Scattergl(
-                x=_segments(x[mask], x[mask]),
-                y=_segments(lo[mask], h[mask]),
-                mode="lines",
-                line=dict(color=color, width=1),
-                hoverinfo="skip",
-                showlegend=False,
-            ),
-            row=1,
-            col=1,
-        )
-        fig.add_trace(
-            go.Scattergl(
-                x=_segments(x[mask], x[mask]),
-                y=_segments(o[mask], c[mask]),
-                mode="lines",
-                line=dict(color=color, width=4),
-                hoverinfo="skip",
-                showlegend=False,
-            ),
-            row=1,
-            col=1,
-        )
+    price_colors = ((rising, "#26a69a"), (~rising, "#ef5350"))
+
+    for mask, color in price_colors:
+        add_segments(mask, lo, h, color, 1)
+
+    if candle_fill is None:
+        for mask, color in price_colors:
+            add_segments(mask, o, c, color, 4)
+    else:
+        # Jak Volume Delta Candles [LuxAlgo]: pusty korpus z ramką
+        # w kolorze ceny, w środku wypełnienie wskaźnika od base
+        # do value w jego własnym kolorze.
+        for mask, color in price_colors:
+            add_segments(mask, o, c, color, 7)
+        add_segments(np.ones(n, dtype=bool), o, c, "white", 4)
+
+        base = candle_fill["base"].reindex(bars.index).to_numpy(dtype=float)
+        value = candle_fill["value"].reindex(bars.index).to_numpy(dtype=float)
+        colors = candle_fill["color"].reindex(bars.index).to_numpy(dtype=object)
+        has_fill = np.isfinite(base) & np.isfinite(value)
+
+        for color in pd.unique(colors[has_fill]):
+            add_segments(has_fill & (colors == color), base, value, color, 4)
 
     # Niewidoczne punkty na zamknięciu — tylko do podpowiedzi.
     fig.add_trace(

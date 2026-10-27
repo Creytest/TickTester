@@ -440,12 +440,17 @@ def main(
         for name, series, color in indicators.get("overlays") or []
     ]
 
-    # Opcjonalny kolor świecy ze wskaźnika (seria kolorów albo None
-    # tam, gdzie zostaje zwykły kolor wzrostu / spadku).
-    candle_colors = indicators.get("candle_colors")
+    # Opcjonalne wypełnienie korpusów świec przez wskaźnik:
+    # {"base", "value", "color"} — serie na każdą świecę. Korpus jest
+    # wtedy pusty z ramką w kolorze ceny, a w środku pasek od base
+    # do value (jak Volume Delta Candles LuxAlgo).
+    candle_fill = indicators.get("candle_fill")
 
-    if candle_colors is not None:
-        candle_colors = candle_colors.reindex(bars.index)
+    if candle_fill is not None:
+        candle_fill = {
+            key: series.reindex(bars.index)
+            for key, series in candle_fill.items()
+        }
 
     panel = dict(indicators["panel"])
     panel["lines"] = [
@@ -522,11 +527,21 @@ def main(
     fig, axes = mpf.plot(
         bars,
         type="candle",
-        style="yahoo",
-        marketcolor_overrides=(
-            None
-            if candle_colors is None
-            else candle_colors.where(candle_colors.notna(), None).tolist()
+        style=(
+            "yahoo"
+            if candle_fill is None
+            # Puste korpusy z ramką w kolorze ceny — w środku
+            # wypełnienie wskaźnika rysowane niżej.
+            else mpf.make_mpf_style(
+                base_mpf_style="yahoo",
+                marketcolors=mpf.make_marketcolors(
+                    up="white",
+                    down="white",
+                    edge={"up": "#26a69a", "down": "#ef5350"},
+                    wick={"up": "#26a69a", "down": "#ef5350"},
+                    ohlc={"up": "#26a69a", "down": "#ef5350"},
+                ),
+            )
         ),
         volume=False,
         addplot=addplots,
@@ -544,6 +559,19 @@ def main(
     )
 
     price_ax = axes[0]
+
+    if candle_fill is not None:
+        base = candle_fill["base"].to_numpy(dtype=float)
+        value = candle_fill["value"].to_numpy(dtype=float)
+        has_fill = np.isfinite(base) & np.isfinite(value)
+        price_ax.bar(
+            np.arange(len(bars))[has_fill],
+            (value - base)[has_fill],
+            bottom=base[has_fill],
+            width=0.5,
+            color=candle_fill["color"].to_numpy(dtype=object)[has_fill],
+            linewidth=0,
+        )
 
     # ========================================================
     # 8. TWO-POLE FILTER W KOLORACH
@@ -789,7 +817,7 @@ def main(
                 initial_capital=INITIAL_CAPITAL,
                 labels=bar_labels,
                 overlays=overlays,
-                candle_colors=candle_colors,
+                candle_fill=candle_fill,
             )
         except ImportError:
             print(

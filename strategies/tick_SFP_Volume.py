@@ -184,8 +184,15 @@ def indicators(bars: pd.DataFrame) -> dict:
     delta = volume_delta(bars)
     norm = 100 * delta / bars["volume"].astype(float)
 
+    # Kolor świecy wg delty, jak wypełnienie w Volume Delta Candles:
+    # zielona przy delcie dodatniej, czerwona przy ujemnej.
+    colors = pd.Series(np.nan, index=bars.index, dtype=object)
+    colors[delta > 0] = "#089981"
+    colors[delta < 0] = "#F23645"
+
     return {
         "trend": None,
+        "candle_colors": colors,
         "overlays": [
             ("Potwierdzenie short", sfp["oppos_bear"], "#F23645"),
             ("Potwierdzenie long", sfp["oppos_bull"], "#089981"),

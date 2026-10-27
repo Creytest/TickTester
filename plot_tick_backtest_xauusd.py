@@ -440,6 +440,13 @@ def main(
         for name, series, color in indicators.get("overlays") or []
     ]
 
+    # Opcjonalny kolor świecy ze wskaźnika (seria kolorów albo None
+    # tam, gdzie zostaje zwykły kolor wzrostu / spadku).
+    candle_colors = indicators.get("candle_colors")
+
+    if candle_colors is not None:
+        candle_colors = candle_colors.reindex(bars.index)
+
     panel = dict(indicators["panel"])
     panel["lines"] = [
         (name, series.reindex(bars.index), color)
@@ -516,6 +523,11 @@ def main(
         bars,
         type="candle",
         style="yahoo",
+        marketcolor_overrides=(
+            None
+            if candle_colors is None
+            else candle_colors.where(candle_colors.notna(), None).tolist()
+        ),
         volume=False,
         addplot=addplots,
         panel_ratios=(5, 2),
@@ -777,6 +789,7 @@ def main(
                 initial_capital=INITIAL_CAPITAL,
                 labels=bar_labels,
                 overlays=overlays,
+                candle_colors=candle_colors,
             )
         except ImportError:
             print(

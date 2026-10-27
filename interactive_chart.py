@@ -33,6 +33,7 @@ def save_interactive_chart(
     initial_capital: float,
     labels: list | None = None,
     overlays: list | None = None,
+    candle_colors: pd.Series | None = None,
 ) -> None:
     # Import tutaj, aby brak plotly nie blokował reszty programu.
     import plotly.graph_objects as go
@@ -67,7 +68,23 @@ def save_interactive_chart(
     c = bars["close"].to_numpy(dtype=float)
     rising = c >= o
 
-    for mask, color in ((rising, "#26a69a"), (~rising, "#ef5350")):
+    # Domyślne kolory świec; strategia może je nadpisać własnymi
+    # (np. kolor delty wolumenu zamiast wzrostu / spadku ceny).
+    groups = [(rising, "#26a69a"), (~rising, "#ef5350")]
+
+    if candle_colors is not None:
+        colors = candle_colors.reindex(bars.index).to_numpy(dtype=object)
+        custom = np.array([color is not None and color == color
+                           for color in colors])
+        groups = [(mask & ~custom, color) for mask, color in groups]
+
+        for color in pd.unique(colors[custom]):
+            groups.append((custom & (colors == color), color))
+
+    for mask, color in groups:
+        if not mask.any():
+            continue
+
         # Knoty i korpusy jako odcinki rozdzielone przerwami (NaN).
         fig.add_trace(
             go.Scattergl(

@@ -17,7 +17,7 @@ from tick_config import (
 )
 from tick_data import load_ticks_cached
 from tick_backtest import run_backtest
-from interactive_chart import save_interactive_chart
+from interactive_chart import _marker_gap, save_interactive_chart
 import importlib
 
 
@@ -390,8 +390,13 @@ def main(
     buy_mask = signals["buy"].fillna(False).astype(bool)
     sell_mask = signals["sell"].fillna(False).astype(bool)
 
-    raw_buy.loc[buy_mask] = bars.loc[buy_mask, "low"] * 0.999
-    raw_sell.loc[sell_mask] = bars.loc[sell_mask, "high"] * 1.001
+    # Odstęp znaczników: ułamek typowej wysokości świecy, a nie
+    # procent ceny (na EURUSD 0,1% to kilka świec).
+    gap = _marker_gap(
+        bars["high"].to_numpy(dtype=float), bars["low"].to_numpy(dtype=float)
+    )
+    raw_buy.loc[buy_mask] = bars.loc[buy_mask, "low"] - 0.7 * gap
+    raw_sell.loc[sell_mask] = bars.loc[sell_mask, "high"] + 0.7 * gap
 
     if not trades.empty:
         for _, trade in trades.iterrows():
@@ -630,9 +635,9 @@ def main(
         for i in np.flatnonzero(mask):
             price_ax.text(
                 i,
-                bars["high"].iloc[i] * 1.0015
+                bars["high"].iloc[i] + 1.5 * gap
                 if above
-                else bars["low"].iloc[i] * 0.9985,
+                else bars["low"].iloc[i] - 1.5 * gap,
                 text,
                 color="white",
                 fontsize=10,

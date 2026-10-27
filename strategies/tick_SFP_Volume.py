@@ -9,14 +9,10 @@ NAME = "SFP+Volume"
 # Autor testuje tylko na 30 minutach.
 TIMEFRAMES = ["30min"]
 
-# Brak SL i TP: przeciwny sygnał zamyka pozycję i otwiera
-# odwrotną. Sygnał w tę samą stronę jest pomijany.
-OPPOSITE_SIGNAL = "reverse"
+# Pozycja kończy się na SL albo TP. Sygnały przy otwartej
+# pozycji (w obie strony) są pomijane.
+OPPOSITE_SIGNAL = "ignore"
 SAME_SIGNAL = "ignore"
-
-# Bez SL nie ma 1% ryzyka — pozycja to 100% kapitału
-# z kapitalizacją.
-EQUITY_FRACTION = 1.0
 
 
 # ============================================================
@@ -149,16 +145,17 @@ def volume_delta(bars: pd.DataFrame) -> pd.Series:
 # STRATEGIA
 # ============================================================
 
-def generate_signals(bars: pd.DataFrame) -> pd.DataFrame:
+def generate_signals(bars: pd.DataFrame, rr_ratio: float = 2.0) -> pd.DataFrame:
     """
     Short: ▼ (potwierdzony bearish SFP) na świecy z czerwoną
     deltą (delta < 0). Long: ▲ na świecy z zieloną deltą.
 
-    Brak SL i TP — wyjście na przeciwnym sygnale, który od razu
-    otwiera pozycję odwrotną.
+    SL na high świecy sygnałowej (dla longa low), TP = 2 × ryzyko,
+    liczone od ceny zamknięcia świecy sygnałowej — jak na filmie
+    autora. Wielkość pozycji: 1% kapitału ryzykowany przy SL.
 
     Wyjście:
-        buy, sell.
+        buy, sell, stop_loss, take_profit.
     """
     required = {"open", "high", "low", "close", "delta"}
     missing = required - set(bars.columns)
@@ -169,9 +166,24 @@ def generate_signals(bars: pd.DataFrame) -> pd.DataFrame:
     sfp = swing_failure_pattern(bars)
     delta = volume_delta(bars)
 
+    high = bars["high"].astype(float)
+    low = bars["low"].astype(float)
+    close = bars["close"].astype(float)
+
+    # Zamknięcie na samym high / low daje ryzyko 0 — nie da się
+    # policzyć wielkości pozycji przy 1% ryzyka, więc pomijamy.
+    buy = sfp["confirm_bull"] & (delta > 0) & (close > low)
+    sell = sfp["confirm_bear"] & (delta < 0) & (close < high)
+
     result = pd.DataFrame(index=bars.index)
-    result["buy"] = sfp["confirm_bull"] & (delta > 0)
-    result["sell"] = sfp["confirm_bear"] & (delta < 0)
+    result["buy"] = buy
+    result["sell"] = sell
+    result["stop_loss"] = np.where(buy, low, np.where(sell, high, np.nan))
+    result["take_profit"] = np.where(
+        buy,
+        close + (close - low) * rr_ratio,
+        np.where(sell, close - (high - close) * rr_ratio, np.nan),
+    )
     return result
 
 

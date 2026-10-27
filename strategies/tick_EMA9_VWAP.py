@@ -9,9 +9,9 @@ NAME = "EMA 9 × VWAP"
 # Autor pokazuje strategię na 30 minutach (day trading).
 TIMEFRAMES = ["30min"]
 
-# Brak SL i TP: przeciwne przecięcie zamyka pozycję i otwiera
-# odwrotną. Ten sam kierunek nie wystąpi dwa razy z rzędu.
-OPPOSITE_SIGNAL = "reverse"
+# Tylko shorty. Brak SL i TP: przecięcie w górę zamyka shorta
+# (exit_short), bez otwierania longa.
+OPPOSITE_SIGNAL = "ignore"
 SAME_SIGNAL = "ignore"
 
 # Bez SL nie ma 1% ryzyka — pozycja to 100% kapitału
@@ -40,13 +40,10 @@ def session_vwap(bars: pd.DataFrame) -> pd.Series:
 def generate_signals(bars: pd.DataFrame, length: int = 9) -> pd.DataFrame:
     """
     Short: EMA 9 przecina VWAP od góry.
-    Long: EMA 9 przecina VWAP od dołu.
-
-    Brak SL i TP — przeciwne przecięcie zamyka pozycję i od razu
-    otwiera odwrotną.
+    Wyjście: EMA 9 przecina VWAP od dołu. Brak SL i TP, brak longów.
 
     Wyjście:
-        buy, sell.
+        buy (zawsze False), sell, exit_short.
     """
     required = {"high", "low", "close", "volume"}
     missing = required - set(bars.columns)
@@ -58,12 +55,13 @@ def generate_signals(bars: pd.DataFrame, length: int = 9) -> pd.DataFrame:
     vwap = session_vwap(bars)
 
     # Odpowiedniki ta.crossover() i ta.crossunder().
-    buy = (fast > vwap) & (fast.shift(1) <= vwap.shift(1))
+    cross_up = (fast > vwap) & (fast.shift(1) <= vwap.shift(1))
     sell = (fast < vwap) & (fast.shift(1) >= vwap.shift(1))
 
     result = pd.DataFrame(index=bars.index)
-    result["buy"] = buy.fillna(False).astype(bool)
+    result["buy"] = False
     result["sell"] = sell.fillna(False).astype(bool)
+    result["exit_short"] = cross_up.fillna(False).astype(bool)
     return result
 
 

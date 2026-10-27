@@ -24,7 +24,7 @@ from plansze import save_plansze
 #   "tick_LuxAlgo_SR_Breaks_MSTS"    — LuxAlgo S/R Breaks + Market Structure Trailing Stop
 #   "tick_CloudMA_EMA30_74"          — Cloud MA EMA 30/74 + SL na swingu
 #   "tick_SFP_Volume"                — SFP+Volume (LuxAlgo SFP + Volume Delta), tylko 30min
-#   "tick_EMA9_VWAP"                 — EMA 9 × VWAP (sesyjny), bez SL/TP, tylko 30min
+#   "tick_EMA9_VWAP"                 — EMA 9 × VWAP (sesyjny), tylko short, wyjście na przecięciu w górę, 30min
 STRATEGY = "tick_EMA9_VWAP"
 
 # Każde aktywo jest testowane na każdym z tych interwałów.

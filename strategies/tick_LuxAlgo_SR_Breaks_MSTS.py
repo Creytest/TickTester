@@ -264,11 +264,22 @@ def indicators(bars: pd.DataFrame) -> dict:
     Linie do wykresów: trailing stop na cenie, oscylator wolumenu
     i wszystkie etykiety B jak w TradingView (również te, przy
     których linia trailing stopu była po złej stronie ceny).
+
+    Opór i wsparcie: poziom obowiązujący na danej świecy, czyli
+    ten, który zamknięcie musi przebić, żeby powstało B. Przy
+    zmianie poziomu linia jest przerwana, jak w LuxAlgo.
     """
     breaks = support_resistance_breaks(bars)
 
+    def segments(level: pd.Series) -> pd.Series:
+        return level.where(level == level.shift(1))
+
     return {
         "trend": market_structure_trailing_stop(bars),
+        "overlays": [
+            ("Opór", segments(breaks["resistance"]), "#FF0000"),
+            ("Wsparcie", segments(breaks["support"]), "#233DEE"),
+        ],
         "panel": {
             "title": "Volume osc %",
             "lines": [("Volume osc", breaks["volume_osc"], "#7E57C2")],

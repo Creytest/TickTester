@@ -1,4 +1,5 @@
 
+import numpy as np
 import pandas as pd
 
 from dataclasses import dataclass
@@ -14,6 +15,10 @@ def build_bars(tick_chunks, timeframe: str) -> pd.DataFrame:
     Generuje świece OHLC na podstawie cen Bid oraz kolumnę volume:
     liczbę ticków w świecy (wolumen tickowy, jak w TradingView
     dla rynków bez wolumenu giełdowego).
+
+    Kolumna delta: wolumen świec 1-minutowych wzrostowych minus
+    spadkowych w obrębie świecy, jak request.security_lower_tf
+    w Volume Delta Candles [LuxAlgo].
 
     tick_chunks: iterator DataFrame z kolumnami timestamp, bid, ask.
     timeframe: np. '1min', '5min', '15min', '30min', '1h'.
@@ -64,7 +69,7 @@ def build_bars(tick_chunks, timeframe: str) -> pd.DataFrame:
 
     if not completed:
         return pd.DataFrame(
-            columns=["open", "high", "low", "close", "volume"]
+            columns=["open", "high", "low", "close", "volume", "delta"]
         )
 
     result = pd.concat(completed)
@@ -77,6 +82,15 @@ def _ohlc_volume(bid: pd.Series, timeframe: str) -> pd.DataFrame:
     resampled = bid.resample(timeframe)
     bars = resampled.ohlc()
     bars["volume"] = resampled.count().astype(float)
+
+    # Delta z niższego interwału: 1 minuta (albo sam interwał,
+    # jeśli jest krótszy), świeca wzrostowa +wolumen, spadkowa −.
+    ltf = min(pd.Timedelta(timeframe), pd.Timedelta("1min"))
+    minutes = bid.resample(ltf).agg(["first", "last", "count"])
+    direction = np.sign(minutes["last"] - minutes["first"]).fillna(0)
+    signed = (direction * minutes["count"]).resample(timeframe).sum()
+    bars["delta"] = signed.reindex(bars.index).fillna(0.0)
+
     return bars.dropna()
 
 

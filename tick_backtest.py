@@ -129,6 +129,7 @@ def run_backtest(
     tick_size: float = 0.01,
     risk_per_trade: float = 0.01,
     fixed_quantity: float = 1.0,
+    equity_fraction: float | None = None,
     trade_start=None,
     opposite_signal: str = "ignore",
     same_signal: str = "ignore",
@@ -151,6 +152,9 @@ def run_backtest(
 
     Sygnał jest wykonywany na pierwszym dostępnym ticku
     po zamknięciu świecy sygnałowej.
+
+    equity_fraction: wielkość pozycji bez SL jako część kapitału,
+    np. 1.0 = 100% kapitału z kapitalizacją. None: fixed_quantity.
 
     trade_start: opcjonalny początek handlu, np. START_DATE.
     Ticki i świece wcześniejsze służą tylko do rozgrzania
@@ -431,6 +435,13 @@ def run_backtest(
                 ask=ask,
                 stop_loss=sl,
             )
+        elif equity_fraction is not None:
+            entry_price = (
+                ask + slippage_ticks * tick_size
+                if desired_side == "long"
+                else bid - slippage_ticks * tick_size
+            )
+            quantity = engine.capital * equity_fraction / entry_price
         else:
             quantity = fixed_quantity
 

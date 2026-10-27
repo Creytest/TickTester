@@ -23,9 +23,11 @@ from plansze import save_plansze
 #   "tick_RSI6_80_20"                — RSI 6 (80/20) RR 2:1
 #   "tick_LuxAlgo_SR_Breaks_MSTS"    — LuxAlgo S/R Breaks + Market Structure Trailing Stop
 #   "tick_CloudMA_EMA30_74"          — Cloud MA EMA 30/74 + SL na swingu
-STRATEGY = "tick_CloudMA_EMA30_74"
+#   "tick_SFP_Volume"                — SFP+Volume (LuxAlgo SFP + Volume Delta), tylko 30min
+STRATEGY = "tick_SFP_Volume"
 
 # Każde aktywo jest testowane na każdym z tych interwałów.
+# Strategia może je nadpisać własną listą TIMEFRAMES.
 TIMEFRAMES_TO_TEST = ["15min", "1h", "4h"]
 
 START_DATE = "2021-01-01"
@@ -57,11 +59,14 @@ def main():
     rows = []
     equities = {}
 
-    strategy_name = single.load_strategy(STRATEGY).NAME
+    strategy_module = single.load_strategy(STRATEGY)
+    strategy_name = strategy_module.NAME
+    timeframes = getattr(strategy_module, "TIMEFRAMES", TIMEFRAMES_TO_TEST)
     print(f"Strategia: {strategy_name}")
+    print(f"Interwały: {', '.join(timeframes)}")
 
     # Najdłuższy interwał wyznacza zapas ticków na rozgrzewkę.
-    longest = max(TIMEFRAMES_TO_TEST, key=pd.Timedelta)
+    longest = max(timeframes, key=pd.Timedelta)
 
     for asset in ASSETS_TO_TEST:
         print("\n" + "=" * 60)
@@ -77,11 +82,11 @@ def main():
             ticks = ticks.sort_values("timestamp").reset_index(drop=True)
         except FileNotFoundError as error:
             print(f"POMINIĘTO {asset}: {error}")
-            for timeframe in TIMEFRAMES_TO_TEST:
+            for timeframe in timeframes:
                 rows.append(_skipped(asset, timeframe, error))
             continue
 
-        for timeframe in TIMEFRAMES_TO_TEST:
+        for timeframe in timeframes:
             print(f"\n--- {asset} | {timeframe} ---")
 
             name = (

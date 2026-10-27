@@ -326,6 +326,8 @@ def main(
         trade_start=start_time,
         opposite_signal=strategy_module.OPPOSITE_SIGNAL,
         same_signal=strategy_module.SAME_SIGNAL,
+        # Strategie bez SL: część kapitału na pozycję (np. 100%).
+        equity_fraction=getattr(strategy_module, "EQUITY_FRACTION", None),
     )
 
     bars_all = result["bars"].copy()

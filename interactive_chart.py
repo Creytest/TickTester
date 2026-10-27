@@ -212,12 +212,12 @@ def save_interactive_chart(
                 y=h[mask] * 1.0015 if above else lo[mask] * 0.9985,
                 mode="markers+text",
                 marker=dict(
-                    symbol="square", size=15, color=color,
+                    symbol="square", size=22, color=color,
                     line=dict(width=0),
                 ),
                 text=[text] * int(mask.sum()),
                 textposition="middle center",
-                textfont=dict(color="white", size=10),
+                textfont=dict(color="white", size=14),
                 name=name,
                 hoverinfo="skip",
             ),
@@ -232,9 +232,9 @@ def save_interactive_chart(
         hover = [
             (
                 f"{t.side} | {t.reason}<br>"
-                f"wejście {t.entry_time:%Y-%m-%d %H:%M:%S} @ {t.entry_price}<br>"
-                f"wyjście {t.exit_time:%Y-%m-%d %H:%M:%S} @ {t.exit_price}<br>"
-                f"SL {t.stop_loss} | TP {t.take_profit}<br>"
+                f"wejście {t.entry_time:%Y-%m-%d %H:%M:%S} @ {_price(t.entry_price)}<br>"
+                f"wyjście {t.exit_time:%Y-%m-%d %H:%M:%S} @ {_price(t.exit_price)}<br>"
+                f"SL {_price(t.stop_loss)} | TP {_price(t.take_profit)}<br>"
                 f"wynik netto: {t.net_pnl:.2f} $"
             )
             for t in trades.itertuples()
@@ -252,9 +252,9 @@ def save_interactive_chart(
                     mode="markers",
                     marker=dict(
                         symbol=symbol,
-                        size=13,
+                        size=20,
                         color=color,
-                        line=dict(color="black", width=1),
+                        line=dict(color="black", width=1.5),
                     ),
                     name=name,
                     text=[text for text, m in zip(hover, mask) if m],
@@ -269,7 +269,10 @@ def save_interactive_chart(
                 x=exit_x,
                 y=trades["exit_price"],
                 mode="markers",
-                marker=dict(symbol="x", size=10, color="black"),
+                marker=dict(
+                    symbol="x", size=16, color="black",
+                    line=dict(color="white", width=1),
+                ),
                 name="Wyjście",
                 text=hover,
                 hovertemplate="%{text}<extra></extra>",
@@ -555,3 +558,12 @@ gd.on('plotly_relayout', function (ev) {
 
 update();
 """
+
+
+def _price(value) -> str:
+    """Cena w podpowiedzi bez szumu typu 29159.890000000003."""
+    if value is None or pd.isna(value):
+        return "–"
+    value = float(value)
+    decimals = 2 if abs(value) >= 1000 else 3 if abs(value) >= 10 else 5
+    return f"{value:.{decimals}f}"

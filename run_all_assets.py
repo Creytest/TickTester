@@ -28,6 +28,7 @@ from plansze import save_plansze
 #   "tick_EMA9"                      — EMA9 (zamknięcie nad/pod EMA 9, reverse), 30min
 #   "tick_SR_Retest"                 — SR Retest (opór/wsparcie z pivotów, wybicie + retest, SL/TP 2:1), 5min
 #   "tick_SSL_IFVG"                  — SSL + IFVG (ICT: sweep płynności + odwrócony FVG, SL za luką, TP 2:1), 1min
+#   "tick_IBS_MeanReversion"         — IBS Mean Reversion (Reddit: zamknięcie pod progiem + IBS < 0,3, wyjście nad wczorajszym high), 1D
 STRATEGY = "tick_EMA9"
 
 # Każde aktywo jest testowane na każdym z tych interwałów.

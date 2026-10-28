@@ -375,26 +375,52 @@ def save_interactive_chart(
         line=dict(color="gray", width=1, dash="dash"),
     )
 
-    # Najdłuższa seria strat — czerwone tło na cenie i kapitale,
-    # żeby od razu było widać, gdzie przewinąć wykres.
+    # Najdłuższa seria strat — czerwone tło i pionowe linie na cenie
+    # i kapitale, czerwony odcinek krzywej kapitału. Na kilku latach
+    # danych tło ma ułamek piksela, więc linie mają stałą grubość,
+    # a kliknięcie napisu przybliża wykres do serii.
+    streak = None
     if stats.get("loss_streak") and stats.get("loss_streak_start") is not None:
         x0, x1 = bar_position(
             [stats["loss_streak_start"], stats["loss_streak_end"]]
         )
+        streak = [float(x0), float(x1)]
         for row in (1, 3):
             fig.add_vrect(
                 x0=x0 - 0.5, x1=x1 + 0.5, row=row, col=1,
-                fillcolor="#FF3B30", opacity=0.08, line_width=0,
+                fillcolor="#FF3B30", opacity=0.15, line_width=0,
                 layer="below",
             )
+            for x in (x0 - 0.5, x1 + 0.5):
+                fig.add_vline(
+                    x=x, row=row, col=1,
+                    line=dict(color="#FF3B30", width=1.5, dash="dot"),
+                )
+        inside = (equity_x >= x0 - 1) & (equity_x <= x1)
+        if inside.any():
+            fig.add_trace(
+                go.Scattergl(
+                    x=equity_x[inside],
+                    y=equity_y[inside],
+                    mode="lines",
+                    line=dict(color="#FF3B30", width=3),
+                    name="Seria strat",
+                    hovertemplate="%{y:,.2f} $<extra></extra>",
+                ),
+                row=3,
+                col=1,
+            )
         fig.add_annotation(
-            x=(x0 + x1) / 2, y=1, xref="x", yref="y domain",
-            yanchor="bottom", showarrow=False,
+            x=0, y=1, xref="paper", yref="y domain",
+            xanchor="left", yanchor="bottom", showarrow=False,
             text=(
-                f"Najdłuższa seria strat: {stats['loss_streak']} z rzędu "
-                f"({stats['loss_streak_return'] * 100:+.1f}%)"
+                f"<b>Najdłuższa seria strat: {stats['loss_streak']} z rzędu "
+                f"({stats['loss_streak_return'] * 100:+.1f}%)</b>"
+                " — kliknij, żeby przybliżyć"
             ),
-            font=dict(size=12, color="#FF3B30"),
+            font=dict(size=13, color="#FF3B30"),
+            bgcolor="rgba(255,59,48,0.08)", bordercolor="#FF3B30",
+            borderpad=3, captureevents=True, name="loss_streak",
         )
 
     # ========================================================
@@ -459,6 +485,7 @@ def save_interactive_chart(
         "equityX": _json_floats(equity_x),
         "equityY": _json_floats(equity_y),
         "initialCapital": float(initial_capital),
+        "streak": streak,
     }
 
     fig.write_html(
@@ -587,6 +614,16 @@ function update() {
         'xaxis3.ticktext': text
     });
 }
+
+// Kliknięcie napisu o serii strat: przybliż do niej z marginesem.
+gd.on('plotly_clickannotation', function (ev) {
+    if (!D.streak || ev.annotation.name !== 'loss_streak') return;
+    var span = D.streak[1] - D.streak[0];
+    var pad = Math.max(span * 0.5, 20);
+    Plotly.relayout(gd, {
+        'xaxis.range': [D.streak[0] - pad, D.streak[1] + pad]
+    });
+});
 
 gd.on('plotly_relayout', function (ev) {
     for (var key in ev) {

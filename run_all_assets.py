@@ -17,8 +17,10 @@ from plansze import save_plansze
 # KONFIGURACJA
 # ============================================================
 
-# Plik strategii z folderu strategies (bez .py).
-# Dostępne strategie:
+# Plik strategii (bez .py) — wystarczy sama nazwa, folder
+# (strategies/tiktok albo strategies/reddit) znajdzie się sam.
+#
+# ---------------- Strategie z TikToka (strategies/tiktok) ----------------
 #   "tick_BigBeluga_Stoch_80percent" — BigBeluga Two-Pole + Stochastic 7,3,3
 #   "tick_RSI6_80_20"                — RSI 6 (80/20) RR 2:1
 #   "tick_LuxAlgo_SR_Breaks_MSTS"    — LuxAlgo S/R Breaks + Market Structure Trailing Stop
@@ -28,7 +30,9 @@ from plansze import save_plansze
 #   "tick_EMA9"                      — EMA9 (zamknięcie nad/pod EMA 9, reverse), 30min
 #   "tick_SR_Retest"                 — SR Retest (opór/wsparcie z pivotów, wybicie + retest, SL/TP 2:1), 5min
 #   "tick_SSL_IFVG"                  — SSL + IFVG (ICT: sweep płynności + odwrócony FVG, SL za luką, TP 2:1), 1min
-#   "tick_IBS_MeanReversion"         — IBS Mean Reversion (Reddit: zamknięcie pod progiem + IBS < 0,3, wyjście nad wczorajszym high), 1D
+#
+# ---------------- Strategie z Reddita (strategies/reddit) ----------------
+#   "tick_IBS_MeanReversion"         — IBS Mean Reversion (zamknięcie pod progiem + IBS < 0,3, wyjście nad wczorajszym high), 1D
 STRATEGY = "tick_EMA9"
 
 # Każde aktywo jest testowane na każdym z tych interwałów.

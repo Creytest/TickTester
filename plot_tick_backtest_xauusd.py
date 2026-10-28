@@ -252,8 +252,21 @@ def draw_stats(fig, stats: dict, left: float, right: float) -> None:
     )
 
 
+# Podfoldery strategii według źródła.
+STRATEGY_SOURCES = ("tiktok", "reddit")
+
+
 def load_strategy(name: str):
-    """Moduł strategii z folderu strategies, np. "tick_RSI6_80_20"."""
+    """
+    Moduł strategii po samej nazwie pliku, np. "tick_RSI6_80_20".
+    Szuka w strategies/tiktok, strategies/reddit, potem w strategies.
+    """
+    folder = Path(__file__).resolve().parent / "strategies"
+
+    for source in STRATEGY_SOURCES:
+        if (folder / source / f"{name}.py").exists():
+            return importlib.import_module(f"strategies.{source}.{name}")
+
     return importlib.import_module(f"strategies.{name}")
 
 

@@ -20,6 +20,12 @@ import numpy as np
 import pandas as pd
 
 
+# Najwięcej świec w jednym pliku HTML. 5 lat na 30 min to ok. 62 tys.
+# świec i działa; 1 min to ok. 1,8 mln i przeglądarka pokazuje
+# białą stronę.
+HTML_MAX_BARS = 100_000
+
+
 def save_interactive_chart(
     path,
     title: str,
@@ -35,10 +41,50 @@ def save_interactive_chart(
     overlays: list | None = None,
     candle_fill: dict | None = None,
     markers: list | None = None,
+    max_bars: int | None = HTML_MAX_BARS,
 ) -> None:
     # Import tutaj, aby brak plotly nie blokował reszty programu.
     import plotly.graph_objects as go
     from plotly.subplots import make_subplots
+
+    # Za dużo świec (np. 1 min × 5 lat) daje plik, którego przeglądarka
+    # nie otworzy — wtedy HTML pokazuje tylko fragment wokół
+    # najdłuższej serii strat. Statystyki zostają z całego okresu.
+    if max_bars and len(bars) > max_bars:
+        i0 = len(bars) - max_bars
+
+        if stats.get("loss_streak_start") is not None:
+            s0, s1 = bars.index.searchsorted(
+                [stats["loss_streak_start"], stats["loss_streak_end"]]
+            )
+            i0 = (s0 + s1) // 2 - max_bars // 2
+
+        i0 = int(min(max(i0, 0), len(bars) - max_bars))
+        i1 = i0 + max_bars
+        t0 = bars.index[i0]
+        t1 = bars.index[i1] if i1 < len(bars) else pd.Timestamp.max
+
+        bars = bars.iloc[i0:i1]
+        signals = signals.reindex(bars.index)
+        trend = trend.reindex(bars.index) if trend is not None else None
+        panel = dict(panel)
+        panel["lines"] = [
+            (name, series.reindex(bars.index), color)
+            for name, series, color in panel["lines"]
+        ]
+
+        if not trades.empty:
+            trades = trades[
+                (pd.to_datetime(trades["entry_time"]) < t1)
+                & (pd.to_datetime(trades["exit_time"]) >= t0)
+            ]
+        if not equity.empty:
+            stamps = pd.to_datetime(equity["timestamp"])
+            equity = equity[(stamps >= t0) & (stamps < t1)]
+
+        title += (
+            f" | fragment {bars.index[0]:%Y-%m-%d} – {bars.index[-1]:%Y-%m-%d}"
+        )
 
     n = len(bars)
     x = np.arange(n, dtype=float)

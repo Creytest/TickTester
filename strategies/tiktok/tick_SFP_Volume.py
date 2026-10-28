@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from strategies.tick_LuxAlgo_SR_Breaks_MSTS import pivot_high, pivot_low
+from strategies.tiktok.tick_LuxAlgo_SR_Breaks_MSTS import pivot_high, pivot_low
 
 
 NAME = "SFP+Volume"

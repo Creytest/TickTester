@@ -34,6 +34,7 @@ def save_interactive_chart(
     labels: list | None = None,
     overlays: list | None = None,
     candle_fill: dict | None = None,
+    markers: list | None = None,
 ) -> None:
     # Import tutaj, aby brak plotly nie blokował reszty programu.
     import plotly.graph_objects as go
@@ -214,6 +215,23 @@ def save_interactive_chart(
                 y=series.reindex(bars.index).to_numpy(dtype=float),
                 mode="lines",
                 line=dict(color=color, width=1.5),
+                name=name,
+                hoverinfo="skip",
+            ),
+            row=1,
+            col=1,
+        )
+
+    # Kropki wskaźnika w podanej cenie, np. pivoty na knotach.
+    for name, series, color, _ in markers or []:
+        values = series.reindex(bars.index).to_numpy(dtype=float)
+        has_value = ~np.isnan(values)
+        fig.add_trace(
+            go.Scattergl(
+                x=x[has_value],
+                y=values[has_value],
+                mode="markers",
+                marker=dict(size=7, color=color, line=dict(width=0)),
                 name=name,
                 hoverinfo="skip",
             ),

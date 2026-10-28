@@ -375,6 +375,28 @@ def save_interactive_chart(
         line=dict(color="gray", width=1, dash="dash"),
     )
 
+    # Najdłuższa seria strat — czerwone tło na cenie i kapitale,
+    # żeby od razu było widać, gdzie przewinąć wykres.
+    if stats.get("loss_streak") and stats.get("loss_streak_start") is not None:
+        x0, x1 = bar_position(
+            [stats["loss_streak_start"], stats["loss_streak_end"]]
+        )
+        for row in (1, 3):
+            fig.add_vrect(
+                x0=x0 - 0.5, x1=x1 + 0.5, row=row, col=1,
+                fillcolor="#FF3B30", opacity=0.08, line_width=0,
+                layer="below",
+            )
+        fig.add_annotation(
+            x=(x0 + x1) / 2, y=1, xref="x", yref="y domain",
+            yanchor="bottom", showarrow=False,
+            text=(
+                f"Najdłuższa seria strat: {stats['loss_streak']} z rzędu "
+                f"({stats['loss_streak_return'] * 100:+.1f}%)"
+            ),
+            font=dict(size=12, color="#FF3B30"),
+        )
+
     # ========================================================
     # 6. UKŁAD I STATYSTYKI
     # ========================================================

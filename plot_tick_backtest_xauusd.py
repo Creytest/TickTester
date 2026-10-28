@@ -118,6 +118,10 @@ def period_stats(
         "profit_factor_gross": None,
         "avg_trade": None,
         "avg_trade_gross": None,
+        "loss_streak": 0,
+        "loss_streak_start": None,
+        "loss_streak_end": None,
+        "loss_streak_return": None,
     }
 
     if trades.empty:
@@ -141,8 +145,44 @@ def period_stats(
     stats["avg_trade_gross"] = float(
         (trades["gross_pnl"] / capital_before).mean()
     )
+    stats.update(loss_streak(trades))
 
     return stats
+
+
+def loss_streak(trades: pd.DataFrame) -> dict:
+    """
+    Najdłuższa seria stratnych transakcji z rzędu (po kosztach):
+    liczba, wejście pierwszej i wyjście ostatniej oraz zmiana
+    kapitału w tej serii — miejsce do pokazania na filmie.
+    """
+    trades = trades.sort_values("entry_time").reset_index(drop=True)
+    losing = trades["net_pnl"].lt(0).to_numpy()
+
+    best_len = best_end = run = 0
+    for i, lost in enumerate(losing):
+        run = run + 1 if lost else 0
+        if run > best_len:
+            best_len, best_end = run, i
+
+    if best_len == 0:
+        return {
+            "loss_streak": 0,
+            "loss_streak_start": None,
+            "loss_streak_end": None,
+            "loss_streak_return": None,
+        }
+
+    first = trades.iloc[best_end - best_len + 1]
+    last = trades.iloc[best_end]
+    before = float(first["capital"] - first["net_pnl"])
+
+    return {
+        "loss_streak": int(best_len),
+        "loss_streak_start": pd.Timestamp(first["entry_time"]),
+        "loss_streak_end": pd.Timestamp(last["exit_time"]),
+        "loss_streak_return": float(last["capital"]) / before - 1,
+    }
 
 
 def draw_stats(fig, stats: dict, left: float, right: float) -> None:

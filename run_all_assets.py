@@ -134,6 +134,11 @@ def main():
                     "max_drawdown_%": _pct(stats["max_drawdown"]),
                     "avg_trade_%": _pct(stats["avg_trade"]),
                     "final_capital": round(stats["final_capital"], 2),
+                    # Najdłuższa seria strat — gdzie przewinąć wykres.
+                    "seria_strat": stats["loss_streak"],
+                    "seria_strat_%": _pct(stats["loss_streak_return"]),
+                    "seria_od": _date(stats["loss_streak_start"]),
+                    "seria_do": _date(stats["loss_streak_end"]),
                     "uwagi": f"pliki: {name}.*",
                 }
             )
@@ -208,6 +213,10 @@ def _skipped(asset, timeframe, error) -> dict:
         "status": "pominięto",
         "uwagi": str(error),
     }
+
+
+def _date(value):
+    return None if value is None else value.strftime("%Y-%m-%d %H:%M")
 
 
 def _pct(value):

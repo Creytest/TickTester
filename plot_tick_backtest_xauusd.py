@@ -485,6 +485,13 @@ def main(
         for name, series, color in indicators.get("overlays") or []
     ]
 
+    # Opcjonalne kropki w podanej cenie: (nazwa, seria cen, kolor,
+    # "above"/"below"), np. pivoty na knotach.
+    markers = [
+        (name, series.reindex(bars.index), color, location)
+        for name, series, color, location in indicators.get("markers") or []
+    ]
+
     # Opcjonalne wypełnienie korpusów świec przez wskaźnik:
     # {"base", "value", "color"} — serie na każdą świecę. Korpus jest
     # wtedy pusty z ramką w kolorze ceny, a w środku pasek od base
@@ -549,6 +556,15 @@ def main(
         addplots.append(
             mpf.make_addplot(series, color=color, width=1.5)
         )
+
+    for _, series, color, _ in markers:
+        if series.notna().any():
+            addplots.append(
+                mpf.make_addplot(
+                    series, type="scatter", marker="o",
+                    markersize=25, color=color,
+                )
+            )
 
     for number, (_, series, color) in enumerate(panel["lines"]):
         addplots.append(
@@ -863,6 +879,7 @@ def main(
                 labels=bar_labels,
                 overlays=overlays,
                 candle_fill=candle_fill,
+                markers=markers,
             )
         except ImportError:
             print(

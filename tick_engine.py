@@ -2,7 +2,7 @@
 import numpy as np
 import pandas as pd
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Literal
 
 
@@ -99,6 +99,15 @@ def _ohlc_volume(bid: pd.Series, timeframe: str) -> pd.DataFrame:
 # ============================================================
 
 @dataclass
+class Leg:
+    """Jedno wejście w pozycję (przy dokładaniu jest ich kilka)."""
+    entry_time: pd.Timestamp
+    entry_price: float
+    quantity: float
+    entry_commission: float
+
+
+@dataclass
 class Position:
     side: Literal["long", "short"]
     quantity: float
@@ -107,6 +116,9 @@ class Position:
     entry_commission: float
     stop_loss: float | None = None
     take_profit: float | None = None
+    # Kolejne wejścia; quantity, entry_price (średnia ważona)
+    # i entry_commission to ich suma dla całej pozycji.
+    legs: list[Leg] = field(default_factory=list)
 
 
 # ============================================================
@@ -251,8 +263,61 @@ class TickExecutionEngine:
             entry_commission=entry_commission,
             stop_loss=stop_loss,
             take_profit=take_profit,
+            legs=[
+                Leg(
+                    entry_time=pd.Timestamp(timestamp),
+                    entry_price=float(entry_price),
+                    quantity=float(quantity),
+                    entry_commission=entry_commission,
+                )
+            ],
         )
         return self.position
+
+    def add_to_position(
+        self,
+        timestamp,
+        bid: float,
+        ask: float,
+        quantity: float,
+    ) -> Position:
+        """
+        Dokłada wejście do otwartej pozycji (pyramiding w Pine
+        Script). Każde wejście jest osobną transakcją na liście,
+        a wszystkie zamykają się razem — jak w TradingView.
+        """
+        pos = self.position
+        if pos is None:
+            raise RuntimeError("Brak otwartej pozycji.")
+        if bid <= 0 or ask < bid:
+            raise ValueError("Nieprawidłowe ceny Bid/Ask.")
+        if quantity <= 0:
+            raise ValueError("quantity musi być dodatnie.")
+
+        if pos.side == "long":
+            entry_price = ask + self.slippage
+        else:
+            entry_price = bid - self.slippage
+
+        entry_commission = self._commission(entry_price, quantity)
+        self.capital -= entry_commission
+
+        pos.legs.append(
+            Leg(
+                entry_time=pd.Timestamp(timestamp),
+                entry_price=float(entry_price),
+                quantity=float(quantity),
+                entry_commission=entry_commission,
+            )
+        )
+
+        total = pos.quantity + quantity
+        pos.entry_price = (
+            pos.entry_price * pos.quantity + entry_price * quantity
+        ) / total
+        pos.quantity = total
+        pos.entry_commission += entry_commission
+        return pos
 
 
     def close_position(
@@ -271,69 +336,76 @@ class TickExecutionEngine:
 
         if pos.side == "long":
             exit_price = bid - self.slippage
-            gross_pnl = (exit_price - pos.entry_price) * pos.quantity
         else:
             exit_price = ask + self.slippage
-            gross_pnl = (pos.entry_price - exit_price) * pos.quantity
 
-        exit_commission = self._commission(exit_price, pos.quantity)
-        net_pnl = gross_pnl - pos.entry_commission - exit_commission
-
-        self.capital += gross_pnl - exit_commission
-
-        # Szacowana strata, gdyby SL został wykonany na poziomie
-        # stop loss z uwzględnieniem skonfigurowanego poślizgu.
-        planned_loss_at_sl = None
-        stop_gap = 0.0
-
-        if pos.stop_loss is not None:
+        # Każde wejście (leg) to osobna transakcja z tym samym
+        # wyjściem. Bez dokładania jest jedno wejście.
+        for leg in pos.legs:
             if pos.side == "long":
-                planned_exit = pos.stop_loss - self.slippage
-                stop_gap = max(0.0, planned_exit - exit_price)
-                planned_gross_loss = (
-                    pos.entry_price - planned_exit
-                ) * pos.quantity
+                gross_pnl = (exit_price - leg.entry_price) * leg.quantity
             else:
-                planned_exit = pos.stop_loss + self.slippage
-                stop_gap = max(0.0, exit_price - planned_exit)
-                planned_gross_loss = (
-                    planned_exit - pos.entry_price
-                ) * pos.quantity
+                gross_pnl = (leg.entry_price - exit_price) * leg.quantity
 
-            planned_exit_commission = self._commission(
-                planned_exit, pos.quantity
-            )
+            exit_commission = self._commission(exit_price, leg.quantity)
+            net_pnl = gross_pnl - leg.entry_commission - exit_commission
 
-            planned_loss_at_sl = (
-                planned_gross_loss
-                + pos.entry_commission
-                + planned_exit_commission
-            )
+            self.capital += gross_pnl - exit_commission
 
-        trade = {
-            "side": pos.side,
-            "entry_time": pos.entry_time,
-            "exit_time": pd.Timestamp(timestamp),
-            "quantity": pos.quantity,
-            "entry_price": pos.entry_price,
-            "exit_price": float(exit_price),
-            "stop_loss": pos.stop_loss,
-            "take_profit": pos.take_profit,
-            "stop_gap": float(stop_gap),
-            "planned_loss_at_sl": (
-                float(planned_loss_at_sl)
-                if planned_loss_at_sl is not None
-                else None
-            ),
-            "gross_pnl": float(gross_pnl),
-            "entry_commission": float(pos.entry_commission),
-            "exit_commission": float(exit_commission),
-            "net_pnl": float(net_pnl),
-            "capital": float(self.capital),
-            "reason": reason,
-        }
+            # Szacowana strata, gdyby SL został wykonany na poziomie
+            # stop loss z uwzględnieniem skonfigurowanego poślizgu.
+            planned_loss_at_sl = None
+            stop_gap = 0.0
 
-        self.trades.append(trade)
+            if pos.stop_loss is not None:
+                if pos.side == "long":
+                    planned_exit = pos.stop_loss - self.slippage
+                    stop_gap = max(0.0, planned_exit - exit_price)
+                    planned_gross_loss = (
+                        leg.entry_price - planned_exit
+                    ) * leg.quantity
+                else:
+                    planned_exit = pos.stop_loss + self.slippage
+                    stop_gap = max(0.0, exit_price - planned_exit)
+                    planned_gross_loss = (
+                        planned_exit - leg.entry_price
+                    ) * leg.quantity
+
+                planned_exit_commission = self._commission(
+                    planned_exit, leg.quantity
+                )
+
+                planned_loss_at_sl = (
+                    planned_gross_loss
+                    + leg.entry_commission
+                    + planned_exit_commission
+                )
+
+            trade = {
+                "side": pos.side,
+                "entry_time": leg.entry_time,
+                "exit_time": pd.Timestamp(timestamp),
+                "quantity": leg.quantity,
+                "entry_price": leg.entry_price,
+                "exit_price": float(exit_price),
+                "stop_loss": pos.stop_loss,
+                "take_profit": pos.take_profit,
+                "stop_gap": float(stop_gap),
+                "planned_loss_at_sl": (
+                    float(planned_loss_at_sl)
+                    if planned_loss_at_sl is not None
+                    else None
+                ),
+                "gross_pnl": float(gross_pnl),
+                "entry_commission": float(leg.entry_commission),
+                "exit_commission": float(exit_commission),
+                "net_pnl": float(net_pnl),
+                "capital": float(self.capital),
+                "reason": reason,
+            }
+
+            self.trades.append(trade)
+
         self.position = None
         return trade
 

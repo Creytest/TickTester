@@ -383,6 +383,8 @@ def main(
         trade_start=start_time,
         opposite_signal=strategy_module.OPPOSITE_SIGNAL,
         same_signal=strategy_module.SAME_SIGNAL,
+        # Najwięcej wejść w jedną pozycję przy SAME_SIGNAL = "add".
+        max_entries=getattr(strategy_module, "PYRAMIDING", 1),
         # Strategie bez SL: część kapitału na pozycję (np. 100%).
         equity_fraction=getattr(strategy_module, "EQUITY_FRACTION", None),
     )

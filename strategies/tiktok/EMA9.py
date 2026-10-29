@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from strategies.tiktok.tick_CloudMA_EMA30_74 import ema
+from strategies.tiktok.CloudMA_EMA30_74 import ema
 
 
 NAME = "EMA9"

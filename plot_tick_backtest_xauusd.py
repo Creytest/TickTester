@@ -27,9 +27,9 @@ import importlib
 
 # Plik strategii z folderu strategies (bez .py).
 # Dostępne strategie:
-#   "tick_BigBeluga_Stoch_80percent" — BigBeluga Two-Pole + Stochastic 7,3,3
-#   "tick_RSI6_80_20"                — RSI 6 (80/20) RR 2:1
-STRATEGY = "tick_RSI6_80_20"
+#   "BigBeluga_Stoch_80percent" — BigBeluga Two-Pole + Stochastic 7,3,3
+#   "RSI6_80_20"                — RSI 6 (80/20) RR 2:1
+STRATEGY = "RSI6_80_20"
 
 ASSET = "XAUUSD"
 TIMEFRAME = "5min"
@@ -258,10 +258,14 @@ STRATEGY_SOURCES = ("tiktok", "reddit")
 
 def load_strategy(name: str):
     """
-    Moduł strategii po samej nazwie pliku, np. "tick_RSI6_80_20".
+    Moduł strategii po samej nazwie pliku, np. "RSI6_80_20".
     Szuka w strategies/tiktok, strategies/reddit, potem w strategies.
+    Stare nazwy z przedrostkiem "tick_" też działają.
     """
     folder = Path(__file__).resolve().parent / "strategies"
+
+    if name.startswith("tick_"):
+        name = name[len("tick_"):]
 
     for source in STRATEGY_SOURCES:
         if (folder / source / f"{name}.py").exists():

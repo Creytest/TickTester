@@ -15,6 +15,11 @@ SAME_SIGNAL = "ignore"
 # z kapitalizacją, jak u autora (cały kapitał w SPY).
 EQUITY_FRACTION = 1.0
 
+# Wyjście: "high" — zamknięcie nad wczorajszym high (reguła z posta),
+# "close" — zamknięcie nad wczorajszym zamknięciem (tak autor napisał
+# w odpowiedzi o stop loss). Druga wersja wychodzi szybciej.
+EXIT_MODE = "high"
+
 
 def ibs(bars: pd.DataFrame) -> pd.Series:
     """
@@ -43,7 +48,8 @@ def generate_signals(bars: pd.DataFrame) -> pd.DataFrame:
 
     Long: zamknięcie pod progiem (10-dniowy high − 2,5 × średni
     25-dniowy zakres) i IBS < 0,3.
-    Wyjście: zamknięcie nad high poprzedniej świecy.
+    Wyjście: zamknięcie nad high poprzedniej świecy (EXIT_MODE
+    "high") albo nad zamknięciem poprzedniej świecy ("close").
 
     Wejście i wyjście na pierwszym ticku po zamknięciu świecy
     dziennej. Bez SL i TP — autor ich nie ma.
@@ -55,7 +61,12 @@ def generate_signals(bars: pd.DataFrame) -> pd.DataFrame:
     high = bars["high"].astype(float)
 
     buy = (close < band(bars)) & (ibs(bars) < 0.3)
-    exit_long = close > high.shift(1)
+    if EXIT_MODE == "close":
+        exit_long = close > close.shift(1)
+    elif EXIT_MODE == "high":
+        exit_long = close > high.shift(1)
+    else:
+        raise ValueError(f"EXIT_MODE musi być 'high' albo 'close', jest {EXIT_MODE!r}")
 
     result = pd.DataFrame(index=bars.index)
     result["buy"] = buy.fillna(False).astype(bool)

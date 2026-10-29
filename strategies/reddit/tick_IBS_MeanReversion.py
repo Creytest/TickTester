@@ -76,10 +76,17 @@ def generate_signals(bars: pd.DataFrame) -> pd.DataFrame:
 
 
 def indicators(bars: pd.DataFrame) -> dict:
-    """Próg wejścia na cenie, IBS w panelu z poziomem 0,3."""
+    """
+    Najwyższy high z 10 świec i próg wejścia na cenie (kolory jak na
+    diagramie zasady wejścia), IBS w panelu z poziomem 0,3.
+    """
+    high_10 = bars["high"].astype(float).rolling(10).max()
     return {
         "trend": None,
-        "overlays": [("Próg wejścia", band(bars), "#2979FF")],
+        "overlays": [
+            ("Najwyższy high z 10 dni", high_10, "#4C8DFF"),
+            ("Próg wejścia", band(bars), "#FFC107"),
+        ],
         "panel": {
             "title": "IBS",
             "lines": [("IBS", ibs(bars), "#7E57C2")],

@@ -120,12 +120,24 @@ def generate_signals(bars: pd.DataFrame) -> pd.DataFrame:
 
 
 def indicators(bars: pd.DataFrame) -> dict:
-    """High i low Initial Balance na cenie, od końca IB do końca sesji."""
+    """
+    High i low Initial Balance na cenie, od końca IB do końca sesji.
+    W panelu cena względem IB: 0 = low IB, 1 = high IB, 2 = TP longa,
+    -1 = TP shorta.
+    """
     ib_high, ib_low, _ = initial_balance(bars)
+    width = (ib_high - ib_low).where(ib_high > ib_low)
+    position = ((bars["close"].astype(float) - ib_low) / width).clip(-1.5, 2.5)
     return {
         "trend": None,
         "overlays": [
             ("IB high", ib_high, "#00D084"),
             ("IB low", ib_low, "#FF3B30"),
         ],
+        "panel": {
+            "title": "Cena względem IB",
+            "lines": [("Pozycja w IB", position, "#7E57C2")],
+            "levels": (-1, 0, 1, 2),
+            "range": (-1.5, 2.5),
+        },
     }

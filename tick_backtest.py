@@ -133,6 +133,7 @@ def run_backtest(
     trade_start=None,
     opposite_signal: str = "ignore",
     same_signal: str = "ignore",
+    max_entries: int = 1,
 ) -> dict:
     """
     Backtest strategii na tickach Bid/Ask.
@@ -166,6 +167,11 @@ def run_backtest(
     same_signal="update_exits" — sygnał w tę samą stronę nie
         dokłada pozycji, ale przestawia jej SL i TP (ponowne
         strategy.exit z tym samym id),
+    same_signal="add" — sygnał w tę samą stronę dokłada kolejne
+        wejście (pyramiding), najwyżej max_entries wejść w sumie.
+        Wielkość dokładki: equity_fraction kapitału albo
+        fixed_quantity. Wszystkie wejścia zamykają się razem,
+        a każde jest osobną transakcją na liście (jak w TV).
     "ignore" — sygnał jest pomijany.
 
     Opcjonalne kolumny exit_long / exit_short (odpowiednik
@@ -341,12 +347,18 @@ def run_backtest(
     # Wyjście na końcu danych zapisujemy jako n_ticks.
     trade_spans = []
 
+    def close(index, reason):
+        # Wszystkie wejścia pozycji kończą się na tym samym ticku.
+        legs = len(engine.position.legs)
+        engine.close_position(*tick_at(index), reason)
+        for span in trade_spans[-legs:]:
+            span[1] = index
+
     def close_at_exit():
         # Przy trailing stopie zapisujemy poziom, który zadziałał.
         if exit_stop is not None:
             engine.position.stop_loss = exit_stop
-        engine.close_position(*tick_at(exit_index), exit_reason)
-        trade_spans[-1][1] = exit_index
+        close(exit_index, exit_reason)
 
     for event in signal_events:
         # Pomijamy niejednoznaczny sygnał.
@@ -378,8 +390,7 @@ def run_backtest(
             if exit_index != -1 and exit_index <= i:
                 close_at_exit()
             else:
-                engine.close_position(*tick_at(i), "exit_signal")
-                trade_spans[-1][1] = i
+                close(i, "exit_signal")
 
         if not (event["buy"] or event["sell"]):
             continue
@@ -414,10 +425,31 @@ def run_backtest(
                     exit_index, exit_reason, exit_stop = find_exit(
                         desired_side, sl, tp, i
                     )
+                elif (
+                    same_signal == "add"
+                    and len(engine.position.legs) < max_entries
+                ):
+                    timestamp, bid, ask = tick_at(i)
+                    if equity_fraction is not None:
+                        entry_price = (
+                            ask + slippage_ticks * tick_size
+                            if desired_side == "long"
+                            else bid - slippage_ticks * tick_size
+                        )
+                        quantity = (
+                            engine.capital * equity_fraction / entry_price
+                        )
+                    else:
+                        quantity = fixed_quantity
+
+                    if quantity > 0:
+                        engine.add_to_position(
+                            timestamp, bid, ask, quantity
+                        )
+                        trade_spans.append([i, n_ticks])
                 continue
             elif opposite_signal == "reverse":
-                engine.close_position(*tick_at(i), "reverse")
-                trade_spans[-1][1] = i
+                close(i, "reverse")
             else:
                 # Zgodnie z Pine Script wchodzimy tylko bez pozycji.
                 continue

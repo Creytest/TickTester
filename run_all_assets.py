@@ -33,6 +33,7 @@ from plansze import save_plansze
 #
 # ---------------- Strategie z Reddita (strategies/reddit) ----------------
 #   "tick_IBS_MeanReversion"         — IBS Mean Reversion (zamknięcie pod progiem + IBS < 0,3, wyjście nad wczorajszym high), 1D
+#                                      wariant wyjścia: EXIT_MODE w pliku strategii ("high" / "close")
 STRATEGY = "tick_EMA9"
 
 # Każde aktywo jest testowane na każdym z tych interwałów.

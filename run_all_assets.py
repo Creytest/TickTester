@@ -34,6 +34,8 @@ from plansze import save_plansze
 # ---------------- Strategie z Reddita (strategies/reddit) ----------------
 #   "tick_IBS_MeanReversion"         — IBS Mean Reversion (zamknięcie pod progiem + IBS < 0,3, wyjście nad wczorajszym high), 1D
 #                                      wariant wyjścia: EXIT_MODE w pliku strategii ("high" / "close")
+#   "tick_IBS_GoldFutures"           — IBS - gold futures (wybicie Initial Balance 8:20–9:20 NY, SL za IB, TP = szerokość IB,
+#                                      wyjście na koniec sesji 13:30 NY), tylko XAUUSD, 1min
 STRATEGY = "tick_EMA9"
 
 # Każde aktywo jest testowane na każdym z tych interwałów.
@@ -72,13 +74,15 @@ def main():
     strategy_module = single.load_strategy(STRATEGY)
     strategy_name = strategy_module.NAME
     timeframes = getattr(strategy_module, "TIMEFRAMES", TIMEFRAMES_TO_TEST)
+    # Strategia może ograniczyć aktywa własną listą ASSETS.
+    assets = getattr(strategy_module, "ASSETS", ASSETS_TO_TEST)
     print(f"Strategia: {strategy_name}")
     print(f"Interwały: {', '.join(timeframes)}")
 
     # Najdłuższy interwał wyznacza zapas ticków na rozgrzewkę.
     longest = max(timeframes, key=pd.Timedelta)
 
-    for asset in ASSETS_TO_TEST:
+    for asset in assets:
         print("\n" + "=" * 60)
         print(f"{asset} | {START_DATE} – {END_DATE}")
         print("=" * 60)
@@ -169,7 +173,7 @@ def main():
 
     costs = "spread z danych + prowizja " + ", ".join(
         f"{asset} {COMMISSION[asset] * 100:.4g}%"
-        for asset in ASSETS_TO_TEST
+        for asset in assets
     ) + " za stronę + 1 tick poślizgu (przybliżone)"
 
     ok = summary[summary["status"] == "OK"]

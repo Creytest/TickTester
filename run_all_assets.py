@@ -41,7 +41,7 @@ from plansze import save_plansze
 #                                 tylko US500, 15min
 #   "RSI_MACD"                  — RSI MA + MACD (RSI 14 przecina swoją SMA 14, MACD przecina w ciągu 5 świec, reverse, bez SL)
 #   "Gold_ThuFri"               — Gold Thursday-Friday (kupno na zamknięciu czwartku, sprzedaż na zamknięciu piątku),
-#                                 tylko XAUUSD, 5min; autor: backtest 20 lat — ustaw START_DATE np. "2005-01-01"
+#                                 tylko XAUUSD, 5min; autor: backtest 20 lat — ustaw START_DATE np. "2005-01-01" i CHUNK_YEARS = 5
 STRATEGY = "EMA9"
 
 # Każde aktywo jest testowane na każdym z tych interwałów.
@@ -50,6 +50,13 @@ TIMEFRAMES_TO_TEST = ["15min", "1h", "4h"]
 
 START_DATE = "2021-01-01"
 END_DATE = "2025-12-31"
+
+# Długi okres liczony w kawałkach po tyle lat, żeby ticki
+# zmieściły się w pamięci (np. 20 lat złota to ~650 mln ticków).
+# Kapitał przechodzi z kawałka na kawałek, a wynik jest sklejony
+# w jeden. Pozycja otwarta na koniec kawałka zamyka się na ostatnim
+# ticku kawałka. None: cały okres naraz.
+CHUNK_YEARS = None
 
 # USA 100 pominięte: dane kończą się w 2014 roku.
 # Wszystkie aktywa z tick_config.py: list(ASSETS).
@@ -93,51 +100,90 @@ def main():
         print(f"{asset} | {START_DATE} – {END_DATE}")
         print("=" * 60)
 
-        # Ticki wczytujemy raz na aktywo, a nie raz na interwał.
-        try:
-            print("Wczytywanie danych tickowych...")
-            ticks = single.load_period_ticks(
-                asset, longest, START_DATE, END_DATE
-            )
-            ticks = ticks.sort_values("timestamp").reset_index(drop=True)
-        except FileNotFoundError as error:
-            print(f"POMINIĘTO {asset}: {error}")
+        periods = _periods(START_DATE, END_DATE, CHUNK_YEARS)
+        chunked = len(periods) > 1
+
+        # Wyniki kawałków dla każdego interwału.
+        capital = {timeframe: single.INITIAL_CAPITAL for timeframe in timeframes}
+        parts = {timeframe: [] for timeframe in timeframes}
+        errors = {}
+
+        for start, end in periods:
+            if chunked:
+                print(f"\n>>> Kawałek {start} – {end}")
+
+            # Ticki wczytujemy raz na aktywo (i kawałek),
+            # a nie raz na interwał.
+            try:
+                print("Wczytywanie danych tickowych...")
+                ticks = single.load_period_ticks(asset, longest, start, end)
+                ticks = ticks.sort_values("timestamp").reset_index(drop=True)
+            except FileNotFoundError as error:
+                print(f"POMINIĘTO {asset}: {error}")
+                errors = {timeframe: error for timeframe in timeframes}
+                break
+
             for timeframe in timeframes:
-                rows.append(_skipped(asset, timeframe, error))
-            continue
+                print(f"\n--- {asset} | {timeframe} ---")
+
+                name = (
+                    f"{STRATEGY}_{asset.replace(' ', '_')}_{timeframe}"
+                    f"_{start}_{end}"
+                )
+
+                try:
+                    stats = single.main(
+                        asset=asset,
+                        timeframe=timeframe,
+                        start_date=start,
+                        end_date=end,
+                        show=False,
+                        save_path=OUTPUT_DIR / f"{name}.png" if SAVE_PNG else None,
+                        html_path=OUTPUT_DIR / f"{name}.html" if SAVE_HTML else None,
+                        trades_path=None,
+                        print_trades=False,
+                        ticks=ticks,
+                        strategy=STRATEGY,
+                        initial_capital=capital[timeframe],
+                    )
+                except (RuntimeError, ValueError) as error:
+                    # Brak danych w kawałku — przechodzimy dalej.
+                    print(f"POMINIĘTO {asset} {timeframe} {start} – {end}: {error}")
+                    errors[timeframe] = error
+                    continue
+
+                capital[timeframe] = stats["final_capital"]
+                parts[timeframe].append(
+                    (stats.pop("equity"), stats.pop("trades_table"))
+                )
+
+            # Zwalniamy pamięć przed kolejnym kawałkiem.
+            del ticks
 
         for timeframe in timeframes:
-            print(f"\n--- {asset} | {timeframe} ---")
+            if not parts[timeframe]:
+                rows.append(_skipped(asset, timeframe, errors.get(timeframe)))
+                continue
 
             name = (
                 f"{STRATEGY}_{asset.replace(' ', '_')}_{timeframe}"
                 f"_{START_DATE}_{END_DATE}"
             )
-            png = OUTPUT_DIR / f"{name}.png"
-            html = OUTPUT_DIR / f"{name}.html"
-            trades_csv = OUTPUT_DIR / f"{name}_transakcje.csv"
-
-            try:
-                stats = single.main(
-                    asset=asset,
-                    timeframe=timeframe,
-                    start_date=START_DATE,
-                    end_date=END_DATE,
-                    show=False,
-                    save_path=png if SAVE_PNG else None,
-                    html_path=html if SAVE_HTML else None,
-                    trades_path=trades_csv,
-                    print_trades=False,
-                    ticks=ticks,
-                    strategy=STRATEGY,
+            equity = pd.concat(
+                [part[0] for part in parts[timeframe]], ignore_index=True
+            )
+            trades = pd.concat(
+                [part[1] for part in parts[timeframe]], ignore_index=True
+            )
+            if not trades.empty:
+                trades.to_csv(
+                    OUTPUT_DIR / f"{name}_transakcje.csv",
+                    index=False, sep=";", decimal=",",
                 )
-            except (RuntimeError, ValueError) as error:
-                # Brak danych w okresie — przechodzimy dalej.
-                print(f"POMINIĘTO {asset} {timeframe}: {error}")
-                rows.append(_skipped(asset, timeframe, error))
-                continue
 
-            equities[(asset, timeframe)] = stats.pop("equity")
+            # Statystyki całego okresu ze sklejonych kawałków.
+            stats = single.period_stats(trades, equity, single.INITIAL_CAPITAL)
+            equities[(asset, timeframe)] = equity
 
             rows.append(
                 {
@@ -157,12 +203,10 @@ def main():
                     "seria_strat_%": _pct(stats["loss_streak_return"]),
                     "seria_od": _date(stats["loss_streak_start"]),
                     "seria_do": _date(stats["loss_streak_end"]),
-                    "uwagi": f"pliki: {name}.*",
+                    "uwagi": f"pliki: {name}.*"
+                    + (f" (wykresy po {CHUNK_YEARS} lat)" if chunked else ""),
                 }
             )
-
-        # Zwalniamy pamięć przed kolejnym aktywem.
-        del ticks
 
     # ========================================================
     # PODSUMOWANIE
@@ -222,6 +266,27 @@ def main():
         )
 
     print(f"\nWykresy i tabela zapisane w: {OUTPUT_DIR}")
+
+
+def _periods(start_date: str, end_date: str, chunk_years) -> list:
+    """Okres podzielony na kawałki po chunk_years lat (daty jako tekst)."""
+    if not chunk_years:
+        return [(start_date, end_date)]
+
+    start = pd.Timestamp(start_date)
+    end = pd.Timestamp(end_date)
+    periods = []
+
+    while start <= end:
+        stop = min(
+            pd.Timestamp(year=start.year + chunk_years, month=1, day=1)
+            - pd.Timedelta(days=1),
+            end,
+        )
+        periods.append((start.strftime("%Y-%m-%d"), stop.strftime("%Y-%m-%d")))
+        start = stop + pd.Timedelta(days=1)
+
+    return periods
 
 
 def _skipped(asset, timeframe, error) -> dict:

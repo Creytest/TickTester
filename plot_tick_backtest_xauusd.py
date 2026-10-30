@@ -15,7 +15,7 @@ from tick_config import (
     RISK_PER_TRADE,
     TICK_SIZE,
 )
-from tick_data import load_ticks_cached
+from tick_data import daily_max_bid, load_ticks_cached
 from tick_backtest import run_backtest
 from interactive_chart import _marker_gap, reindex_panel, save_interactive_chart
 import importlib
@@ -274,6 +274,24 @@ def load_strategy(name: str):
     return importlib.import_module(f"strategies.{name}")
 
 
+def history_high(asset: str, ticks: pd.DataFrame, before) -> float | None:
+    """
+    Najwyższy Bid w danych przed chwilą before: z całego pliku
+    (dzienne maksima z cache) i z wczytanych ticków tego samego dnia.
+    """
+    before = pd.Timestamp(before)
+    daily = daily_max_bid(ASSETS[asset], reverse_bid_ask=REVERSE_BID_ASK[asset])
+    values = [daily[daily.index < before.normalize()].max()]
+
+    # Ticki są posortowane — bez maski na całej tabeli.
+    first = ticks["timestamp"].searchsorted(before, side="left")
+    if first > 0:
+        values.append(ticks["bid"].iloc[:first].max())
+
+    values = [value for value in values if pd.notna(value)]
+    return float(max(values)) if values else None
+
+
 def nearest_bar_index(index: pd.DatetimeIndex, timestamp) -> int:
     timestamp = pd.Timestamp(timestamp)
     pos = index.searchsorted(timestamp, side="right") - 1
@@ -359,6 +377,14 @@ def main(
     print(f"Okres backtestu: {start_date} – {end_date}")
     print(f"Pierwszy tick w okresie: {first_selected_tick}")
     print(f"Rozgrzewka od: {warmup_start}")
+
+    # Strategie ze szczytem wszech czasów (atrybut HISTORY_HIGH)
+    # dostają najwyższy Bid z danych sprzed rozgrzewki.
+    if hasattr(strategy_module, "HISTORY_HIGH"):
+        strategy_module.HISTORY_HIGH = history_high(
+            asset, all_ticks, warmup_start
+        )
+        print(f"Szczyt sprzed rozgrzewki: {strategy_module.HISTORY_HIGH}")
 
     # ========================================================
     # 2. BACKTEST

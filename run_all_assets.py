@@ -46,6 +46,8 @@ from interactive_chart import save_interactive_chart
 #                                 tylko XAUUSD, 5min; autor: backtest 20 lat — ustaw START_DATE np. "2005-01-01" i CHUNK_YEARS = 5
 #   "ATH_ATR"                   — New ATH + ATR trailing (zamknięcie nad szczytem wszech czasów, trailing stop 3 × ATR 14),
 #                                 tylko long, 1% ryzyka; szczyt liczony z całego pliku danych, nie tylko z okresu
+#   "HolyGrail"                 — Holy Grail (Connors & Raschke "Street Smarts" 1995): ADX 14 > 30 i rośnie, dotyk EMA 20,
+#                                 buy/sell stop za poprzednią świecą, SL dołek cofnięcia, TP ostatni szczyt; 15m/1h/4h + 1D
 STRATEGY = "EMA9"
 
 # Każde aktywo jest testowane na każdym z tych interwałów.

@@ -39,6 +39,7 @@ from plansze import save_plansze
 #   "RSI_90"                    — RSI 90% (RSI 14 30/70, każdy sygnał +1/10 kapitału, przeciwny odwraca, bez SL)
 #   "MOC_MOO"                   — MOC to MOO (kupno na zamknięciu 16:00 NY, sprzedaż na otwarciu 9:30 NY, codziennie),
 #                                 tylko US500, 15min
+#   "RSI_MACD"                  — RSI MA + MACD (RSI 14 przecina swoją SMA 14, MACD przecina w ciągu 5 świec, reverse, bez SL)
 STRATEGY = "EMA9"
 
 # Każde aktywo jest testowane na każdym z tych interwałów.

@@ -37,6 +37,8 @@ from plansze import save_plansze
 #   "IBS_GoldFutures"           — IBS - gold futures (wybicie Initial Balance 8:20–9:20 NY, SL za IB, TP = szerokość IB,
 #                                 wyjście na koniec sesji 13:30 NY), tylko XAUUSD, 1min
 #   "RSI_90"                    — RSI 90% (RSI 14 30/70, każdy sygnał +1/10 kapitału, przeciwny odwraca, bez SL)
+#   "MOC_MOO"                   — MOC to MOO (kupno na zamknięciu 16:00 NY, sprzedaż na otwarciu 9:30 NY, codziennie),
+#                                 tylko US500, 15min
 STRATEGY = "EMA9"
 
 # Każde aktywo jest testowane na każdym z tych interwałów.

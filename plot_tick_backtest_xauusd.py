@@ -292,6 +292,7 @@ def main(
     print_trades: bool = True,
     ticks: pd.DataFrame | None = None,
     strategy: str = STRATEGY,
+    initial_capital: float = INITIAL_CAPITAL,
 ) -> dict:
     """
     Backtest jednego aktywa z wykresem.
@@ -303,6 +304,9 @@ def main(
 
     ticks pozwala podać ticki wczytane wcześniej (posortowane,
     z zapasem na rozgrzewkę), np. raz dla kilku interwałów.
+
+    initial_capital: kapitał na start okresu — przy teście
+    w kawałkach kapitał końcowy poprzedniego kawałka.
     """
     strategy_module = load_strategy(strategy)
 
@@ -374,7 +378,7 @@ def main(
         tick_source=backtest_tick_source,
         strategy=strategy_module.generate_signals,
         timeframe=timeframe,
-        initial_capital=INITIAL_CAPITAL,
+        initial_capital=initial_capital,
         commission=COMMISSION[asset],
         slippage_ticks=SLIPPAGE_TICKS,
         tick_size=TICK_SIZE[asset],
@@ -827,7 +831,7 @@ def main(
     equity_ax.set_ylabel("Kapitał ($)")
     equity_ax.set_xlabel("Data")
     equity_ax.axhline(
-        INITIAL_CAPITAL,
+        initial_capital,
         linestyle="--",
         linewidth=1,
         color="gray",
@@ -858,10 +862,10 @@ def main(
             y1 = y_equity[1:]
 
             colors = np.where(
-                (y0 >= INITIAL_CAPITAL) & (y1 >= INITIAL_CAPITAL),
+                (y0 >= initial_capital) & (y1 >= initial_capital),
                 "green",
                 np.where(
-                    (y0 < INITIAL_CAPITAL) & (y1 < INITIAL_CAPITAL),
+                    (y0 < initial_capital) & (y1 < initial_capital),
                     "red",
                     "gray",
                 ),
@@ -879,8 +883,8 @@ def main(
             )
 
             equity_ax.set_ylim(
-                min(y_equity.min(), INITIAL_CAPITAL) * 0.995,
-                max(y_equity.max(), INITIAL_CAPITAL) * 1.005,
+                min(y_equity.min(), initial_capital) * 0.995,
+                max(y_equity.max(), initial_capital) * 1.005,
             )
 
         elif len(y_equity) == 1:
@@ -914,7 +918,7 @@ def main(
     )
 
     # Statystyki okresu nad wykresem ceny.
-    stats = period_stats(trades, equity, INITIAL_CAPITAL)
+    stats = period_stats(trades, equity, initial_capital)
     draw_stats(fig, stats, 0.04, 0.96)
 
     # ========================================================
@@ -940,7 +944,7 @@ def main(
                 panel2=panel2,
                 equity=equity,
                 stats=stats,
-                initial_capital=INITIAL_CAPITAL,
+                initial_capital=initial_capital,
                 labels=bar_labels,
                 overlays=overlays,
                 candle_fill=candle_fill,
@@ -995,6 +999,8 @@ def main(
     if not equity.empty:
         equity = equity[["timestamp", "equity"]]
     stats["equity"] = equity
+    # Transakcje okresu do sklejenia testu w kawałkach.
+    stats["trades_table"] = trades
     return stats
 
 

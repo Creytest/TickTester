@@ -217,12 +217,36 @@ def load_ticks_cached(
             start_date=f"{min(missing)}-01-01",
             end_date=f"{max(missing) + 1}-01-01",
         )
-        loaded = _concat_ticks(list(chunks))
-        by_year = loaded["timestamp"].dt.year
 
+        # Rok zapisujemy, gdy tylko się skończy, i zwalniamy jego
+        # ticki — w pamięci jest najwyżej jeden rok naraz, a nie
+        # wszystkie brakujące lata (20 lat złota to ~650 mln ticków).
+        buffer = []
+        buffer_year = None
+
+        def flush():
+            if buffer_year in missing:
+                part = _concat_ticks(buffer)
+                part.to_pickle(folder / f"{buffer_year}.pkl")
+
+        for chunk in chunks:
+            by_year = chunk["timestamp"].dt.year
+
+            for year in by_year.unique():
+                if year != buffer_year:
+                    flush()
+                    buffer = []
+                    buffer_year = year
+                buffer.append(chunk.loc[by_year == year])
+
+        flush()
+        del buffer
+
+        # Lata bez ticków (np. przed początkiem danych) zapisujemy
+        # puste, żeby nie czytać CSV przy każdym uruchomieniu.
         for year in missing:
-            part = loaded.loc[by_year == year].reset_index(drop=True)
-            part.to_pickle(folder / f"{year}.pkl")
+            if not (folder / f"{year}.pkl").is_file():
+                _concat_ticks([]).to_pickle(folder / f"{year}.pkl")
 
     parts = [pd.read_pickle(folder / f"{year}.pkl") for year in years]
     ticks = _concat_ticks(parts)

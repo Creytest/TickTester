@@ -597,12 +597,14 @@ def main(
         )
 
     # Poziomy panelu (np. 30 i 70 dla RSI) jako przerywane linie.
-    for level in panel.get("levels", ()):
+    levels = panel.get("levels", ())
+    level_colors = panel.get("level_colors") or ["gray"] * len(levels)
+    for level, level_color in zip(levels, level_colors):
         addplots.append(
             mpf.make_addplot(
                 pd.Series(float(level), index=bars.index),
                 panel=1,
-                color="gray",
+                color=level_color,
                 width=1.2,
                 linestyle="--",
                 ylim=panel.get("range", (0, 100)),

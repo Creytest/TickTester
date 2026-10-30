@@ -136,5 +136,6 @@ def indicators(bars: pd.DataFrame) -> dict:
             "title": "RSI 6",
             "lines": [("RSI", rsi(bars["close"], 6), "#7E57C2")],
             "levels": (20, 80),
+            "level_colors": ("#00D084", "#FF3B30"),
         },
     }

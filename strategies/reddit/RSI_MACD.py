@@ -102,6 +102,7 @@ def indicators(bars: pd.DataFrame) -> dict:
                 (f"SMA {RSI_MA_LENGTH} z RSI", average, "#FFC107"),
             ],
             "levels": (30, 50, 70),
+            "level_colors": ("#00D084", "#8A8F98", "#FF3B30"),
             "range": (0, 100),
         },
     }

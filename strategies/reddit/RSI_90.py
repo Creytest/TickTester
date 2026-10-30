@@ -49,6 +49,7 @@ def indicators(bars: pd.DataFrame) -> dict:
             "title": f"RSI {RSI_LENGTH}",
             "lines": [("RSI", rsi(bars["close"], RSI_LENGTH), "#7E57C2")],
             "levels": (OVERSOLD, OVERBOUGHT),
+            "level_colors": ("#00D084", "#FF3B30"),
             "range": (0, 100),
         },
     }

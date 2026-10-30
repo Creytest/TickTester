@@ -174,6 +174,13 @@ def run_backtest(
         a każde jest osobną transakcją na liście (jak w TV).
     "ignore" — sygnał jest pomijany.
 
+    Opcjonalna kolumna entry_stop (zlecenie stop, jak strategy.entry
+    ze stop= w Pine Script): sygnał buy / sell z ceną entry_stop
+    wchodzi dopiero, gdy Ask (long) wzrośnie do tej ceny albo Bid
+    (short) spadnie do niej w następnej świecy. Niewypełnione
+    zlecenie wygasa wraz z tą świecą — strategia ponawia je
+    sygnałem na kolejnej świecy. NaN: wejście jak zwykle.
+
     Opcjonalne kolumny exit_long / exit_short (odpowiednik
     strategy.close): zamykają otwartą pozycję long / short na
     pierwszym ticku po zamknięciu świecy, bez otwierania nowej.
@@ -250,6 +257,17 @@ def run_backtest(
         else None
     )
 
+    entry_stops = (
+        signals["entry_stop"].to_numpy(dtype=float)
+        if "entry_stop" in signals.columns
+        else None
+    )
+    # Zlecenie stop ważne do końca następnej świecy.
+    stop_until = np.append(
+        (bars.index[1:] + pd.Timedelta(timeframe)).to_numpy(),
+        np.datetime64("NaT"),
+    )
+
     exit_long = (
         signals["exit_long"].astype(bool).to_numpy()
         if "exit_long" in signals.columns
@@ -281,6 +299,12 @@ def run_backtest(
                     if take_profits is not None
                     else None
                 ),
+                "entry_stop": (
+                    entry_stops[i]
+                    if entry_stops is not None
+                    else np.nan
+                ),
+                "stop_until": stop_until[i],
             }
         )
 
@@ -396,6 +420,27 @@ def run_backtest(
             continue
 
         desired_side = "long" if event["buy"] else "short"
+
+        # Zlecenie stop: wejście na pierwszym ticku, który dojdzie
+        # do ceny zlecenia przed końcem następnej świecy.
+        if not np.isnan(event["entry_stop"]):
+            last = (
+                n_ticks
+                if pd.isna(event["stop_until"])
+                else int(np.searchsorted(
+                    timestamps,
+                    np.datetime64(event["stop_until"]).astype(timestamps.dtype),
+                    side="left",
+                ))
+            )
+            if desired_side == "long":
+                hit = asks[i:last] >= event["entry_stop"]
+            else:
+                hit = bids[i:last] <= event["entry_stop"]
+
+            if not hit.any():
+                continue
+            i += int(hit.argmax())
 
         sl = event["stop_loss"]
         tp = event["take_profit"]

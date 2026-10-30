@@ -40,6 +40,8 @@ from plansze import save_plansze
 #   "MOC_MOO"                   — MOC to MOO (kupno na zamknięciu 16:00 NY, sprzedaż na otwarciu 9:30 NY, codziennie),
 #                                 tylko US500, 15min
 #   "RSI_MACD"                  — RSI MA + MACD (RSI 14 przecina swoją SMA 14, MACD przecina w ciągu 5 świec, reverse, bez SL)
+#   "Gold_ThuFri"               — Gold Thursday-Friday (kupno na zamknięciu czwartku, sprzedaż na zamknięciu piątku),
+#                                 tylko XAUUSD, 5min; autor: backtest 20 lat — ustaw START_DATE np. "2005-01-01"
 STRATEGY = "EMA9"
 
 # Każde aktywo jest testowane na każdym z tych interwałów.

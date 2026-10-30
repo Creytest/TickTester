@@ -17,7 +17,7 @@ from tick_config import (
 )
 from tick_data import load_ticks_cached
 from tick_backtest import run_backtest
-from interactive_chart import _marker_gap, save_interactive_chart
+from interactive_chart import _marker_gap, reindex_panel, save_interactive_chart
 import importlib
 
 
@@ -523,11 +523,10 @@ def main(
             for key, series in candle_fill.items()
         }
 
-    panel = dict(indicators["panel"])
-    panel["lines"] = [
-        (name, series.reindex(bars.index), color)
-        for name, series, color in panel["lines"]
-    ]
+    # Panel wskaźnika pod ceną i opcjonalny drugi (np. MACD).
+    # Klucz "points": kropki (nazwa, seria, kolor), np. przecięcia.
+    panel = reindex_panel(indicators["panel"], bars.index)
+    panel2 = reindex_panel(indicators.get("panel2"), bars.index)
 
     # ========================================================
     # 7. WYKRES CENY I WSKAŹNIKÓW
@@ -585,31 +584,61 @@ def main(
                 )
             )
 
-    for number, (_, series, color) in enumerate(panel["lines"]):
-        addplots.append(
-            mpf.make_addplot(
-                series,
-                panel=1,
-                color=color,
-                ylabel=panel["title"] if number == 0 else "",
-                ylim=panel.get("range", (0, 100)),
-            )
-        )
+    def panel_plots(p, number, default_range):
+        # Drugi panel bez "range" (np. MACD) dostaje skalę z danych.
+        y_range = p.get("range", default_range)
+        extra = {"ylim": y_range}
+        if y_range is None:
+            values = pd.concat([s for _, s, _ in p["lines"]], axis=1)
+            lo, hi = np.nanmin(values.to_numpy(dtype=float)), np.nanmax(values.to_numpy(dtype=float))
+            pad = (hi - lo) * 0.08 or 1.0
+            y_range = (lo - pad, hi + pad)
+            # Jedna oś Y na panel — inaczej mplfinance dokłada drugą,
+            # gdy serie mają różny zakres.
+            extra = {"ylim": y_range, "secondary_y": False}
 
-    # Poziomy panelu (np. 30 i 70 dla RSI) jako przerywane linie.
-    levels = panel.get("levels", ())
-    level_colors = panel.get("level_colors") or ["gray"] * len(levels)
-    for level, level_color in zip(levels, level_colors):
-        addplots.append(
-            mpf.make_addplot(
-                pd.Series(float(level), index=bars.index),
-                panel=1,
-                color=level_color,
-                width=1.2,
-                linestyle="--",
-                ylim=panel.get("range", (0, 100)),
+        for i, (_, series, color) in enumerate(p["lines"]):
+            addplots.append(
+                mpf.make_addplot(
+                    series,
+                    panel=number,
+                    color=color,
+                    ylabel=p["title"] if i == 0 else "",
+                    **extra,
+                )
             )
-        )
+
+        # Poziomy panelu (np. 30 i 70 dla RSI) jako przerywane linie.
+        levels = p.get("levels", ())
+        level_colors = p.get("level_colors") or ["gray"] * len(levels)
+        for level, level_color in zip(levels, level_colors):
+            addplots.append(
+                mpf.make_addplot(
+                    pd.Series(float(level), index=bars.index),
+                    panel=number,
+                    color=level_color,
+                    width=1.2,
+                    linestyle="--",
+                    **extra,
+                )
+            )
+
+        for _, series, color in p.get("points") or []:
+            addplots.append(
+                mpf.make_addplot(
+                    series,
+                    panel=number,
+                    type="scatter",
+                    marker="o",
+                    markersize=40,
+                    color=color,
+                    **extra,
+                )
+            )
+
+    panel_plots(panel, 1, (0, 100))
+    if panel2:
+        panel_plots(panel2, 2, None)
 
     # mplfinance nie rysuje pustej serii punktów (np. strategia
     # bez ani jednego sygnału short w danym okresie) — pomijamy ją.
@@ -640,7 +669,7 @@ def main(
         ),
         volume=False,
         addplot=addplots,
-        panel_ratios=(5, 2),
+        panel_ratios=(5, 2, 2) if panel2 else (5, 2),
         figsize=(18, 12),
         title=(
             f"{asset} | {timeframe} | {strategy_module.NAME}\n"
@@ -786,11 +815,12 @@ def main(
     # mplfinance zwraca osie obu paneli; equity dodajemy jako
     # kolejny panel Matplotlib współdzielący oś X z wykresem ceny.
     # Szerokość i lewa krawędź jak w panelu ceny, aby daty
-    # obu wykresów pokrywały się w pionie.
+    # obu wykresów pokrywały się w pionie. Panele mplfinance kończą
+    # się na 0,18 wysokości, więc kapitał zajmuje pas 0,05–0,17.
     price_box = price_ax.get_position()
 
     equity_ax = fig.add_axes(
-        [price_box.x0, 0.06, price_box.width, 0.14],
+        [price_box.x0, 0.05, price_box.width, 0.12],
         sharex=price_ax,
     )
 
@@ -907,6 +937,7 @@ def main(
                 trades=trades,
                 trend=trend,
                 panel=panel,
+                panel2=panel2,
                 equity=equity,
                 stats=stats,
                 initial_capital=INITIAL_CAPITAL,

@@ -91,8 +91,18 @@ def generate_signals(bars: pd.DataFrame) -> pd.DataFrame:
 
 
 def indicators(bars: pd.DataFrame) -> dict:
-    """RSI 14 i jego SMA 14 w panelu (MACD nie mieści się w jednym panelu)."""
-    value, average = rsi_and_ma(bars["close"].astype(float))
+    """
+    Panel 1: RSI 14 i jego SMA 14, kropki na przecięciach (zielona
+    w górę, czerwona w dół). Panel 2: MACD i linia sygnałowa (EMA 9
+    z MACD), kropki na ich przecięciach.
+    """
+    close = bars["close"].astype(float)
+    value, average = rsi_and_ma(close)
+    line, signal = macd(close)
+
+    rsi_up, rsi_down = _crosses(value, average)
+    macd_up, macd_down = _crosses(line, signal)
+
     return {
         "trend": None,
         "panel": {
@@ -101,8 +111,24 @@ def indicators(bars: pd.DataFrame) -> dict:
                 ("RSI", value, "#7E57C2"),
                 (f"SMA {RSI_MA_LENGTH} z RSI", average, "#FFC107"),
             ],
+            "points": [
+                ("RSI przecina SMA w górę", value.where(rsi_up), "#00D084"),
+                ("RSI przecina SMA w dół", value.where(rsi_down), "#FF3B30"),
+            ],
             "levels": (30, 50, 70),
             "level_colors": ("#00D084", "#8A8F98", "#FF3B30"),
             "range": (0, 100),
+        },
+        "panel2": {
+            "title": f"MACD {MACD_FAST},{MACD_SLOW},{MACD_SIGNAL}",
+            "lines": [
+                ("MACD", line, "#4C8DFF"),
+                (f"Sygnał (EMA {MACD_SIGNAL})", signal, "#FF9800"),
+            ],
+            "points": [
+                ("MACD przecina sygnał w górę", line.where(macd_up), "#00D084"),
+                ("MACD przecina sygnał w dół", line.where(macd_down), "#FF3B30"),
+            ],
+            "levels": (0,),
         },
     }

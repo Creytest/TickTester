@@ -42,6 +42,7 @@ def save_interactive_chart(
     candle_fill: dict | None = None,
     markers: list | None = None,
     max_bars: int | None = HTML_MAX_BARS,
+    panel2: dict | None = None,
 ) -> None:
     # Import tutaj, aby brak plotly nie blokował reszty programu.
     import plotly.graph_objects as go
@@ -67,11 +68,8 @@ def save_interactive_chart(
         bars = bars.iloc[i0:i1]
         signals = signals.reindex(bars.index)
         trend = trend.reindex(bars.index) if trend is not None else None
-        panel = dict(panel)
-        panel["lines"] = [
-            (name, series.reindex(bars.index), color)
-            for name, series, color in panel["lines"]
-        ]
+        panel = reindex_panel(panel, bars.index)
+        panel2 = reindex_panel(panel2, bars.index)
 
         if not trades.empty:
             trades = trades[
@@ -97,12 +95,18 @@ def save_interactive_chart(
         positions = bars.index.searchsorted(times, side="right") - 1
         return np.clip(positions, 0, n - 1).astype(float)
 
+    # Drugi panel wskaźnika (np. MACD) jest opcjonalny — kapitał
+    # jest zawsze w ostatnim rzędzie.
+    rows = 4 if panel2 else 3
+    eq_row = rows
     fig = make_subplots(
-        rows=3,
+        rows=rows,
         cols=1,
         shared_xaxes=True,
         vertical_spacing=0.02,
-        row_heights=[0.62, 0.18, 0.20],
+        row_heights=(
+            [0.52, 0.15, 0.15, 0.18] if panel2 else [0.62, 0.18, 0.20]
+        ),
     )
 
     # ========================================================
@@ -389,27 +393,59 @@ def save_interactive_chart(
     # 4. OSCYLATOR STRATEGII (np. Stochastic, RSI)
     # ========================================================
 
-    for name, series, color in panel["lines"]:
-        fig.add_trace(
-            go.Scattergl(
-                x=x,
-                y=series.to_numpy(dtype=float),
-                mode="lines",
-                line=dict(color=color, width=1.8),
-                name=name,
-                hoverinfo="skip",
-            ),
-            row=2,
-            col=1,
-        )
+    def add_panel(p, row):
+        for name, series, color in p["lines"]:
+            fig.add_trace(
+                go.Scattergl(
+                    x=x,
+                    y=series.to_numpy(dtype=float),
+                    mode="lines",
+                    line=dict(color=color, width=1.8),
+                    name=name,
+                    hoverinfo="skip",
+                ),
+                row=row,
+                col=1,
+            )
 
-    # Opcjonalnie panel["level_colors"]: kolor każdego poziomu.
-    level_colors = panel.get("level_colors") or ["#8A8F98"] * len(panel["levels"])
-    for level, level_color in zip(panel["levels"], level_colors):
-        fig.add_hline(
-            y=level, row=2, col=1,
-            line=dict(color=level_color, width=1.5, dash="dash"),
-        )
+        # Opcjonalnie p["points"]: kropki (nazwa, seria, kolor) —
+        # wartość tylko na świecach z kropką, reszta NaN.
+        for name, series, color in p.get("points") or []:
+            values = series.to_numpy(dtype=float)
+            has = np.isfinite(values)
+            if not has.any():
+                continue
+            fig.add_trace(
+                go.Scattergl(
+                    x=x[has],
+                    y=values[has],
+                    mode="markers",
+                    marker=dict(
+                        color=color, size=9,
+                        line=dict(color="black", width=1),
+                    ),
+                    name=name,
+                    customdata=np.asarray(labels)[has],
+                    hovertemplate=(
+                        f"{name}<br>%{{customdata}}<br>%{{y:.2f}}<extra></extra>"
+                    ),
+                ),
+                row=row,
+                col=1,
+            )
+
+        # Opcjonalnie p["level_colors"]: kolor każdego poziomu.
+        levels = p.get("levels", ())
+        level_colors = p.get("level_colors") or ["#8A8F98"] * len(levels)
+        for level, level_color in zip(levels, level_colors):
+            fig.add_hline(
+                y=level, row=row, col=1,
+                line=dict(color=level_color, width=1.5, dash="dash"),
+            )
+
+    add_panel(panel, 2)
+    if panel2:
+        add_panel(panel2, 3)
 
     # ========================================================
     # 5. KRZYWA KAPITAŁU
@@ -432,12 +468,12 @@ def save_interactive_chart(
                 name="Kapitał",
                 hovertemplate="%{y:,.2f} $<extra></extra>",
             ),
-            row=3,
+            row=eq_row,
             col=1,
         )
 
     fig.add_hline(
-        y=initial_capital, row=3, col=1,
+        y=initial_capital, row=eq_row, col=1,
         line=dict(color="gray", width=1, dash="dash"),
     )
 
@@ -451,7 +487,7 @@ def save_interactive_chart(
             [stats["loss_streak_start"], stats["loss_streak_end"]]
         )
         streak = [float(x0), float(x1)]
-        for row in (1, 3):
+        for row in (1, eq_row):
             fig.add_vrect(
                 x0=x0 - 0.5, x1=x1 + 0.5, row=row, col=1,
                 fillcolor="#FF3B30", opacity=0.15, line_width=0,
@@ -473,7 +509,7 @@ def save_interactive_chart(
                     name="Seria strat",
                     hovertemplate="%{y:,.2f} $<extra></extra>",
                 ),
-                row=3,
+                row=eq_row,
                 col=1,
             )
         fig.add_annotation(
@@ -542,7 +578,11 @@ def save_interactive_chart(
         row=2,
         col=1,
     )
-    fig.update_yaxes(title_text="Kapitał ($)", row=3, col=1)
+    if panel2:
+        fig.update_yaxes(title_text=panel2["title"], row=3, col=1)
+        if panel2.get("range"):
+            fig.update_yaxes(range=list(panel2["range"]), row=3, col=1)
+    fig.update_yaxes(title_text="Kapitał ($)", row=eq_row, col=1)
 
     data = {
         "labels": list(labels),
@@ -552,6 +592,13 @@ def save_interactive_chart(
         "equityY": _json_floats(equity_y),
         "initialCapital": float(initial_capital),
         "streak": streak,
+        "eqAxis": "" if eq_row == 1 else str(eq_row),
+        # Drugi panel bez stałego zakresu: skala Y z widocznych świec.
+        "panel2": (
+            [_json_floats(s.to_numpy(dtype=float)) for _, s, _ in panel2["lines"]]
+            if panel2 and not panel2.get("range")
+            else None
+        ),
     }
 
     fig.write_html(
@@ -560,6 +607,22 @@ def save_interactive_chart(
         config={"scrollZoom": True, "displaylogo": False},
         post_script=_AXIS_SCRIPT.replace("__DATA__", json.dumps(data)),
     )
+
+
+def reindex_panel(panel: dict | None, index) -> dict | None:
+    """Linie i kropki panelu wskaźnika dopasowane do podanych świec."""
+    if not panel:
+        return panel
+    panel = dict(panel)
+    panel["lines"] = [
+        (name, series.reindex(index), color)
+        for name, series, color in panel["lines"]
+    ]
+    panel["points"] = [
+        (name, series.reindex(index), color)
+        for name, series, color in panel.get("points") or []
+    ]
+    return panel
 
 
 def _segments(start: np.ndarray, end: np.ndarray) -> np.ndarray:
@@ -672,13 +735,28 @@ function update() {
         text.push(D.labels[t]);
     }
 
-    Plotly.relayout(gd, {
-        'yaxis.range': [lo - pad, hi + pad],
-        'yaxis3.range': [eq[0] - eqPad, eq[1] + eqPad],
-        'xaxis3.tickmode': 'array',
-        'xaxis3.tickvals': vals,
-        'xaxis3.ticktext': text
-    });
+    var rel = {'yaxis.range': [lo - pad, hi + pad]};
+    rel['yaxis' + D.eqAxis + '.range'] = [eq[0] - eqPad, eq[1] + eqPad];
+    rel['xaxis' + D.eqAxis + '.tickmode'] = 'array';
+    rel['xaxis' + D.eqAxis + '.tickvals'] = vals;
+    rel['xaxis' + D.eqAxis + '.ticktext'] = text;
+
+    if (D.panel2) {
+        var plo = Infinity, phi = -Infinity;
+        D.panel2.forEach(function (ys) {
+            for (var i = i0; i <= i1; i++) {
+                if (ys[i] === null) continue;
+                if (ys[i] < plo) plo = ys[i];
+                if (ys[i] > phi) phi = ys[i];
+            }
+        });
+        if (plo <= phi) {
+            var ppad = (phi - plo) * 0.08 || Math.abs(phi) * 0.1 || 1;
+            rel['yaxis3.range'] = [plo - ppad, phi + ppad];
+        }
+    }
+
+    Plotly.relayout(gd, rel);
 }
 
 // Kliknięcie napisu o serii strat: przybliż do niej z marginesem.

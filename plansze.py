@@ -229,10 +229,11 @@ def _medians(path, data, title, subtitle, claim_win_rate):
 def _table(path, data, title, subtitle, costs):
     columns = [
         ("Aktywo", 0.06, "left"),
-        ("Interwał", 0.25, "left"),
-        ("Wynik netto", 0.45, "right"),
-        ("Profit Factor", 0.60, "right"),
-        ("Win Rate", 0.73, "right"),
+        ("Interwał", 0.21, "left"),
+        ("Wynik netto", 0.40, "right"),
+        ("CAGR", 0.51, "right"),
+        ("Profit Factor", 0.62, "right"),
+        ("Win Rate", 0.72, "right"),
         ("Max Drawdown", 0.87, "right"),
         ("Transakcje", 0.96, "right"),
     ]
@@ -262,6 +263,7 @@ def _table(path, data, title, subtitle, costs):
             (row["asset"], WHITE),
             (_timeframe(row["timeframe"]), WHITE),
             (_pct(result), _sign_color(result)),
+            (_pct(row["cagr_%"]), _sign_color(row["cagr_%"])),
             (_num(row["profit_factor"], 2), WHITE),
             (_pct(row["win_rate_%"], 1, sign=False), WHITE),
             (_pct(row["max_drawdown_%"], 1, sign=False), WHITE),
@@ -363,6 +365,6 @@ def _pct(value, decimals: int = 1, sign: bool = True) -> str:
 
 
 def _sign_color(value) -> str:
-    if value == 0:
+    if value is None or pd.isna(value) or value == 0:
         return WHITE
     return GREEN if value > 0 else RED

@@ -1027,6 +1027,13 @@ def main(
     stats["equity"] = equity
     # Transakcje okresu do sklejenia testu w kawałkach.
     stats["trades_table"] = trades
+    # Świece dzienne do zbiorczego wykresu HTML testu w kawałkach.
+    stats["daily_bars"] = (
+        bars[["open", "high", "low", "close"]]
+        .resample("1D")
+        .agg({"open": "first", "high": "max", "low": "min", "close": "last"})
+        .dropna()
+    )
     return stats
 
 

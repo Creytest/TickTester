@@ -406,7 +406,7 @@ def save_interactive_chart(
     for level in panel["levels"]:
         fig.add_hline(
             y=level, row=2, col=1,
-            line=dict(color="gray", width=1, dash="dot"),
+            line=dict(color="#8A8F98", width=1.5, dash="dash"),
         )
 
     # ========================================================

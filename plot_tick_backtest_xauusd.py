@@ -596,6 +596,19 @@ def main(
             )
         )
 
+    # Poziomy panelu (np. 30 i 70 dla RSI) jako przerywane linie.
+    for level in panel.get("levels", ()):
+        addplots.append(
+            mpf.make_addplot(
+                pd.Series(float(level), index=bars.index),
+                panel=1,
+                color="gray",
+                width=1.2,
+                linestyle="--",
+                ylim=panel.get("range", (0, 100)),
+            )
+        )
+
     # mplfinance nie rysuje pustej serii punktów (np. strategia
     # bez ani jednego sygnału short w danym okresie) — pomijamy ją.
     addplots = [

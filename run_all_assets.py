@@ -5,12 +5,14 @@ import matplotlib
 # Wykresy zapisujemy do plików, bez otwierania okien.
 matplotlib.use("Agg")
 
+import numpy as np
 import pandas as pd
 
 from tick_config import ASSETS, COMMISSION
 import plot_tick_backtest_xauusd as single
 from summary_chart import save_summary_chart
 from plansze import save_plansze
+from interactive_chart import save_interactive_chart
 
 
 # ============================================================
@@ -156,7 +158,11 @@ def main():
 
                 capital[timeframe] = stats["final_capital"]
                 parts[timeframe].append(
-                    (stats.pop("equity"), stats.pop("trades_table"))
+                    (
+                        stats.pop("equity"),
+                        stats.pop("trades_table"),
+                        stats.pop("daily_bars"),
+                    )
                 )
 
             # Zwalniamy pamięć przed kolejnym kawałkiem.
@@ -186,6 +192,18 @@ def main():
             # Statystyki całego okresu ze sklejonych kawałków.
             stats = single.period_stats(trades, equity, single.INITIAL_CAPITAL)
             equities[(asset, timeframe)] = equity
+
+            # Jeden wykres całego okresu na świecach dziennych —
+            # wykresy kawałków pokazują szczegóły.
+            if chunked and SAVE_HTML:
+                daily = pd.concat([part[2] for part in parts[timeframe]])
+                daily = daily[~daily.index.duplicated(keep="first")]
+                _save_combined_html(
+                    OUTPUT_DIR / f"{name}_zbiorczy.html",
+                    f"{asset} | {timeframe} | {START_DATE} – {END_DATE}"
+                    f" | {strategy_name} | świece dzienne",
+                    daily, trades, equity, stats,
+                )
 
             rows.append(
                 {
@@ -268,6 +286,51 @@ def main():
         )
 
     print(f"\nWykresy i tabela zapisane w: {OUTPUT_DIR}")
+
+
+def _save_combined_html(path, title, daily, trades, equity, stats) -> None:
+    """
+    Zbiorczy wykres HTML testu w kawałkach: świece dzienne, wszystkie
+    transakcje i pełna krzywa kapitału. W panelu wynik transakcji
+    zamkniętych danego dnia (% kapitału przed transakcją).
+    """
+    result = pd.Series(np.nan, index=daily.index)
+
+    if not trades.empty:
+        before = trades["capital"] - trades["net_pnl"]
+        pnl = 100 * trades["net_pnl"] / before
+        day = pd.to_datetime(trades["exit_time"]).dt.normalize()
+        result = pnl.groupby(day.to_numpy()).sum().reindex(daily.index)
+
+    low = min(float(np.nanmin(result)) if result.notna().any() else -1, 0)
+    high = max(float(np.nanmax(result)) if result.notna().any() else 1, 0)
+    margin = 0.1 * (high - low or 1)
+
+    signals = pd.DataFrame({"buy": False, "sell": False}, index=daily.index)
+    panel = {
+        "title": "Wynik dnia %",
+        "lines": [],
+        "points": [
+            ("Zysk", result.where(result > 0), "#00D084"),
+            ("Strata", result.where(result <= 0), "#FF3B30"),
+        ],
+        "levels": (0,),
+        "range": (low - margin, high + margin),
+    }
+
+    save_interactive_chart(
+        path,
+        title=title,
+        bars=daily,
+        signals=signals,
+        trades=trades,
+        trend=None,
+        panel=panel,
+        equity=equity,
+        stats=stats,
+        initial_capital=single.INITIAL_CAPITAL,
+        max_bars=None,
+    )
 
 
 def _periods(start_date: str, end_date: str, chunk_years) -> list:

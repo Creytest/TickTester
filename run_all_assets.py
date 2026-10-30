@@ -42,6 +42,8 @@ from plansze import save_plansze
 #   "RSI_MACD"                  — RSI MA + MACD (RSI 14 przecina swoją SMA 14, MACD przecina w ciągu 5 świec, reverse, bez SL)
 #   "Gold_ThuFri"               — Gold Thursday-Friday (kupno na zamknięciu czwartku, sprzedaż na zamknięciu piątku),
 #                                 tylko XAUUSD, 5min; autor: backtest 20 lat — ustaw START_DATE np. "2005-01-01" i CHUNK_YEARS = 5
+#   "ATH_ATR"                   — New ATH + ATR trailing (zamknięcie nad szczytem wszech czasów, trailing stop 3 × ATR 14),
+#                                 tylko long, 1% ryzyka; szczyt liczony z całego pliku danych, nie tylko z okresu
 STRATEGY = "EMA9"
 
 # Każde aktywo jest testowane na każdym z tych interwałów.

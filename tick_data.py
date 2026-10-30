@@ -255,6 +255,62 @@ def load_ticks_cached(
     return ticks.loc[mask].reset_index(drop=True)
 
 
+def daily_max_bid(
+    file_path: str | Path,
+    reverse_bid_ask: bool = False,
+    cache_dir: str | Path | None = None,
+    chunksize: int = 1_000_000,
+) -> pd.Series:
+    """
+    Najwyższy Bid każdego dnia w całym pliku CSV (indeks: data).
+
+    Plik czytany jest partiami, bez trzymania ticków w pamięci,
+    a wynik zapisywany w cache — liczy się raz na wersję pliku.
+    Służy do szczytu wszech czasów sprzed okresu backtestu.
+    """
+    path = Path(file_path)
+
+    if not path.is_file():
+        raise FileNotFoundError(
+            f"Nie znaleziono pliku z danymi tickowymi: {path}"
+        )
+
+    if cache_dir is None:
+        cache_dir = Path(__file__).resolve().parent / "cache"
+
+    stat = path.stat()
+    signature = (
+        f"{path.stem}_{stat.st_size}_{stat.st_mtime_ns}"
+        f"_{'rev' if reverse_bid_ask else 'norm'}"
+    )
+    cache_file = Path(cache_dir) / signature / "daily_max_bid.pkl"
+
+    if cache_file.is_file():
+        return pd.read_pickle(cache_file)
+
+    print(
+        "Liczenie dziennych maksimów z całego pliku "
+        "(jednorazowo, może potrwać)..."
+    )
+
+    parts = []
+    for chunk in load_ticks(
+        path, chunksize=chunksize, reverse_bid_ask=reverse_bid_ask
+    ):
+        parts.append(chunk.groupby(chunk["timestamp"].dt.normalize())["bid"].max())
+
+    if parts:
+        daily = pd.concat(parts)
+        # Dzień może być podzielony między dwie partie.
+        daily = daily.groupby(level=0).max()
+    else:
+        daily = pd.Series(dtype="float64")
+
+    cache_file.parent.mkdir(parents=True, exist_ok=True)
+    daily.to_pickle(cache_file)
+    return daily
+
+
 def _concat_ticks(chunks: list[pd.DataFrame]) -> pd.DataFrame:
     chunks = [chunk for chunk in chunks if not chunk.empty]
 

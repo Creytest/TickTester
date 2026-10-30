@@ -395,7 +395,7 @@ def save_interactive_chart(
                 x=x,
                 y=series.to_numpy(dtype=float),
                 mode="lines",
-                line=dict(color=color, width=1),
+                line=dict(color=color, width=1.8),
                 name=name,
                 hoverinfo="skip",
             ),
@@ -403,10 +403,12 @@ def save_interactive_chart(
             col=1,
         )
 
-    for level in panel["levels"]:
+    # Opcjonalnie panel["level_colors"]: kolor każdego poziomu.
+    level_colors = panel.get("level_colors") or ["#8A8F98"] * len(panel["levels"])
+    for level, level_color in zip(panel["levels"], level_colors):
         fig.add_hline(
             y=level, row=2, col=1,
-            line=dict(color="#8A8F98", width=1.5, dash="dash"),
+            line=dict(color=level_color, width=1.5, dash="dash"),
         )
 
     # ========================================================

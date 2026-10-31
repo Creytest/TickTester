@@ -7,6 +7,78 @@ COLUMNS = ["timestamp", "bid", "ask", "extra_1", "extra_2"]
 
 DATE_FORMAT = "%d.%m.%Y %H:%M:%S.%f"
 
+# Pliki pobrane prosto z Dukascopy (z nagłówkiem).
+COMPACT_DATE_FORMAT = "%Y%m%d %H:%M:%S:%f"
+
+
+def tick_files(file_path: str | Path) -> list[Path]:
+    """
+    Pliki CSV aktywa: jeden plik albo folder z plikami (np. jeden
+    na rok), posortowane po nazwie — muszą iść chronologicznie.
+    """
+    path = Path(file_path)
+
+    if path.is_dir():
+        files = sorted(path.glob("*.csv"))
+    elif path.is_file():
+        files = [path]
+    else:
+        files = []
+
+    if not files:
+        raise FileNotFoundError(
+            f"Nie znaleziono pliku z danymi tickowymi: {path}"
+        )
+
+    return files
+
+
+def _signature(file_path: str | Path, reverse_bid_ask: bool) -> str:
+    """Nazwa folderu cache — zmienia się razem z plikami danych."""
+    files = tick_files(file_path)
+    size = sum(file.stat().st_size for file in files)
+    mtime = max(file.stat().st_mtime_ns for file in files)
+    return (
+        f"{Path(file_path).stem}_{size}_{mtime}"
+        f"_{'rev' if reverse_bid_ask else 'norm'}"
+    )
+
+
+def _date_format(timestamp: str) -> str:
+    """Tickstory: 01.11.2021 01:00:15.669, Dukascopy: 20211101 01:00:15:669."""
+    return DATE_FORMAT if timestamp[2:3] == "." else COMPACT_DATE_FORMAT
+
+
+def file_range(path: Path) -> tuple[pd.Timestamp, pd.Timestamp, int]:
+    """
+    Pierwszy i ostatni czas w pliku bez czytania całości
+    oraz liczba wierszy nagłówka do pominięcia.
+    """
+    with open(path, "rb") as file:
+        first = file.readline().decode(errors="replace").strip()
+        header = 0
+
+        # Nagłówek (np. "Timestamp,Bid price,...") nie zaczyna się cyfrą.
+        if first and not first[0].isdigit():
+            header = 1
+            first = file.readline().decode(errors="replace").strip()
+
+        file.seek(0, 2)
+        size = file.tell()
+        file.seek(max(0, size - 4096))
+        tail = file.read().decode(errors="replace").strip().splitlines()
+
+    last = tail[-1] if tail else first
+    first_time, last_time = (
+        pd.to_datetime(
+            line.split(",")[0],
+            format=_date_format(line.split(",")[0]),
+            errors="coerce",
+        )
+        for line in (first, last)
+    )
+    return first_time, last_time, header
+
 
 def load_ticks(
     file_path: str | Path,
@@ -18,6 +90,11 @@ def load_ticks(
     """
     Wczytuje ticki partiami.
 
+    file_path:
+        Plik CSV albo folder z plikami CSV (np. jeden na rok).
+        Obsługuje format Tickstory (01.11.2021 01:00:15.669)
+        i Dukascopy z nagłówkiem (20211101 01:00:15:669).
+
     start_date:
         Opcjonalna data początku, np. "2023-12-01".
 
@@ -25,16 +102,11 @@ def load_ticks(
         Opcjonalna data końca, np. "2025-01-01".
         Jest to granica wyłączna.
 
-    Plik musi być uporządkowany chronologicznie,
+    Pliki muszą być uporządkowane chronologicznie,
     aby można było przerwać odczyt po end_date.
     """
 
-    path = Path(file_path)
-
-    if not path.is_file():
-        raise FileNotFoundError(
-            f"Nie znaleziono pliku z danymi tickowymi: {path}"
-        )
+    files = tick_files(file_path)
 
     if chunksize is not None and chunksize <= 0:
         raise ValueError("chunksize musi być większe od zera.")
@@ -54,25 +126,11 @@ def load_ticks(
     if start is not None and end is not None and start >= end:
         raise ValueError("start_date musi być wcześniejsza niż end_date.")
 
-    reader = pd.read_csv(
-        path,
-        header=None,
-        names=COLUMNS,
-        usecols=["timestamp", "bid", "ask"],
-        dtype={
-            "timestamp": "string",
-            "bid": "float64",
-            "ask": "float64",
-        },
-        chunksize=chunksize,
-        skip_blank_lines=True,
-    )
-
-    def prepare(chunk: pd.DataFrame) -> pd.DataFrame:
+    def prepare(chunk: pd.DataFrame, date_format: str) -> pd.DataFrame:
         if not pd.api.types.is_datetime64_any_dtype(chunk["timestamp"]):
             chunk["timestamp"] = pd.to_datetime(
                 chunk["timestamp"],
-                format=DATE_FORMAT,
+                format=date_format,
                 errors="coerce",
             )
 
@@ -100,45 +158,78 @@ def load_ticks(
         return chunk.reset_index(drop=True)
 
     def prepared_chunks():
-        for chunk in reader:
-            # Dane są chronologiczne, więc partię w całości
-            # sprzed start_date pomijamy bez parsowania wszystkich
-            # dat — wystarczy sprawdzić ostatni wiersz.
-            if start is not None and not chunk.empty:
-                last = pd.to_datetime(
-                    chunk["timestamp"].iloc[-1:],
-                    format=DATE_FORMAT,
-                    errors="coerce",
-                ).iloc[0]
+        for path in files:
+            first, last, header = file_range(path)
 
-                if pd.notna(last) and last < start:
-                    continue
+            # Cały plik przed okresem albo po nim — bez czytania.
+            if start is not None and pd.notna(last) and last < start:
+                continue
+            if end is not None and pd.notna(first) and first >= end:
+                break
 
-            # Daty parsujemy raz i wykorzystujemy je zarówno
-            # do sprawdzenia końca okresu, jak i w prepare().
-            chunk["timestamp"] = pd.to_datetime(
-                chunk["timestamp"],
-                format=DATE_FORMAT,
-                errors="coerce",
+            # Format daty rozpoznajemy po pierwszym wierszu pliku.
+            date_format = None
+
+            reader = pd.read_csv(
+                path,
+                header=None,
+                skiprows=header,
+                names=COLUMNS,
+                usecols=["timestamp", "bid", "ask"],
+                dtype={
+                    "timestamp": "string",
+                    "bid": "float64",
+                    "ask": "float64",
+                },
+                chunksize=chunksize or 1_000_000,
+                skip_blank_lines=True,
             )
 
-            # Po przekroczeniu końca okresu przerywamy odczyt.
-            if end is not None:
-                timestamps = chunk["timestamp"]
+            for chunk in reader:
+                if chunk.empty:
+                    continue
 
-                if (
-                    timestamps.notna().any()
-                    and timestamps.min() >= end
-                ):
-                    break
+                if date_format is None:
+                    date_format = _date_format(str(chunk["timestamp"].iloc[0]))
 
-            result = prepare(chunk)
+                # Dane są chronologiczne, więc partię w całości
+                # sprzed start_date pomijamy bez parsowania wszystkich
+                # dat — wystarczy sprawdzić ostatni wiersz.
+                if start is not None:
+                    last_row = pd.to_datetime(
+                        chunk["timestamp"].iloc[-1:],
+                        format=date_format,
+                        errors="coerce",
+                    ).iloc[0]
 
-            if not result.empty:
-                yield result
+                    if pd.notna(last_row) and last_row < start:
+                        continue
+
+                # Daty parsujemy raz i wykorzystujemy je zarówno
+                # do sprawdzenia końca okresu, jak i w prepare().
+                chunk["timestamp"] = pd.to_datetime(
+                    chunk["timestamp"],
+                    format=date_format,
+                    errors="coerce",
+                )
+
+                # Po przekroczeniu końca okresu przerywamy odczyt.
+                if end is not None:
+                    timestamps = chunk["timestamp"]
+
+                    if (
+                        timestamps.notna().any()
+                        and timestamps.min() >= end
+                    ):
+                        return
+
+                result = prepare(chunk, date_format)
+
+                if not result.empty:
+                    yield result
 
     if chunksize is None:
-        return prepare(reader)
+        return _concat_ticks(list(prepared_chunks()))
 
     return prepared_chunks()
 
@@ -162,11 +253,7 @@ def load_ticks_cached(
     """
 
     path = Path(file_path)
-
-    if not path.is_file():
-        raise FileNotFoundError(
-            f"Nie znaleziono pliku z danymi tickowymi: {path}"
-        )
+    tick_files(path)  # błąd, gdy brak danych
 
     if start_date is None or end_date is None:
         # Bez zakresu dat cache po latach nic nie daje.
@@ -188,11 +275,7 @@ def load_ticks_cached(
     if cache_dir is None:
         cache_dir = Path(__file__).resolve().parent / "cache"
 
-    stat = path.stat()
-    signature = (
-        f"{path.stem}_{stat.st_size}_{stat.st_mtime_ns}"
-        f"_{'rev' if reverse_bid_ask else 'norm'}"
-    )
+    signature = _signature(path, reverse_bid_ask)
     folder = Path(cache_dir) / signature
     folder.mkdir(parents=True, exist_ok=True)
 
@@ -269,20 +352,12 @@ def daily_max_bid(
     Służy do szczytu wszech czasów sprzed okresu backtestu.
     """
     path = Path(file_path)
-
-    if not path.is_file():
-        raise FileNotFoundError(
-            f"Nie znaleziono pliku z danymi tickowymi: {path}"
-        )
+    tick_files(path)  # błąd, gdy brak danych
 
     if cache_dir is None:
         cache_dir = Path(__file__).resolve().parent / "cache"
 
-    stat = path.stat()
-    signature = (
-        f"{path.stem}_{stat.st_size}_{stat.st_mtime_ns}"
-        f"_{'rev' if reverse_bid_ask else 'norm'}"
-    )
+    signature = _signature(path, reverse_bid_ask)
     cache_file = Path(cache_dir) / signature / "daily_max_bid.pkl"
 
     if cache_file.is_file():

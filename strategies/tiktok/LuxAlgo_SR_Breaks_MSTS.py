@@ -9,6 +9,9 @@ NAME = "LuxAlgo S/R Breaks + Market Structure Trailing Stop"
 OPPOSITE_SIGNAL = "ignore"
 SAME_SIGNAL = "ignore"
 
+# 4h pominięte: za mało transakcji.
+TIMEFRAMES = ["15min", "30min", "1h"]
+
 
 # ============================================================
 # FUNKCJE ZGODNE Z PINE SCRIPT

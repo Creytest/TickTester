@@ -20,9 +20,9 @@ ASSETS = {
         r"D:\Tickdata\US_Brent_Crude_Oil_GMT+2_US-DST.csv"
     ),
     # Folder z plikami na każdy rok (Dukascopy, już w GMT+2 z US-DST).
-    # Dane od 2021-11-01.
+    # Dane od 2020-11-01.
     "US500": Path(
-        r"D:\Tickdata\USA500IDXUSD"
+        r"D:\Ticksy\USA500IDXUSD"
     ),
 }
 

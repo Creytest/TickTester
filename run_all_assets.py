@@ -65,9 +65,9 @@ END_DATE = "2025-12-31"
 CHUNK_YEARS = None
 
 # USA 100 pominięte: dane kończą się w 2014 roku.
-# US500 (dane od 2021-11-01) można dopisać: "US500".
+# US500: dane od 2020-11-01.
 # Wszystkie aktywa z tick_config.py: list(ASSETS).
-ASSETS_TO_TEST = ["XAUUSD", "Bitcoin", "EURUSD", "Brent"]
+ASSETS_TO_TEST = ["XAUUSD", "Bitcoin", "EURUSD", "Brent", "US500"]
 
 # Interaktywny wykres HTML (otwierany w przeglądarce)
 # i/lub statyczny obrazek PNG dla każdej kombinacji.

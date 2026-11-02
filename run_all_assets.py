@@ -86,7 +86,9 @@ OUTPUT_DIR = Path(__file__).resolve().parent / "wyniki"
 
 
 def main():
-    OUTPUT_DIR.mkdir(exist_ok=True)
+    # Każda strategia ma własny podfolder w wyniki/.
+    out_dir = OUTPUT_DIR / STRATEGY
+    out_dir.mkdir(parents=True, exist_ok=True)
 
     rows = []
     equities = {}
@@ -145,8 +147,8 @@ def main():
                         start_date=start,
                         end_date=end,
                         show=False,
-                        save_path=OUTPUT_DIR / f"{name}.png" if SAVE_PNG else None,
-                        html_path=OUTPUT_DIR / f"{name}.html" if SAVE_HTML else None,
+                        save_path=out_dir / f"{name}.png" if SAVE_PNG else None,
+                        html_path=out_dir / f"{name}.html" if SAVE_HTML else None,
                         trades_path=None,
                         print_trades=False,
                         ticks=ticks,
@@ -188,7 +190,7 @@ def main():
             )
             if not trades.empty:
                 trades.to_csv(
-                    OUTPUT_DIR / f"{name}_transakcje.csv",
+                    out_dir / f"{name}_transakcje.csv",
                     index=False, sep=";", decimal=",",
                 )
 
@@ -202,7 +204,7 @@ def main():
                 daily = pd.concat([part[2] for part in parts[timeframe]])
                 daily = daily[~daily.index.duplicated(keep="first")]
                 _save_combined_html(
-                    OUTPUT_DIR / f"{name}_zbiorczy.html",
+                    out_dir / f"{name}_zbiorczy.html",
                     f"{asset} | {timeframe} | {START_DATE} – {END_DATE}"
                     f" | {strategy_name} | świece dzienne",
                     daily, trades, equity, stats,
@@ -241,7 +243,7 @@ def main():
         summary["trades"] = summary["trades"].astype("Int64")
 
     name = f"podsumowanie_{STRATEGY}_{START_DATE}_{END_DATE}"
-    table = OUTPUT_DIR / f"{name}.csv"
+    table = out_dir / f"{name}.csv"
     summary.to_csv(table, index=False, sep=";", decimal=",")
 
     costs = "spread z danych + prowizja " + ", ".join(
@@ -253,7 +255,7 @@ def main():
 
     if not ok.empty:
         save_summary_chart(
-            OUTPUT_DIR / f"{name}.html",
+            out_dir / f"{name}.html",
             ok,
             title=f"{strategy_name} | {START_DATE} – {END_DATE}",
             costs=costs,
@@ -261,7 +263,7 @@ def main():
 
     if SAVE_PLANSZE and not ok.empty:
         save_plansze(
-            OUTPUT_DIR / f"plansze_{STRATEGY}_{START_DATE}_{END_DATE}",
+            out_dir / f"plansze_{STRATEGY}_{START_DATE}_{END_DATE}",
             ok,
             equities,
             title=strategy_name,
@@ -288,7 +290,7 @@ def main():
             f"kombinacji. Mediana wyniku netto: {median:.2f}%."
         )
 
-    print(f"\nWykresy i tabela zapisane w: {OUTPUT_DIR}")
+    print(f"\nWykresy i tabela zapisane w: {out_dir}")
 
 
 def _save_combined_html(path, title, daily, trades, equity, stats) -> None:

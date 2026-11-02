@@ -9,7 +9,7 @@ NAME = "Cloud MA EMA 30/74 + SL na swingu"
 # średnich naprzemiennie), więc SAME_SIGNAL nie ma znaczenia.
 OPPOSITE_SIGNAL = "reverse"
 SAME_SIGNAL = "ignore"
-ASSETS = ["BTCUSDT", "EURUSD"]
+ASSETS = ["BITCOIN", "EURUSD"]
 
 def ema(source: pd.Series, length: int) -> pd.Series:
     """Odpowiednik ema() z Pine Script: start od średniej prostej."""

@@ -10,7 +10,7 @@ OPPOSITE_SIGNAL = "ignore"
 SAME_SIGNAL = "ignore"
 
 # 4h pominięte: za mało transakcji.
-TIMEFRAMES = ["15min", "30min", "1h"]
+TIMEFRAMES = ["5min", "15min", "30min"]
 
 
 # ============================================================

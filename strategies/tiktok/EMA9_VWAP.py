@@ -7,7 +7,7 @@ from strategies.tiktok.CloudMA_EMA30_74 import ema
 NAME = "EMA 9 × VWAP"
 
 # Autor pokazuje strategię na 30 minutach (day trading).
-TIMEFRAMES = ["30min"]
+TIMEFRAMES = ["15min", "1h", "4h"]
 
 # Tylko shorty. Brak SL i TP: przecięcie w górę zamyka shorta
 # (exit_short), bez otwierania longa.

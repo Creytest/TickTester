@@ -48,6 +48,9 @@ from interactive_chart import save_interactive_chart
 #                                 tylko long, 1% ryzyka; szczyt liczony z całego pliku danych, nie tylko z okresu
 #   "HolyGrail"                 — Holy Grail (Connors & Raschke "Street Smarts" 1995): ADX 14 > 30 i rośnie, dotyk EMA 20,
 #                                 buy/sell stop za poprzednią świecą, SL dołek cofnięcia, TP ostatni szczyt; 15m/1h/4h + 1D
+# Kolejka: lista nazw, np. ["EMA9", "RSI_90", "HolyGrail"] — strategie
+# liczą się po kolei, każda zapisuje wyniki we własnym podfolderze.
+# Błąd jednej strategii nie zatrzymuje kolejnych.
 STRATEGY = "EMA9"
 
 # Każde aktywo jest testowane na każdym z tych interwałów.
@@ -381,4 +384,16 @@ def _round(value):
 
 
 if __name__ == "__main__":
-    main()
+    import traceback
+
+    queue = [STRATEGY] if isinstance(STRATEGY, str) else list(STRATEGY)
+    failed = []
+    for STRATEGY in queue:
+        print(f"\n##### {STRATEGY} ({queue.index(STRATEGY) + 1}/{len(queue)}) #####")
+        try:
+            main()
+        except Exception:
+            traceback.print_exc()
+            failed.append(STRATEGY)
+    if len(queue) > 1:
+        print(f"\nKolejka zakończona. Błędy: {', '.join(failed) or 'brak'}")

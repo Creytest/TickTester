@@ -26,7 +26,7 @@ from interactive_chart import save_interactive_chart
 #   "BigBeluga_Stoch_80percent" — BigBeluga Two-Pole + Stochastic 7,3,3
 #   "RSI6_80_20"                — RSI 6 (80/20) RR 2:1
 #   "LuxAlgo_SR_Breaks_MSTS"    — LuxAlgo S/R Breaks + Market Structure Trailing Stop
-#   "CloudMA_EMA30_74"          — Cloud MA EMA 30/74 + SL na swingu
+#   "CloudMA_EMA30_74"          — Triangles. Cloud MA EMA 30/74 + SL na swingu
 #   "SFP_Volume"                — SFP+Volume (LuxAlgo SFP + Volume Delta), tylko 30min
 #   "EMA9_VWAP"                 — EMA 9 × VWAP (sesyjny), tylko short, wyjście na przecięciu w górę, 30min
 #   "EMA9"                      — EMA9 (zamknięcie nad/pod EMA 9, reverse), 30min

@@ -51,7 +51,7 @@ from interactive_chart import save_interactive_chart
 # Kolejka: lista nazw, np. ["EMA9", "RSI_90", "HolyGrail"] — strategie
 # liczą się po kolei, każda zapisuje wyniki we własnym podfolderze.
 # Błąd jednej strategii nie zatrzymuje kolejnych.
-STRATEGY = "EMA9"
+STRATEGY = ["EMA9", "LuxAlgo_SR_Breaks_MSTS", "CloudMA_EMA30_74", "BigBeluga_Stoch_80percent", "RSI6_80_20", "SFP_Volume"]
 
 # Każde aktywo jest testowane na każdym z tych interwałów.
 # Strategia może je nadpisać własną listą TIMEFRAMES.

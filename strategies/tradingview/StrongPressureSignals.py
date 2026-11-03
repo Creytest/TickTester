@@ -131,6 +131,7 @@ def _simulate(bars: pd.DataFrame) -> dict:
 
     out = {
         "basis": basis, "upper": upper, "lower": lower,
+        "up_m0": up_m0, "dn_m0": dn_m0,
         "dir": np.zeros(n, dtype=int),
         "stop": np.full(n, np.nan),
         "tp": np.full((n, 3), np.nan),
@@ -287,7 +288,7 @@ def generate_signals(bars: pd.DataFrame) -> pd.DataFrame:
 
 
 def indicators(bars: pd.DataFrame) -> dict:
-    """EMA 20 i bandy ± 2 ATR na cenie, TP1/SL jako kropki."""
+    """EMA 20 i bandy ± 2 ATR na cenie, SL jako kropki, siła wybicia w panelu."""
     sim = _simulate(bars)
     idx = bars.index
     d = pd.Series(sim["dir"], index=idx)
@@ -303,4 +304,13 @@ def indicators(bars: pd.DataFrame) -> dict:
             ("SL long", stop.where(d == 1), "#FF3B30", "below"),
             ("SL short", stop.where(d == -1), "#FF3B30", "above"),
         ],
+        "panel": {
+            "title": "Wybicie poza bandę (× ATR)",
+            "lines": [
+                ("W górę (→ short)", pd.Series(sim["up_m0"], index=idx), "#FF3B30"),
+                ("W dół (→ long)", pd.Series(sim["dn_m0"], index=idx), "#00D084"),
+            ],
+            "levels": (1.0,),
+            "range": (0, 4),
+        },
     }

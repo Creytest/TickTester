@@ -253,13 +253,14 @@ def draw_stats(fig, stats: dict, left: float, right: float) -> None:
 
 
 # Podfoldery strategii według źródła.
-STRATEGY_SOURCES = ("tiktok", "reddit")
+STRATEGY_SOURCES = ("tiktok", "reddit", "tradingview")
 
 
 def load_strategy(name: str):
     """
     Moduł strategii po samej nazwie pliku, np. "RSI6_80_20".
-    Szuka w strategies/tiktok, strategies/reddit, potem w strategies.
+    Szuka w strategies/tiktok, strategies/reddit, strategies/tradingview,
+    potem w strategies.
     Stare nazwy z przedrostkiem "tick_" też działają.
     """
     folder = Path(__file__).resolve().parent / "strategies"
@@ -385,6 +386,11 @@ def main(
             asset, all_ticks, warmup_start
         )
         print(f"Szczyt sprzed rozgrzewki: {strategy_module.HISTORY_HIGH}")
+
+    # Strategie z ceną "1 tick za świecą" (atrybut TICK) dostają
+    # najmniejszą zmianę ceny aktywa (syminfo.mintick).
+    if hasattr(strategy_module, "TICK"):
+        strategy_module.TICK = TICK_SIZE[asset]
 
     # ========================================================
     # 2. BACKTEST

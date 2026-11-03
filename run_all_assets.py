@@ -20,7 +20,7 @@ from interactive_chart import save_interactive_chart
 # ============================================================
 
 # Plik strategii (bez .py) — wystarczy sama nazwa, folder
-# (strategies/tiktok albo strategies/reddit) znajdzie się sam.
+# (strategies/tiktok, strategies/reddit albo strategies/tradingview) znajdzie się sam.
 #
 # ---------------- Strategie z TikToka (strategies/tiktok) ----------------
 #   "BigBeluga_Stoch_80percent" — BigBeluga Two-Pole + Stochastic 7,3,3
@@ -48,6 +48,11 @@ from interactive_chart import save_interactive_chart
 #                                 tylko long, 1% ryzyka; szczyt liczony z całego pliku danych, nie tylko z okresu
 #   "HolyGrail"                 — Holy Grail (Connors & Raschke "Street Smarts" 1995): ADX 14 > 30 i rośnie, dotyk EMA 20,
 #                                 buy/sell stop za poprzednią świecą, SL dołek cofnięcia, TP ostatni szczyt; 15m/1h/4h + 1D
+#
+# ---------------- Strategie z TradingView (strategies/tradingview) ----------------
+#   "BressertCycleSignals"      — Bressert Cycle Signals (BY_Tse, Community Scripts): Double Stochastic 10 skręca spod 40 /
+#                                 znad 70, trend z wyższego interwału, buy/sell stop za świecą setupu (4 świece),
+#                                 SL za dołkiem/szczytem, trailing 2 świece od 70/40, reverse; 15m/1h/4h + 1D (autor: D1)
 # Kolejka: lista nazw, np. ["EMA9", "RSI_90", "HolyGrail"] — strategie
 # liczą się po kolei, każda zapisuje wyniki we własnym podfolderze.
 # Błąd jednej strategii nie zatrzymuje kolejnych.

@@ -43,6 +43,8 @@ def save_interactive_chart(
     markers: list | None = None,
     max_bars: int | None = HTML_MAX_BARS,
     panel2: dict | None = None,
+    zones: list | None = None,
+    lines: list | None = None,
 ) -> None:
     # Import tutaj, aby brak plotly nie blokował reszty programu.
     import plotly.graph_objects as go
@@ -65,6 +67,9 @@ def save_interactive_chart(
         t0 = bars.index[i0]
         t1 = bars.index[i1] if i1 < len(bars) else pd.Timestamp.max
 
+        zones, lines = clip_shapes(
+            zones, lines, bars.index, bars.index[i0], bars.index[i1 - 1]
+        )
         bars = bars.iloc[i0:i1]
         signals = signals.reindex(bars.index)
         trend = trend.reindex(bars.index) if trend is not None else None
@@ -267,6 +272,42 @@ def save_interactive_chart(
                 line=dict(color=color, width=1.5),
                 name=name,
                 hoverinfo="skip",
+            ),
+            row=1,
+            col=1,
+        )
+
+    # Strefy wskaźnika (prostokąty), np. wsparcia i opory: jeden
+    # wypełniony ślad na kolor, prostokąty rozdzielone przerwami.
+    by_color = {}
+    for t0, t1, top, bot, color in zones or []:
+        x0, x1 = bar_position([t0, t1])
+        xs, ys = by_color.setdefault(color, ([], []))
+        xs += [x0 - 0.5, x1 + 0.5, x1 + 0.5, x0 - 0.5, x0 - 0.5, None]
+        ys += [top, top, bot, bot, top, None]
+    for color, (xs, ys) in by_color.items():
+        fig.add_trace(
+            go.Scatter(
+                x=xs, y=ys, mode="lines", fill="toself", fillcolor=color,
+                line=dict(width=0.5, color=color), name="Strefy",
+                hoverinfo="skip", showlegend=False,
+            ),
+            row=1,
+            col=1,
+        )
+
+    # Odcinki linii wskaźnika, np. linie trendu: jeden ślad na kolor.
+    by_color = {}
+    for t0, y0, t1, y1, color in lines or []:
+        x0, x1 = bar_position([t0, t1])
+        xs, ys = by_color.setdefault(color, ([], []))
+        xs += [x0, x1, None]
+        ys += [y0, y1, None]
+    for color, (xs, ys) in by_color.items():
+        fig.add_trace(
+            go.Scattergl(
+                x=xs, y=ys, mode="lines", line=dict(color=color, width=2),
+                name="Linie", hoverinfo="skip", showlegend=False,
             ),
             row=1,
             col=1,
@@ -607,6 +648,41 @@ def save_interactive_chart(
         config={"scrollZoom": True, "displaylogo": False},
         post_script=_AXIS_SCRIPT.replace("__DATA__", json.dumps(data)),
     )
+
+
+def clip_shapes(zones, lines, index, start, end):
+    """
+    Przycina strefy i odcinki linii do świec od start do end.
+    index: ciągłe świece obejmujące końce kształtów — linia jest
+    prosta w numerach świec, więc cenę na krawędzi liczymy z nich.
+    """
+    if not zones and not lines:
+        return zones, lines
+
+    index = pd.DatetimeIndex(index)
+
+    def pos(t):
+        return int(index.searchsorted(pd.Timestamp(t), side="right") - 1)
+
+    p_start, p_end = pos(start), pos(end)
+
+    out_zones = []
+    for t0, t1, top, bot, color in zones or []:
+        if pd.Timestamp(t1) < start or pd.Timestamp(t0) > end:
+            continue
+        out_zones.append((max(t0, start), min(t1, end), top, bot, color))
+
+    out_lines = []
+    for t0, y0, t1, y1, color in lines or []:
+        if pd.Timestamp(t1) < start or pd.Timestamp(t0) > end:
+            continue
+        a, b = pos(t0), pos(t1)
+        slope = (y1 - y0) / (b - a) if b != a else 0.0
+        a2, b2 = max(a, p_start), min(b, p_end)
+        out_lines.append(
+            (index[a2], y0 + slope * (a2 - a), index[b2], y0 + slope * (b2 - a), color)
+        )
+    return out_zones, out_lines
 
 
 def reindex_panel(panel: dict | None, index) -> dict | None:

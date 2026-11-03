@@ -17,7 +17,7 @@ from tick_config import (
 )
 from tick_data import daily_max_bid, load_ticks_cached
 from tick_backtest import run_backtest
-from interactive_chart import _marker_gap, reindex_panel, save_interactive_chart
+from interactive_chart import _marker_gap, clip_shapes, reindex_panel, save_interactive_chart
 import importlib
 
 
@@ -555,6 +555,14 @@ def main(
     # do value (jak Volume Delta Candles LuxAlgo).
     candle_fill = indicators.get("candle_fill")
 
+    # Opcjonalne strefy (prostokąty) i odcinki linii na cenie:
+    # zones (czas od, czas do, góra, dół, kolor), lines (czas od,
+    # cena od, czas do, cena do, kolor) — przycięte do okresu.
+    shape_zones, shape_lines = clip_shapes(
+        indicators.get("zones"), indicators.get("lines"),
+        bars_all.index, bars.index[0], bars.index[-1],
+    )
+
     if candle_fill is not None:
         candle_fill = {
             key: series.reindex(bars.index)
@@ -983,6 +991,8 @@ def main(
                 overlays=overlays,
                 candle_fill=candle_fill,
                 markers=markers,
+                zones=shape_zones,
+                lines=shape_lines,
             )
         except ImportError:
             print(

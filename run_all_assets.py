@@ -64,8 +64,12 @@ from interactive_chart import save_interactive_chart
 #   "LiquidityHuntPro"          — Liquidity Hunt Pro (Viprasol): sweep swing low/high (pivot) + w ciągu kilku świec mocne
 #                                 zamknięcie za przeciwnym swingiem → BUY/SELL; SL za knotem sweepu, po 1/3 na TP 1/2/3 × ryzyko;
 #                                 1m/15m/1h/4h/1D z ustawieniami autora dla interwału (scalping / intraday / swing + EMA 50/200)
-#   (bez strategii) AutoLevelsTrendlines — Auto Levels & Trendlines + Breakout Check: wskaźnik bez wejść/SL/TP,
-#                                 liczony osobno skryptem event_study.py (badanie zdarzeń: TRUE/FALSE i ruch po sygnale)
+#   "AutoLevelsTrendlines"      — Auto Levels & Trendlines + Breakout Check: strefy S/R i linie trendu z pivotów 5/5,
+#                                 wejście na TRUE breakout (3 zamknięcia za granicą), wyjście po HOLD_BARS = 10 świecach
+#                                 (nasze założenie, autor nie podaje), bez SL/TP, 100% kapitału; 15m/1h/4h
+#   "AutoLevelsTrendlines_Control" — grupa kontrolna: te same liczby wejść, kierunki i czas trzymania, losowe momenty.
+#                                 Liczyć razem z AutoLevelsTrendlines, potem compare_control.py (plansze porównania).
+#                                 Badanie zdarzeń bez transakcji: event_study.py
 # Kolejka: lista nazw, np. ["EMA9", "RSI_90", "HolyGrail"] — strategie
 # liczą się po kolei, każda zapisuje wyniki we własnym podfolderze.
 # Błąd jednej strategii nie zatrzymuje kolejnych.

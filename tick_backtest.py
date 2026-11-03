@@ -134,6 +134,7 @@ def run_backtest(
     opposite_signal: str = "ignore",
     same_signal: str = "ignore",
     max_entries: int = 1,
+    tp_split: tuple | None = None,
 ) -> dict:
     """
     Backtest strategii na tickach Bid/Ask.
@@ -173,6 +174,11 @@ def run_backtest(
         fixed_quantity. Wszystkie wejścia zamykają się razem,
         a każde jest osobną transakcją na liście (jak w TV).
     "ignore" — sygnał jest pomijany.
+
+    Częściowe wyjścia (tp_split, np. (1/3, 1/3, 1/3)): pozycja
+    dzieli się na części, każda z własnym TP z kolumn take_profit,
+    take_profit_2, take_profit_3 i wspólnym SL. Każda część jest
+    osobną transakcją na liście (jak strategy.exit z qty_percent).
 
     Opcjonalna kolumna entry_stop (zlecenie stop, jak strategy.entry
     ze stop= w Pine Script): sygnał buy / sell z ceną entry_stop
@@ -257,6 +263,13 @@ def run_backtest(
         else None
     )
 
+    extra_tps = [
+        signals[column].to_numpy(dtype=float)
+        if column in signals.columns
+        else None
+        for column in ("take_profit_2", "take_profit_3")
+    ]
+
     entry_stops = (
         signals["entry_stop"].to_numpy(dtype=float)
         if "entry_stop" in signals.columns
@@ -305,6 +318,10 @@ def run_backtest(
                     else np.nan
                 ),
                 "stop_until": stop_until[i],
+                "extra_tps": [
+                    float(column[i]) if column is not None else np.nan
+                    for column in extra_tps
+                ],
             }
         )
 
@@ -371,18 +388,47 @@ def run_backtest(
     # Wyjście na końcu danych zapisujemy jako n_ticks.
     trade_spans = []
 
+    # Częściowe wyjścia: (indeks ticku, powód, poziom TP) dla
+    # każdej części pozycji, w kolejności TP1, TP2, TP3.
+    leg_exits = []
+
     def close(index, reason):
         # Wszystkie wejścia pozycji kończą się na tym samym ticku.
         legs = len(engine.position.legs)
         engine.close_position(*tick_at(index), reason)
         for span in trade_spans[-legs:]:
             span[1] = index
+        leg_exits.clear()
 
     def close_at_exit():
+        nonlocal exit_index, exit_reason
+        if leg_exits:
+            # Zamykamy pierwszą otwartą część pozycji.
+            index, reason, level = leg_exits.pop(0)
+            span = trade_spans[-len(engine.position.legs)]
+            engine.close_first_leg(
+                *tick_at(index), reason, take_profit=level
+            )
+            span[1] = index
+            if leg_exits:
+                exit_index, exit_reason = leg_exits[0][0], leg_exits[0][1]
+            else:
+                exit_index, exit_reason = -1, None
+            return
+
         # Przy trailing stopie zapisujemy poziom, który zadziałał.
         if exit_stop is not None:
             engine.position.stop_loss = exit_stop
         close(exit_index, exit_reason)
+
+    def flush_exits(index):
+        """Zamyka wszystko, co SL/TP zamknęły do ticku index."""
+        while (
+            engine.position is not None
+            and exit_index != -1
+            and exit_index <= index
+        ):
+            close_at_exit()
 
     for event in signal_events:
         # Pomijamy niejednoznaczny sygnał.
@@ -411,9 +457,8 @@ def run_backtest(
             engine.position is not None
             and event["exit_" + engine.position.side]
         ):
-            if exit_index != -1 and exit_index <= i:
-                close_at_exit()
-            else:
+            flush_exits(i)
+            if engine.position is not None:
                 close(i, "exit_signal")
 
         if not (event["buy"] or event["sell"]):
@@ -459,9 +504,10 @@ def run_backtest(
         # SL/TP sprawdzane są przed sygnałami na tym samym ticku,
         # więc pozycja zamknięta na ticku i zwalnia miejsce.
         if engine.position is not None:
-            if exit_index != -1 and exit_index <= i:
-                close_at_exit()
-            elif engine.position.side == desired_side:
+            flush_exits(i)
+
+        if engine.position is not None:
+            if engine.position.side == desired_side:
                 if same_signal == "update_exits":
                     # Nowe poziomy działają od tego ticku; jeśli są
                     # już przekroczone, pozycja zamyka się od razu.
@@ -554,21 +600,46 @@ def run_backtest(
         if quantity <= 0:
             continue
 
+        split = (
+            tp_split is not None
+            and tp is not None
+            and not any(np.isnan(event["extra_tps"][:len(tp_split) - 1]))
+        )
+        levels = (
+            [tp] + event["extra_tps"][:len(tp_split) - 1]
+            if split
+            else [tp]
+        )
+        fractions = tp_split if split else (1.0,)
+
         engine.open_position(
             side=desired_side,
             timestamp=timestamp,
             bid=bid,
             ask=ask,
-            quantity=quantity,
+            quantity=quantity * fractions[0],
             stop_loss=sl,
             take_profit=tp,
         )
         trade_spans.append([i, n_ticks])
 
+        # Pozostałe części pozycji: to samo wejście, inny TP.
+        for fraction in fractions[1:]:
+            engine.add_to_position(timestamp, bid, ask, quantity * fraction)
+            trade_spans.append([i, n_ticks])
+
         # SL/TP sprawdzamy od następnego ticku po wejściu.
-        exit_index, exit_reason, exit_stop = find_exit(
-            desired_side, sl, tp, i + 1
-        )
+        if split:
+            leg_exits.clear()
+            for level in levels:
+                index, reason, _ = find_exit(desired_side, sl, level, i + 1)
+                leg_exits.append((index, reason, level))
+            exit_index, exit_reason = leg_exits[0][0], leg_exits[0][1]
+            exit_stop = None
+        else:
+            exit_index, exit_reason, exit_stop = find_exit(
+                desired_side, sl, tp, i + 1
+            )
 
     # ========================================================
     # 4. Zamknięcie pozycji na końcu dostępnych danych
@@ -576,8 +647,7 @@ def run_backtest(
 
     closed_at_end = False
 
-    if engine.position is not None and exit_index != -1:
-        close_at_exit()
+    flush_exits(n_ticks)
 
     if engine.position is not None and n_ticks > 0:
         engine.close_position(*tick_at(n_ticks - 1), "end_of_data")

@@ -53,6 +53,9 @@ from interactive_chart import save_interactive_chart
 #   "BressertCycleSignals"      — Bressert Cycle Signals (BY_Tse, Community Scripts): Double Stochastic 10 skręca spod 40 /
 #                                 znad 70, trend z wyższego interwału, buy/sell stop za świecą setupu (4 świece),
 #                                 SL za dołkiem/szczytem, trailing 2 świece od 70/40, reverse; 15m/1h/4h + 1D (autor: D1)
+#   "StrongPressureSignals"     — Strong Pressure Signals (ProjectSyndicate): knot poza EMA 20 ± 2 ATR (szczyt ≥ 1 ATR), gdy
+#                                 wybicie słabnie → wejście przeciw ruchowi; SL za wybiciem, po 1/3 na TP1/TP2/TP3 (klastry
+#                                 z pivotów albo 1/2/3 × SL), time stop 200 świec; 15m/1h/4h (autor: XAUUSD intraday)
 # Kolejka: lista nazw, np. ["EMA9", "RSI_90", "HolyGrail"] — strategie
 # liczą się po kolei, każda zapisuje wyniki we własnym podfolderze.
 # Błąd jednej strategii nie zatrzymuje kolejnych.

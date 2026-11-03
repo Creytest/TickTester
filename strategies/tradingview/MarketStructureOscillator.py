@@ -1,6 +1,9 @@
 """
 Market Structure Oscillator [BigBeluga] (TradingView Community Scripts):
 https://pl.tradingview.com/script/mFMTYEYR-Market-Structure-Oscillator-BigBeluga/
+© BigBeluga, oryginał na licencji CC BY-NC-SA 4.0
+(https://creativecommons.org/licenses/by-nc-sa/4.0/); ten port jest
+adaptacją i podlega tej samej licencji.
 
 Port 1:1 części wskaźnika, która decyduje o kierunku (Pine v6,
 indicator, ustawienia domyślne):

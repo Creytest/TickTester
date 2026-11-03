@@ -629,10 +629,16 @@ def _equity_curve(
 
     unit = np.datetime_data(timestamps.dtype)[0]
     step = pd.Timedelta(timeframe) // pd.Timedelta(1, unit=unit)
-    keys = timestamps.astype("int64") // step
-    sample = np.flatnonzero(
-        np.concatenate(([True], keys[1:] != keys[:-1]))
-    )
+    # Pierwszy tick każdego interwału: szukamy granic interwałów
+    # w posortowanych tickach zamiast liczyć klucz dla każdego ticku
+    # (przy ~330 mln ticków BTC to 2,5 GB pamięci).
+    first_key = int(timestamps[0].astype("int64")) // step
+    last_key = int(timestamps[-1].astype("int64")) // step
+    edges = (
+        np.arange(first_key, last_key + 1, dtype=np.int64) * step
+    ).astype(timestamps.dtype)
+    sample = np.unique(np.searchsorted(timestamps, edges, side="left"))
+    sample = sample[sample < len(timestamps)]
 
     # Zmiany kapitału zrealizowanego w kolejności ticków.
     # Na tym samym ticku zamknięcie następuje przed wejściem.

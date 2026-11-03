@@ -59,6 +59,8 @@ from interactive_chart import save_interactive_chart
 #   "MarketStructureOscillator" — Market Structure Oscillator (BigBeluga): zamknięcie przebija swing high / low z pivotów 5/5
 #                                 (CHoCH / BoS) → long / short, zawsze w rynku (reverse), bez SL, 100% kapitału;
 #                                 oscylator i dywergencje tylko na wykresie; 15m/1h/4h (autor nie podaje interwału ani rynku)
+#   "AuctionRangeMigrationTrend" — Auction Range Migration Trend (SchizoQuant): trend score z ruchu
+#                                 świec w ATR przebija adaptacyjny próg → LONG/SHORT, zawsze w rynku
 # Kolejka: lista nazw, np. ["EMA9", "RSI_90", "HolyGrail"] — strategie
 # liczą się po kolei, każda zapisuje wyniki we własnym podfolderze.
 # Błąd jednej strategii nie zatrzymuje kolejnych.

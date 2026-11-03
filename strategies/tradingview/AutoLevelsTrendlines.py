@@ -2,11 +2,15 @@
 Auto Levels & Trendlines + Breakout Check (TradingView Community Scripts):
 https://www.tradingview.com/script/7C36YesS-auto-levels-trendlines-breakout-check/
 
-To NIE jest strategia: wskaźnik autora nie ma wejść, SL ani TP
-("This is an analysis aid, not a trading recommendation"). Plik
-zawiera port 1:1 logiki zdarzeń wskaźnika (Pine v6), z którego
-korzysta event_study.py (badanie zdarzeń). Rysunek i tabela
-są pominięte, bo nie wpływają na zdarzenia.
+Wskaźnik autora nie ma wejść, SL ani TP ("This is an analysis aid,
+not a trading recommendation"). Plik zawiera port 1:1 logiki zdarzeń
+wskaźnika (Pine v6), z którego korzystają:
+- event_study.py (badanie zdarzeń, bez transakcji),
+- run_all_assets.py: strategia z NASZYMI założeniami (wejście na
+  TRUE, wyjście po HOLD_BARS świecach) + grupa kontrolna
+  AutoLevelsTrendlines_Control, porównanie: compare_control.py.
+Tabela wskaźnika jest pominięta; strefy, linie i etykiety są
+rysowane na wykresie HTML (indicators()).
 
 Reguły z kodu (ustawienia domyślne, DEFAULTS niżej):
 
@@ -56,6 +60,29 @@ NAME = "Auto Levels & Trendlines"
 
 # Interwał i aktywa: autor ich nie podaje.
 TIMEFRAMES = ["15min", "1h", "4h"]
+
+# ------------------------------------------------------------
+# Wersja do backtestu (NASZE założenia — autor nie podaje zasad
+# handlu, nazywa skrypt "analysis aid"):
+# - wejście na sygnale TRUE (alert "true breakout"): long przy
+#   wybiciu w górę, short w dół, na pierwszym ticku po zamknięciu
+#   świecy, na której wybicie zostało uznane za TRUE (3. zamknięcie
+#   za granicą, licząc świecę wybicia),
+# - wyjście po HOLD_BARS świecach (na pierwszym ticku po zamknięciu
+#   świecy wejścia + HOLD_BARS), bez SL i TP,
+# - jedna pozycja naraz: sygnały w trakcie pozycji są pomijane,
+# - bez SL → 100% kapitału z kapitalizacją.
+# Grupa kontrolna: AutoLevelsTrendlines_Control.py (te same wejścia
+# co do liczby i kierunku, ale w losowych momentach).
+# ------------------------------------------------------------
+HOLD_BARS = 10
+
+OPPOSITE_SIGNAL = "ignore"
+SAME_SIGNAL = "ignore"
+EQUITY_FRACTION = 1.0
+
+# Ustawienia wskaźnika inne niż domyślne autora, np. {"conf_bars": 2}.
+PARAMS = {}
 
 DEFAULTS = {
     "swing_len": 5,
@@ -108,6 +135,8 @@ class Level:
     last_touch: int
     born: int
     broken: bool = False
+    qual_bar: int | None = None  # pierwsza świeca z >= min dotyków
+    end_bar: int | None = None   # złamanie albo wypadnięcie z listy
 
 
 @dataclass
@@ -118,7 +147,9 @@ class TLine:
     is_high: bool
     touches: int
     last_t: int
+    created: int = 0             # świeca, na której linia powstała
     broken: bool = False
+    end_bar: int | None = None
 
     def value(self, x: int) -> float:
         return self.y1 + self.slope * (x - self.x1)
@@ -140,7 +171,7 @@ class Brk:
     log: list = field(default_factory=list)  # (bar, state)
 
 
-def _add_pivot(levels, p, piv_bar, close, atr_v, prm):
+def _add_pivot(levels, p, piv_bar, close, atr_v, prm, history):
     tol = prm["tol_atr"] * atr_v
     pad = prm["pad_atr"] * atr_v
     for lv in levels:
@@ -151,17 +182,17 @@ def _add_pivot(levels, p, piv_bar, close, atr_v, prm):
                 lv.top, lv.bot = nt, nb
                 lv.price = (nt + nb) / 2
                 return
-    levels.append(
-        Level(
-            price=p,
-            top=p + pad,
-            bot=p - pad,
-            side=1 if close > p else -1,
-            touches=1,
-            last_touch=piv_bar,
-            born=piv_bar,
-        )
+    lv = Level(
+        price=p,
+        top=p + pad,
+        bot=p - pad,
+        side=1 if close > p else -1,
+        touches=1,
+        last_touch=piv_bar,
+        born=piv_bar,
     )
+    levels.append(lv)
+    history.append(lv)
 
 
 def _tl_eval(high, low, is_high, xa, ya, xb, yb, tol, gap):
@@ -189,7 +220,7 @@ def _tl_eval(high, low, is_high, xa, ya, xb, yb, tol, gap):
     return True, n, slope
 
 
-def _try_line(tls, py, px, is_high, high, low, atr_v, prm):
+def _try_line(tls, py, px, is_high, high, low, atr_v, prm, bar, history):
     sz = len(py)
     if sz < 2:
         return
@@ -225,10 +256,14 @@ def _try_line(tls, py, px, is_high, high, low, atr_v, prm):
                 is_high=is_high,
                 touches=best_n,
                 last_t=xb,
+                created=bar,
             )
         )
+        history.append(tls[-1])
         while len(tls) > prm["max_tl"]:
-            tls.pop(0)
+            old = tls.pop(0)
+            if old.end_bar is None:
+                old.end_bar = bar
 
 
 def breakout_events(bars: pd.DataFrame, **params) -> pd.DataFrame:
@@ -241,6 +276,12 @@ def breakout_events(bars: pd.DataFrame, **params) -> pd.DataFrame:
     final_state, vol_ratio oraz czasy *_time.
     Indeksy świec liczone od 0 w `bars`.
     """
+    brks, _, _ = _run(bars, params)
+    return _events_frame(brks, bars.index)
+
+
+def _run(bars: pd.DataFrame, params: dict):
+    """Pełny przebieg wskaźnika: (wybicia, historia stref, historia linii)."""
     prm = {**DEFAULTS, **params}
     unknown = set(params) - set(DEFAULTS)
     if unknown:
@@ -265,6 +306,14 @@ def breakout_events(bars: pd.DataFrame, **params) -> pd.DataFrame:
     brks: list[Brk] = []
     done_brks: list[Brk] = []
     ph_y, ph_x, pl_y, pl_x = [], [], [], []
+    lv_hist: list[Level] = []
+    tl_hist: list[TLine] = []
+
+    def trim_levels(bar):
+        while len(levels) > prm["max_lv"]:
+            old = levels.pop(0)
+            if old.end_bar is None:
+                old.end_bar = bar
     sl = prm["swing_len"]
     min_gap = prm["min_gap"]
 
@@ -283,11 +332,10 @@ def breakout_events(bars: pd.DataFrame, **params) -> pd.DataFrame:
                 ph_y.pop(0)
                 ph_x.pop(0)
             if prm["show_levels"]:
-                _add_pivot(levels, ph[i], xh, c, a, prm)
-                while len(levels) > prm["max_lv"]:
-                    levels.pop(0)
+                _add_pivot(levels, ph[i], xh, c, a, prm, lv_hist)
+                trim_levels(i)
             if prm["show_lines"]:
-                _try_line(tls, ph_y, ph_x, True, high, low, a, prm)
+                _try_line(tls, ph_y, ph_x, True, high, low, a, prm, i, tl_hist)
         if not np.isnan(pl[i]):
             xl = i - sl
             pl_y.append(pl[i])
@@ -296,11 +344,10 @@ def breakout_events(bars: pd.DataFrame, **params) -> pd.DataFrame:
                 pl_y.pop(0)
                 pl_x.pop(0)
             if prm["show_levels"]:
-                _add_pivot(levels, pl[i], xl, c, a, prm)
-                while len(levels) > prm["max_lv"]:
-                    levels.pop(0)
+                _add_pivot(levels, pl[i], xl, c, a, prm, lv_hist)
+                trim_levels(i)
             if prm["show_lines"]:
-                _try_line(tls, pl_y, pl_x, False, high, low, a, prm)
+                _try_line(tls, pl_y, pl_x, False, high, low, a, prm, i, tl_hist)
 
         # ---------- aktualizacja i wybicia ----------
         tol_t = prm["tol_atr"] * a
@@ -321,11 +368,14 @@ def breakout_events(bars: pd.DataFrame, **params) -> pd.DataFrame:
                     lv.touches += 1
                     lv.last_touch = i
                 qual = lv.touches >= prm["min_touch_lv"]
+                if qual and lv.qual_bar is None:
+                    lv.qual_bar = i
                 b_up = lv.side == -1 and c > lv.top + buf
                 b_dn = lv.side == 1 and c < lv.bot - buf
                 if b_up or b_dn:
                     if qual:
                         lv.broken = True
+                        lv.end_bar = i
                         brks.append(
                             Brk(
                                 kind="level",
@@ -358,6 +408,7 @@ def breakout_events(bars: pd.DataFrame, **params) -> pd.DataFrame:
                 t_dn = (not t.is_high) and c < yl - buf
                 if t_up or t_dn:
                     t.broken = True
+                    t.end_bar = i
                     brks.append(
                         Brk(
                             kind="line",
@@ -411,7 +462,7 @@ def breakout_events(bars: pd.DataFrame, **params) -> pd.DataFrame:
             if done:
                 done_brks.append(brks.pop(j))
 
-    return _events_frame(done_brks + brks, bars.index)
+    return done_brks + brks, lv_hist, tl_hist
 
 
 def _events_frame(brks, index) -> pd.DataFrame:
@@ -447,3 +498,137 @@ def _events_frame(brks, index) -> pd.DataFrame:
             index[v] if pd.notna(v) else pd.NaT for v in events[col]
         ]
     return events.sort_values(["breakout_bar", "kind"]).reset_index(drop=True)
+
+
+# ============================================================
+# STRATEGIA (nasze założenia, patrz HOLD_BARS u góry)
+# ============================================================
+
+_CACHE = {}
+
+
+def _cached_run(bars: pd.DataFrame):
+    """generate_signals i indicators liczą to samo — liczymy raz."""
+    key = (
+        len(bars),
+        bars.index[0] if len(bars) else None,
+        bars.index[-1] if len(bars) else None,
+        float(bars["close"].sum()) if len(bars) else 0.0,
+        tuple(sorted(PARAMS.items())),
+    )
+    if key not in _CACHE:
+        _CACHE.clear()
+        _CACHE[key] = _run(bars, PARAMS)
+    return _CACHE[key]
+
+
+def true_signals(bars: pd.DataFrame) -> list[tuple[int, int]]:
+    """(świeca TRUE, kierunek) dla każdego wybicia uznanego za TRUE."""
+    brks, _, _ = _cached_run(bars)
+    out = []
+    for b in brks:
+        for bar, state in b.log:
+            if state == TRUE:
+                out.append((bar, b.dir))
+    return sorted(out)
+
+
+def take_entries(signals, hold: int) -> list[tuple[int, int]]:
+    """Jedna pozycja naraz: kolejne wejście dopiero po świecy wyjścia."""
+    taken = []
+    busy_until = -1
+    for bar, direction in signals:
+        if bar > busy_until:
+            taken.append((bar, direction))
+            busy_until = bar + hold
+    return taken
+
+
+def signals_frame(bars: pd.DataFrame, entries, hold: int) -> pd.DataFrame:
+    n = len(bars)
+    buy = np.zeros(n, dtype=bool)
+    sell = np.zeros(n, dtype=bool)
+    exit_long = np.zeros(n, dtype=bool)
+    exit_short = np.zeros(n, dtype=bool)
+    for bar, direction in entries:
+        (buy if direction == 1 else sell)[bar] = True
+        if bar + hold < n:
+            (exit_long if direction == 1 else exit_short)[bar + hold] = True
+    return pd.DataFrame(
+        {"buy": buy, "sell": sell, "exit_long": exit_long, "exit_short": exit_short},
+        index=bars.index,
+    )
+
+
+def generate_signals(bars: pd.DataFrame) -> pd.DataFrame:
+    entries = take_entries(true_signals(bars), HOLD_BARS)
+    return signals_frame(bars, entries, HOLD_BARS)
+
+
+def indicators(bars: pd.DataFrame) -> dict:
+    """
+    Strefy (prostokąty), linie trendu i etykiety jak na wykresie
+    autora: W wybicie (⚡ w TV), ✓ TRUE, ✗ FALSE / nieudany retest.
+    Strefa rysowana od pivota, od którego powstała (jak box w Pine),
+    do złamania albo wypadnięcia z listy 20 stref; tylko strefy,
+    które doszły do min. liczby dotyków. Panel: ATR(14).
+    """
+    brks, lv_hist, tl_hist = _cached_run(bars)
+    idx = bars.index
+    last = len(bars) - 1
+
+    zones = []
+    for lv in lv_hist:
+        if lv.qual_bar is None:
+            continue
+        end = lv.end_bar if lv.end_bar is not None else last
+        if lv.broken:
+            color = "rgba(150,150,150,0.18)"
+        elif lv.side == -1:
+            color = "rgba(239,83,80,0.22)"
+        else:
+            color = "rgba(38,166,154,0.22)"
+        zones.append((idx[lv.born], idx[end], lv.top, lv.bot, color))
+
+    lines = []
+    for t in tl_hist:
+        end = t.end_bar if t.end_bar is not None else last
+        if t.broken:
+            color = "rgba(150,150,150,0.8)"
+        else:
+            color = "#ffa726" if t.is_high else "#42a5f5"
+        lines.append((idx[t.x1], t.y1, idx[end], t.value(end), color))
+
+    def mask(bars_list):
+        m = np.zeros(len(bars), dtype=bool)
+        m[list(bars_list)] = True
+        return pd.Series(m, index=idx)
+
+    labels = []
+    for direction, where in ((1, "below"), (-1, "above")):
+        sel = [b for b in brks if b.dir == direction]
+        brk_bars = [b.bar for b in sel]
+        true_bars = [bar for b in sel for bar, st in b.log if st == TRUE]
+        false_bars = [
+            bar for b in sel for bar, st in b.log if st in (FALSE, RETEST_FAIL)
+        ]
+        arrow = "▲" if direction == 1 else "▼"
+        labels += [
+            (f"Wybicie {arrow}", mask(brk_bars), "W", "#ffca28", where),
+            (f"TRUE {arrow}", mask(true_bars), "✓", "#4caf50", where),
+            (f"FALSE {arrow}", mask(false_bars), "✗", "#ef5350", where),
+        ]
+
+    atr_series = pd.Series(atr_rma(bars, DEFAULTS["atr_len"]), index=idx)
+    return {
+        "trend": None,
+        "zones": zones,
+        "lines": lines,
+        "labels": labels,
+        "panel": {
+            "title": "ATR(14)",
+            "lines": [("ATR(14)", atr_series, "#B0BEC5")],
+            "levels": (),
+            "range": (0, float(np.nanpercentile(atr_series, 99.5)) * 1.3 or 1.0),
+        },
+    }

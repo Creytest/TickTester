@@ -332,81 +332,106 @@ class TickExecutionEngine:
         if bid <= 0 or ask < bid:
             raise ValueError("Nieprawidłowe ceny Bid/Ask.")
 
+        # Każde wejście (leg) to osobna transakcja z tym samym
+        # wyjściem. Bez dokładania jest jedno wejście.
+        while self.position is not None:
+            trade = self.close_first_leg(timestamp, bid, ask, reason)
+        return trade
+
+    def close_first_leg(
+        self,
+        timestamp,
+        bid: float,
+        ask: float,
+        reason: str = "signal",
+        take_profit: float | None = None,
+    ) -> dict:
+        """
+        Zamyka pierwsze wejście (leg) pozycji jako osobną transakcję.
+        Przy częściowych wyjściach (TP1/TP2/TP3) każda część pozycji
+        jest osobnym legiem. Ostatni leg zamyka całą pozycję.
+        """
+        if self.position is None:
+            raise RuntimeError("Brak otwartej pozycji.")
+        if bid <= 0 or ask < bid:
+            raise ValueError("Nieprawidłowe ceny Bid/Ask.")
+
         pos = self.position
+        leg = pos.legs.pop(0)
 
         if pos.side == "long":
             exit_price = bid - self.slippage
+            gross_pnl = (exit_price - leg.entry_price) * leg.quantity
         else:
             exit_price = ask + self.slippage
+            gross_pnl = (leg.entry_price - exit_price) * leg.quantity
 
-        # Każde wejście (leg) to osobna transakcja z tym samym
-        # wyjściem. Bez dokładania jest jedno wejście.
-        for leg in pos.legs:
+        exit_commission = self._commission(exit_price, leg.quantity)
+        net_pnl = gross_pnl - leg.entry_commission - exit_commission
+
+        self.capital += gross_pnl - exit_commission
+
+        # Szacowana strata, gdyby SL został wykonany na poziomie
+        # stop loss z uwzględnieniem skonfigurowanego poślizgu.
+        planned_loss_at_sl = None
+        stop_gap = 0.0
+
+        if pos.stop_loss is not None:
             if pos.side == "long":
-                gross_pnl = (exit_price - leg.entry_price) * leg.quantity
+                planned_exit = pos.stop_loss - self.slippage
+                stop_gap = max(0.0, planned_exit - exit_price)
+                planned_gross_loss = (
+                    leg.entry_price - planned_exit
+                ) * leg.quantity
             else:
-                gross_pnl = (leg.entry_price - exit_price) * leg.quantity
+                planned_exit = pos.stop_loss + self.slippage
+                stop_gap = max(0.0, exit_price - planned_exit)
+                planned_gross_loss = (
+                    planned_exit - leg.entry_price
+                ) * leg.quantity
 
-            exit_commission = self._commission(exit_price, leg.quantity)
-            net_pnl = gross_pnl - leg.entry_commission - exit_commission
+            planned_exit_commission = self._commission(
+                planned_exit, leg.quantity
+            )
 
-            self.capital += gross_pnl - exit_commission
+            planned_loss_at_sl = (
+                planned_gross_loss
+                + leg.entry_commission
+                + planned_exit_commission
+            )
 
-            # Szacowana strata, gdyby SL został wykonany na poziomie
-            # stop loss z uwzględnieniem skonfigurowanego poślizgu.
-            planned_loss_at_sl = None
-            stop_gap = 0.0
+        trade = {
+            "side": pos.side,
+            "entry_time": leg.entry_time,
+            "exit_time": pd.Timestamp(timestamp),
+            "quantity": leg.quantity,
+            "entry_price": leg.entry_price,
+            "exit_price": float(exit_price),
+            "stop_loss": pos.stop_loss,
+            "take_profit": (
+                take_profit if take_profit is not None else pos.take_profit
+            ),
+            "stop_gap": float(stop_gap),
+            "planned_loss_at_sl": (
+                float(planned_loss_at_sl)
+                if planned_loss_at_sl is not None
+                else None
+            ),
+            "gross_pnl": float(gross_pnl),
+            "entry_commission": float(leg.entry_commission),
+            "exit_commission": float(exit_commission),
+            "net_pnl": float(net_pnl),
+            "capital": float(self.capital),
+            "reason": reason,
+        }
 
-            if pos.stop_loss is not None:
-                if pos.side == "long":
-                    planned_exit = pos.stop_loss - self.slippage
-                    stop_gap = max(0.0, planned_exit - exit_price)
-                    planned_gross_loss = (
-                        leg.entry_price - planned_exit
-                    ) * leg.quantity
-                else:
-                    planned_exit = pos.stop_loss + self.slippage
-                    stop_gap = max(0.0, exit_price - planned_exit)
-                    planned_gross_loss = (
-                        planned_exit - leg.entry_price
-                    ) * leg.quantity
+        self.trades.append(trade)
 
-                planned_exit_commission = self._commission(
-                    planned_exit, leg.quantity
-                )
-
-                planned_loss_at_sl = (
-                    planned_gross_loss
-                    + leg.entry_commission
-                    + planned_exit_commission
-                )
-
-            trade = {
-                "side": pos.side,
-                "entry_time": leg.entry_time,
-                "exit_time": pd.Timestamp(timestamp),
-                "quantity": leg.quantity,
-                "entry_price": leg.entry_price,
-                "exit_price": float(exit_price),
-                "stop_loss": pos.stop_loss,
-                "take_profit": pos.take_profit,
-                "stop_gap": float(stop_gap),
-                "planned_loss_at_sl": (
-                    float(planned_loss_at_sl)
-                    if planned_loss_at_sl is not None
-                    else None
-                ),
-                "gross_pnl": float(gross_pnl),
-                "entry_commission": float(leg.entry_commission),
-                "exit_commission": float(exit_commission),
-                "net_pnl": float(net_pnl),
-                "capital": float(self.capital),
-                "reason": reason,
-            }
-
-            self.trades.append(trade)
-
-        self.position = None
+        if pos.legs:
+            pos.quantity -= leg.quantity
+            pos.entry_commission -= leg.entry_commission
+        else:
+            self.position = None
         return trade
 
 

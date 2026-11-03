@@ -423,6 +423,8 @@ def main(
         max_entries=getattr(strategy_module, "PYRAMIDING", 1),
         # Strategie bez SL: część kapitału na pozycję (np. 100%).
         equity_fraction=getattr(strategy_module, "EQUITY_FRACTION", None),
+        # Częściowe wyjścia na TP1/TP2/TP3, np. (1/3, 1/3, 1/3).
+        tp_split=getattr(strategy_module, "TP_SPLIT", None),
     )
 
     bars_all = result["bars"].copy()

@@ -56,6 +56,9 @@ from interactive_chart import save_interactive_chart
 #   "StrongPressureSignals"     — Strong Pressure Signals (ProjectSyndicate): knot poza EMA 20 ± 2 ATR (szczyt ≥ 1 ATR), gdy
 #                                 wybicie słabnie → wejście przeciw ruchowi; SL za wybiciem, po 1/3 na TP1/TP2/TP3 (klastry
 #                                 z pivotów albo 1/2/3 × SL), time stop 200 świec; 15m/1h/4h (autor: XAUUSD intraday)
+#   "MarketStructureOscillator" — Market Structure Oscillator (BigBeluga): zamknięcie przebija swing high / low z pivotów 5/5
+#                                 (CHoCH / BoS) → long / short, zawsze w rynku (reverse), bez SL, 100% kapitału;
+#                                 oscylator i dywergencje tylko na wykresie; 15m/1h/4h (autor nie podaje interwału ani rynku)
 # Kolejka: lista nazw, np. ["EMA9", "RSI_90", "HolyGrail"] — strategie
 # liczą się po kolei, każda zapisuje wyniki we własnym podfolderze.
 # Błąd jednej strategii nie zatrzymuje kolejnych.

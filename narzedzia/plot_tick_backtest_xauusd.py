@@ -6,7 +6,12 @@ import pandas as pd
 import numpy as np
 from matplotlib.collections import LineCollection
 
-from tick_config import (
+# Uruchamianie bezpośrednio z tego folderu: dodaj folder repo do ścieżki importów.
+import sys
+from pathlib import Path as _Path
+sys.path.insert(0, str(_Path(__file__).resolve().parents[1]))
+
+from narzedzia.tick_config import (
     ASSETS,
     REVERSE_BID_ASK,
     INITIAL_CAPITAL,
@@ -15,9 +20,9 @@ from tick_config import (
     RISK_PER_TRADE,
     TICK_SIZE,
 )
-from tick_data import daily_max_bid, load_ticks_cached
-from tick_backtest import run_backtest
-from interactive_chart import _marker_gap, clip_shapes, reindex_panel, save_interactive_chart
+from narzedzia.tick_data import daily_max_bid, load_ticks_cached
+from narzedzia.tick_backtest import run_backtest
+from narzedzia.interactive_chart import _marker_gap, clip_shapes, reindex_panel, save_interactive_chart
 import importlib
 
 
@@ -263,7 +268,7 @@ def load_strategy(name: str):
     potem w strategies.
     Stare nazwy z przedrostkiem "tick_" też działają.
     """
-    folder = Path(__file__).resolve().parent / "strategies"
+    folder = Path(__file__).resolve().parents[1] / "strategies"
 
     if name.startswith("tick_"):
         name = name[len("tick_"):]
@@ -362,7 +367,7 @@ def main(
     if selected_ticks.empty:
         raise RuntimeError(
             f"Brak ticków w okresie {start_date} – {end_date}. "
-            "Sprawdź zakres dat i ścieżkę w tick_config.py."
+            "Sprawdź zakres dat i ścieżkę w narzedzia/tick_config.py."
         )
 
     first_selected_tick = selected_ticks["timestamp"].iloc[0]
@@ -1057,7 +1062,7 @@ def main(
 
 if __name__ == "__main__":
     # Obok okna matplotlib zapisujemy interaktywny wykres HTML.
-    output_dir = Path(__file__).resolve().parent / "wyniki"
+    output_dir = Path(__file__).resolve().parents[1] / "wyniki"
     output_dir.mkdir(exist_ok=True)
 
     main(

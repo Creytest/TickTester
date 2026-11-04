@@ -30,7 +30,11 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-import event_study
+# Uruchamianie bezpośrednio z tego folderu: dodaj folder repo do ścieżki importów.
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from analizy import event_study
 from strategies.tradingview import Wyckoff as indicator
 
 
@@ -50,7 +54,7 @@ WARMUP_DAYS = 90
 # Ustawienia wskaźnika inne niż domyślne autora, np. {"side": "Accumulation"}.
 PARAMS = {}
 
-OUTPUT_DIR = Path(__file__).resolve().parent / "wyniki" / "event_study_Wyckoff"
+OUTPUT_DIR = Path(__file__).resolve().parents[1] / "wyniki" / "event_study_Wyckoff"
 
 
 # ============================================================

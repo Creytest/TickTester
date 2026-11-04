@@ -2,8 +2,13 @@ from pathlib import Path
 
 import pandas as pd
 
-from tick_config import ASSETS
-from tick_data import file_range, tick_files
+# Uruchamianie bezpośrednio z tego folderu: dodaj folder repo do ścieżki importów.
+import sys
+from pathlib import Path as _Path
+sys.path.insert(0, str(_Path(__file__).resolve().parents[1]))
+
+from narzedzia.tick_config import ASSETS
+from narzedzia.tick_data import file_range, tick_files
 
 
 def main():

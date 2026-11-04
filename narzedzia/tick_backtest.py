@@ -4,7 +4,7 @@ from collections.abc import Callable
 import numpy as np
 import pandas as pd
 
-from tick_engine import TickExecutionEngine, build_bars
+from narzedzia.tick_engine import TickExecutionEngine, build_bars
 
 
 def _find_exit(

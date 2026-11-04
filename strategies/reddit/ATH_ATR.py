@@ -17,7 +17,7 @@ ATR_LENGTH = 14
 ATR_MULT = 3.0
 
 # Najwyższa cena (Bid) w danych sprzed rozgrzewki. Ustawia ją
-# plot_tick_backtest_xauusd.main przed backtestem, żeby szczyt był
+# narzedzia/plot_tick_backtest_xauusd.main przed backtestem, żeby szczyt był
 # naprawdę historyczny, a nie tylko z wczytanego okresu.
 # None: szczyt liczony tylko z wczytanych świec.
 HISTORY_HIGH = None

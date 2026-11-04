@@ -7,9 +7,9 @@ Autor: forex, złoto, indeksy, krypto, 15m–1D. Wskaźnik NIE daje
 wejścia ("The schematic gives structure and targets, not an entry.
 It has no stop loss or position sizing"). Plik zawiera port 1:1
 maszyny stanów wskaźnika (Pine v6), z którego korzystają:
-- event_study_wyckoff.py: track record autora (panel "THIS SYMBOL"),
+- analizy/event_study_wyckoff.py: track record autora (panel "THIS SYMBOL"),
 - run_all_assets.py: strategia z NASZYM wejściem na poziomach autora
-  + grupa kontrolna Wyckoff_Control, porównanie: compare_control.py.
+  + grupa kontrolna Wyckoff_Control, porównanie: analizy/compare_control.py.
 
 Reguły z kodu (ustawienia domyślne, DEFAULTS niżej). Wszystko na
 zamkniętych świecach i dopiero, gdy ATR(50) ma wartość:

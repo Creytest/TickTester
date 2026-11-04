@@ -6,7 +6,7 @@ Port 1:1 liczenia stref (Pine v6, indicator, ustawienia domyślne).
 To NIE jest strategia: wskaźnik nie ma wejść, wyjść, SL ani TP,
 a autor pisze, że strefa "is a place to pay attention to, not a signal
 to buy or sell". Moduł tylko wyznacza strefy; pomiar reakcji ceny
-robi event_study_key_levels.py.
+robi analizy/event_study_key_levels.py.
 
 Reguły z kodu:
 1. Poziomy HL: high, low i środek (mid) poprzedniego dnia, tygodnia
@@ -45,8 +45,8 @@ Wersja do backtestu (NASZE założenia, autor nie podaje zasad handlu,
   wyjście po HOLD_BARS świecach, bez SL i TP, 100% kapitału,
 - jedna pozycja naraz; świeca z dotknięciami w obu kierunkach pomijana.
 Grupa kontrolna: KeyLevelZones_Control.py (te same liczby wejść,
-kierunki i czas trzymania, losowe momenty), porównanie: compare_control.py.
-Badanie zdarzeń bez transakcji: event_study_key_levels.py.
+kierunki i czas trzymania, losowe momenty), porównanie: analizy/compare_control.py.
+Badanie zdarzeń bez transakcji: analizy/event_study_key_levels.py.
 
 Autor nie podaje konkretnego interwału ("Intraday and swing traders who
 plan around daily and weekly key levels") ani rynku.

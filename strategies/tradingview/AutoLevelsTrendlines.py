@@ -5,10 +5,10 @@ https://www.tradingview.com/script/7C36YesS-auto-levels-trendlines-breakout-chec
 Wskaźnik autora nie ma wejść, SL ani TP ("This is an analysis aid,
 not a trading recommendation"). Plik zawiera port 1:1 logiki zdarzeń
 wskaźnika (Pine v6), z którego korzystają:
-- event_study.py (badanie zdarzeń, bez transakcji),
+- analizy/event_study.py (badanie zdarzeń, bez transakcji),
 - run_all_assets.py: strategia z NASZYMI założeniami (wejście na
   TRUE, wyjście po HOLD_BARS świecach) + grupa kontrolna
-  AutoLevelsTrendlines_Control, porównanie: compare_control.py.
+  AutoLevelsTrendlines_Control, porównanie: analizy/compare_control.py.
 Tabela wskaźnika jest pominięta; strefy, linie i etykiety są
 rysowane na wykresie HTML (indicators()).
 

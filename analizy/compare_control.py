@@ -5,7 +5,7 @@ Najpierw policz obie wersje w run_all_assets.py, np.:
     STRATEGY = ["AutoLevelsTrendlines", "AutoLevelsTrendlines_Control"]
 (te same aktywa, interwały i daty), ustaw ACTIVE niżej i uruchom ten plik.
 
-Zapisuje do wyniki/<STRATEGY>/porownanie_z_kontrolna/:
+Zapisuje do wyniki/<STRATEGY>/porownanie_z_kontrolna/ (albo folderu z presetu):
     1_strategia_vs_kontrolna.png — duże liczby obok siebie: ile
         kombinacji na plusie, mediana wyniku netto, mediana Win Rate,
         łączna liczba transakcji,
@@ -57,18 +57,45 @@ PRESETS = {
         "title": "Wyckoff (LunqFX)",
         "strategy_label": "Wejście na SOS / SOW",
     },
+    # Efficiency Weighted Hull: dwa porównania z tą samą strategią.
+    "EfficiencyWeightedHull": {
+        "control": "EfficiencyWeightedHull_Control",
+        "title": "Efficiency Weighted Hull",
+        "strategy_label": "Flipy Hulla",
+        "subtitle_note": "tyle samo odwróceń long/short, losowe momenty",
+    },
+    "EfficiencyWeightedHull_vs_Standard": {
+        "strategy": "EfficiencyWeightedHull",
+        "control": "EfficiencyWeightedHull_Standard",
+        "title": "Efficiency Weighted Hull",
+        "strategy_label": "Efficiency Hull",
+        "control_label": "Zwykły Hull",
+        "versus": "porównanie ze zwykłym Hullem",
+        "better_text": "Efficiency Hull lepszy od zwykłego Hulla",
+        "subtitle_note": "te same reguły, standardowa kompensacja Hulla",
+        "folder": "porownanie_ze_standardowym_hullem",
+    },
 }
 
-STRATEGY = ACTIVE
-CONTROL = PRESETS[ACTIVE]["control"]
+# Klucze opcjonalne w PRESETS (domyślnie: grupa kontrolna z losowymi wejściami):
+#   strategy      — nazwa strategii, jeśli inna niż klucz presetu,
+#   control_label, versus, better_text, subtitle_note, folder.
+
+_P = PRESETS[ACTIVE]
+STRATEGY = _P.get("strategy", ACTIVE)
+CONTROL = _P["control"]
 
 # Te same daty co w run_all_assets.py.
 START_DATE = "2021-01-01"
 END_DATE = "2025-12-31"
 
-TITLE = PRESETS[ACTIVE]["title"]
-STRATEGY_LABEL = PRESETS[ACTIVE]["strategy_label"]
-CONTROL_LABEL = "Losowe wejścia"
+TITLE = _P["title"]
+STRATEGY_LABEL = _P["strategy_label"]
+CONTROL_LABEL = _P.get("control_label", "Losowe wejścia")
+VERSUS = _P.get("versus", "strategia vs grupa kontrolna")
+BETTER_TEXT = _P.get("better_text", "Strategia lepsza od grupy kontrolnej")
+SUBTITLE_NOTE = _P.get("subtitle_note", "te same kierunki i czas trzymania, losowe momenty wejścia")
+FOLDER = _P.get("folder", "porownanie_z_kontrolna")
 
 RESULTS = Path(__file__).resolve().parents[1] / "wyniki"
 
@@ -118,7 +145,7 @@ def _column(fig, x, label, data, color):
 
 def big_numbers(path, strategy, control, subtitle):
     fig = plt.figure(figsize=SIZE, dpi=DPI, facecolor=BLACK)
-    _header(fig, f"{TITLE}: strategia vs grupa kontrolna", subtitle)
+    _header(fig, f"{TITLE}: {VERSUS}", subtitle)
     fig.add_artist(plt.Line2D([0.5, 0.5], [0.08, 0.80], color="#2A2E35",
                               transform=fig.transFigure))
     values = _column(fig, 0.27, STRATEGY_LABEL, strategy, WHITE)
@@ -170,7 +197,7 @@ def per_combination(path, strategy, control, subtitle):
 
     better = int((merged["return_%_s"] > merged["return_%_c"]).sum())
     fig.text(0.04, 0.04,
-             f"Strategia lepsza od grupy kontrolnej w {better} z {len(merged)} kombinacji.",
+             f"{BETTER_TEXT} w {better} z {len(merged)} kombinacji.",
              ha="left", va="center", color=GRAY, fontsize=16,
              fontfamily=_body_font())
     _save(fig, path)
@@ -181,13 +208,13 @@ def main():
     strategy = load_summary(STRATEGY)
     control = load_summary(CONTROL)
 
-    folder = RESULTS / STRATEGY / "porownanie_z_kontrolna"
+    folder = RESULTS / STRATEGY / FOLDER
     folder.mkdir(parents=True, exist_ok=True)
     subtitle = (
         f"{strategy['asset'].nunique()} aktywa × "
         f"{strategy['timeframe'].nunique()} interwały  |  "
         f"{START_DATE[:4]}–{END_DATE[:4]}  |  po kosztach  |  "
-        "te same kierunki i czas trzymania, losowe momenty wejścia"
+        f"{SUBTITLE_NOTE}"
     )
 
     with plt.style.context("default"):
@@ -202,7 +229,7 @@ def main():
             f"{label:16s}: na plusie {(r > 0).sum()}/{len(r)}, "
             f"mediana {r.median():+.2f}%, transakcje {int(data['trades'].sum())}"
         )
-    print(f"Strategia lepsza od kontrolnej w {better} z {total} kombinacji.")
+    print(f"{BETTER_TEXT} w {better} z {total} kombinacji.")
     print(f"Plansze: {folder}")
 
 

@@ -33,9 +33,14 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from tick_config import ASSETS, REVERSE_BID_ASK
-from tick_data import load_ticks_cached
-from tick_engine import build_bars
+# Uruchamianie bezpośrednio z tego folderu: dodaj folder repo do ścieżki importów.
+import sys
+from pathlib import Path as _Path
+sys.path.insert(0, str(_Path(__file__).resolve().parents[1]))
+
+from narzedzia.tick_config import ASSETS, REVERSE_BID_ASK
+from narzedzia.tick_data import load_ticks_cached
+from narzedzia.tick_engine import build_bars
 from strategies.tiktok.SR_Retest import atr as atr_rma
 from strategies.tradingview import AutoLevelsTrendlines as indicator
 
@@ -59,7 +64,7 @@ HORIZONS = [5, 10, 20]
 # Ustawienia wskaźnika inne niż domyślne autora, np. {"conf_bars": 2}.
 PARAMS = {}
 
-OUTPUT_DIR = Path(__file__).resolve().parent / "wyniki" / "event_study_AutoLevels"
+OUTPUT_DIR = Path(__file__).resolve().parents[1] / "wyniki" / "event_study_AutoLevels"
 
 
 # ============================================================

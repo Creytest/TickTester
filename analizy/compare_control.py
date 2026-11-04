@@ -22,7 +22,12 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from plansze import (
+# Uruchamianie bezpośrednio z tego folderu: dodaj folder repo do ścieżki importów.
+import sys
+from pathlib import Path as _Path
+sys.path.insert(0, str(_Path(__file__).resolve().parents[1]))
+
+from narzedzia.plansze import (
     BLACK, DPI, GRAY, GREEN, RED, SIZE, WHITE,
     _body_font, _fit_width, _header, _heading_font, _heading_weight,
     _pct, _save, _sign_color, _timeframe,
@@ -60,7 +65,7 @@ TITLE = PRESETS[ACTIVE]["title"]
 STRATEGY_LABEL = PRESETS[ACTIVE]["strategy_label"]
 CONTROL_LABEL = "Losowe wejścia"
 
-RESULTS = Path(__file__).resolve().parent / "wyniki"
+RESULTS = Path(__file__).resolve().parents[1] / "wyniki"
 
 
 def load_summary(name: str) -> pd.DataFrame:

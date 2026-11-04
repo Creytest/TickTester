@@ -273,7 +273,7 @@ def load_ticks_cached(
         raise ValueError("start_date musi być wcześniejsza niż end_date.")
 
     if cache_dir is None:
-        cache_dir = Path(__file__).resolve().parent / "cache"
+        cache_dir = Path(__file__).resolve().parents[1] / "cache"
 
     signature = _signature(path, reverse_bid_ask)
     folder = Path(cache_dir) / signature
@@ -355,7 +355,7 @@ def daily_max_bid(
     tick_files(path)  # błąd, gdy brak danych
 
     if cache_dir is None:
-        cache_dir = Path(__file__).resolve().parent / "cache"
+        cache_dir = Path(__file__).resolve().parents[1] / "cache"
 
     signature = _signature(path, reverse_bid_ask)
     cache_file = Path(cache_dir) / signature / "daily_max_bid.pkl"

@@ -8,11 +8,11 @@ matplotlib.use("Agg")
 import numpy as np
 import pandas as pd
 
-from tick_config import ASSETS, COMMISSION
-import plot_tick_backtest_xauusd as single
-from summary_chart import save_summary_chart
-from plansze import save_plansze
-from interactive_chart import save_interactive_chart
+from narzedzia.tick_config import ASSETS, COMMISSION
+from narzedzia import plot_tick_backtest_xauusd as single
+from narzedzia.summary_chart import save_summary_chart
+from narzedzia.plansze import save_plansze
+from narzedzia.interactive_chart import save_interactive_chart
 
 
 # ============================================================
@@ -68,14 +68,14 @@ from interactive_chart import save_interactive_chart
 #                                 wejście na TRUE breakout (3 zamknięcia za granicą), wyjście po HOLD_BARS = 10 świecach
 #                                 (nasze założenie, autor nie podaje), bez SL/TP, 100% kapitału; 15m/1h/4h
 #   "AutoLevelsTrendlines_Control" — grupa kontrolna: te same liczby wejść, kierunki i czas trzymania, losowe momenty.
-#                                 Liczyć razem z AutoLevelsTrendlines, potem compare_control.py (plansze porównania).
-#                                 Badanie zdarzeń bez transakcji: event_study.py
+#                                 Liczyć razem z AutoLevelsTrendlines, potem analizy/compare_control.py (plansze porównania).
+#                                 Badanie zdarzeń bez transakcji: analizy/event_study.py
 #   "KeyLevelZones"             — Key Level Zones (Forex City Pro): strefy, gdzie poziom HL D/W/M spotyka pivot D/W/M
 #                                 (0,5 × ATR 4h); 1. dotknięcie strefy w dniu → wejście w stronę odbicia, wyjście po
 #                                 HOLD_BARS = 10 świecach (nasze założenie, autor: "not a signal"), bez SL/TP, 100% kapitału
 #   "KeyLevelZones_Control"     — grupa kontrolna: te same liczby wejść, kierunki i czas trzymania, losowe momenty.
-#                                 Liczyć razem z KeyLevelZones, potem compare_control.py z ACTIVE = "KeyLevelZones".
-#                                 Badanie zdarzeń bez transakcji: event_study_key_levels.py
+#                                 Liczyć razem z KeyLevelZones, potem analizy/compare_control.py z ACTIVE = "KeyLevelZones".
+#                                 Badanie zdarzeń bez transakcji: analizy/event_study_key_levels.py
 # Kolejka: lista nazw, np. ["EMA9", "RSI_90", "HolyGrail"] — strategie
 # liczą się po kolei, każda zapisuje wyniki we własnym podfolderze.
 # Błąd jednej strategii nie zatrzymuje kolejnych.
@@ -99,7 +99,7 @@ CHUNK_YEARS = None
 
 # USA 100 pominięte: dane kończą się w 2014 roku.
 # US500: dane od 2020-11-01.
-# Wszystkie aktywa z tick_config.py: list(ASSETS).
+# Wszystkie aktywa z narzedzia/tick_config.py: list(ASSETS).
 ASSETS_TO_TEST = ["XAUUSD", "Bitcoin", "EURUSD", "Brent", "US500"]
 
 # Interaktywny wykres HTML (otwierany w przeglądarce)

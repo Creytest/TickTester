@@ -53,7 +53,7 @@ SAME_SIGNAL = "ignore"
 EQUITY_FRACTION = 1.0
 
 # Najmniejsza zmiana ceny (syminfo.mintick). Ustawiana przez
-# plot_tick_backtest_xauusd.py z TICK_SIZE w tick_config.py.
+# narzedzia/plot_tick_backtest_xauusd.py z TICK_SIZE w narzedzia/tick_config.py.
 TICK = 0.01
 
 # Ustawienia domyślne skryptu.

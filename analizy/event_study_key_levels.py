@@ -25,8 +25,8 @@ Kontrola (ta sama geometria i ta sama reguła):
 Przy braku przewagi odsetek odbić stref ≈ odsetek odbić losowych poziomów.
 
 Uruchomienie:
-    python event_study_key_levels.py
-    python event_study_key_levels.py XAUUSD 2025-03-12   # strefy z jednego dnia (porównanie z TV)
+    python analizy/event_study_key_levels.py
+    python analizy/event_study_key_levels.py XAUUSD 2025-03-12   # strefy z jednego dnia (porównanie z TV)
 """
 
 import sys
@@ -35,9 +35,14 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from tick_config import ASSETS, REVERSE_BID_ASK
-from tick_data import load_ticks_cached
-from tick_engine import build_bars
+# Uruchamianie bezpośrednio z tego folderu: dodaj folder repo do ścieżki importów.
+import sys
+from pathlib import Path as _Path
+sys.path.insert(0, str(_Path(__file__).resolve().parents[1]))
+
+from narzedzia.tick_config import ASSETS, REVERSE_BID_ASK
+from narzedzia.tick_data import load_ticks_cached
+from narzedzia.tick_engine import build_bars
 from strategies.tradingview import KeyLevelZones as klz
 
 
@@ -53,7 +58,7 @@ SEED = 42
 # Zapas danych przed START_DATE na poprzedni miesiąc i ATR.
 WARMUP_DAYS = 70
 
-OUTPUT_DIR = Path(__file__).resolve().parent / "wyniki" / "KeyLevelZones"
+OUTPUT_DIR = Path(__file__).resolve().parents[1] / "wyniki" / "KeyLevelZones"
 
 GROUPS = [
     "Strefy: 2 poziomy (turkus)",

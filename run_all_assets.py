@@ -70,6 +70,12 @@ from interactive_chart import save_interactive_chart
 #   "AutoLevelsTrendlines_Control" — grupa kontrolna: te same liczby wejść, kierunki i czas trzymania, losowe momenty.
 #                                 Liczyć razem z AutoLevelsTrendlines, potem compare_control.py (plansze porównania).
 #                                 Badanie zdarzeń bez transakcji: event_study.py
+#   "KeyLevelZones"             — Key Level Zones (Forex City Pro): strefy, gdzie poziom HL D/W/M spotyka pivot D/W/M
+#                                 (0,5 × ATR 4h); 1. dotknięcie strefy w dniu → wejście w stronę odbicia, wyjście po
+#                                 HOLD_BARS = 10 świecach (nasze założenie, autor: "not a signal"), bez SL/TP, 100% kapitału
+#   "KeyLevelZones_Control"     — grupa kontrolna: te same liczby wejść, kierunki i czas trzymania, losowe momenty.
+#                                 Liczyć razem z KeyLevelZones, potem compare_control.py z ACTIVE = "KeyLevelZones".
+#                                 Badanie zdarzeń bez transakcji: event_study_key_levels.py
 # Kolejka: lista nazw, np. ["EMA9", "RSI_90", "HolyGrail"] — strategie
 # liczą się po kolei, każda zapisuje wyniki we własnym podfolderze.
 # Błąd jednej strategii nie zatrzymuje kolejnych.

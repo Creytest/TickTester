@@ -36,6 +36,18 @@ Granice okresów liczone w czasie danych (Tickstory GMT+2 z DST USA
 Tydzień od poniedziałku. Dla BTC TradingView liczy dzień od 00:00 UTC,
 u nas od 00:00 GMT+2 — przybliżenie.
 
+Wersja do backtestu (NASZE założenia, autor nie podaje zasad handlu,
+"not a signal to buy or sell"), wzorem Auto Levels & Trendlines:
+- sygnał = pierwsze dotknięcie strefy w dniu, w którym obowiązuje
+  (strefa, w której cena jest już na otwarciu dnia, jest pomijana),
+- kierunek = odbicie: cena przyszła z góry → long, z dołu → short,
+- wejście na pierwszym ticku po zamknięciu świecy dotknięcia,
+  wyjście po HOLD_BARS świecach, bez SL i TP, 100% kapitału,
+- jedna pozycja naraz; świeca z dotknięciami w obu kierunkach pomijana.
+Grupa kontrolna: KeyLevelZones_Control.py (te same liczby wejść,
+kierunki i czas trzymania, losowe momenty), porównanie: compare_control.py.
+Badanie zdarzeń bez transakcji: event_study_key_levels.py.
+
 Autor nie podaje konkretnego interwału ("Intraday and swing traders who
 plan around daily and weekly key levels") ani rynku.
 """
@@ -45,6 +57,18 @@ import pandas as pd
 
 
 NAME = "Key Level Zones"
+
+TIMEFRAMES = ["15min", "1h", "4h"]
+
+HOLD_BARS = 10
+# 2 = wszystkie strefy, 3 = tylko złote i czerwone, 4 = tylko czerwone.
+MIN_LEVELS = 2
+
+OPPOSITE_SIGNAL = "ignore"
+SAME_SIGNAL = "ignore"
+EQUITY_FRACTION = 1.0
+
+COLORS = {2: "rgba(47,227,198,0.30)", 3: "rgba(255,216,77,0.30)", 4: "rgba(255,97,82,0.30)"}
 
 # Ustawienia domyślne skryptu.
 TOL_ATR = 0.5
@@ -250,3 +274,111 @@ def daily_zones(bars: pd.DataFrame) -> list:
             }
         )
     return result
+
+
+# ============================================================
+# Backtest (nasze założenia — patrz opis na górze)
+# ============================================================
+
+_CACHE = {}
+
+
+def _cached_days(bars: pd.DataFrame) -> list:
+    key = (id(bars), len(bars), bars.index[0], bars.index[-1])
+    if key not in _CACHE:
+        _CACHE.clear()
+        _CACHE[key] = daily_zones(bars)
+    return _CACHE[key]
+
+
+def touch_signals(bars: pd.DataFrame) -> list:
+    """
+    (świeca pierwszego dotknięcia, kierunek odbicia, strefa) dla każdej
+    strefy z >= MIN_LEVELS poziomami. Kierunek: +1 = cena przyszła
+    z góry (wsparcie), -1 = z dołu (opór).
+    """
+    o = bars["open"].to_numpy()
+    h = bars["high"].to_numpy()
+    l = bars["low"].to_numpy()
+    index = bars.index
+
+    out = []
+    for day in _cached_days(bars):
+        i0 = index.searchsorted(day["t0"])
+        i_end = index.searchsorted(day["t_end"])
+        for zone in day["zones"]:
+            if zone["members"] < MIN_LEVELS:
+                continue
+            top, bot = zone["top"], zone["bot"]
+            if bot <= o[i0] <= top:
+                continue
+            from_above = o[i0] > top
+            hit = l[i0:i_end] <= top if from_above else h[i0:i_end] >= bot
+            if hit.any():
+                out.append((i0 + int(np.argmax(hit)), 1 if from_above else -1, zone))
+    return sorted(out, key=lambda item: (item[0], item[1]))
+
+
+def _entries(bars: pd.DataFrame) -> list:
+    """Sygnały bez świec z dotknięciami w obu kierunkach."""
+    by_bar = {}
+    for bar, direction, _ in touch_signals(bars):
+        by_bar.setdefault(bar, set()).add(direction)
+    return [(bar, dirs.pop()) for bar, dirs in sorted(by_bar.items()) if len(dirs) == 1]
+
+
+def take_entries(signals, hold: int) -> list:
+    """Jedna pozycja naraz: kolejne wejście dopiero po świecy wyjścia."""
+    taken = []
+    busy_until = -1
+    for bar, direction in signals:
+        if bar > busy_until:
+            taken.append((bar, direction))
+            busy_until = bar + hold
+    return taken
+
+
+def signals_frame(bars: pd.DataFrame, entries, hold: int) -> pd.DataFrame:
+    n = len(bars)
+    cols = {name: np.zeros(n, dtype=bool) for name in ("buy", "sell", "exit_long", "exit_short")}
+    for bar, direction in entries:
+        cols["buy" if direction == 1 else "sell"][bar] = True
+        if bar + hold < n:
+            cols["exit_long" if direction == 1 else "exit_short"][bar + hold] = True
+    return pd.DataFrame(cols, index=bars.index)
+
+
+def generate_signals(bars: pd.DataFrame) -> pd.DataFrame:
+    return signals_frame(bars, take_entries(_entries(bars), HOLD_BARS), HOLD_BARS)
+
+
+def indicators(bars: pd.DataFrame) -> dict:
+    """Strefy w kolorach autora (od początku do końca dnia), etykiety dotknięć, panel ATR(14, 4h)."""
+    zones = []
+    for day in _cached_days(bars):
+        for zone in day["zones"]:
+            color = COLORS[min(zone["members"], 4)]
+            zones.append((day["t0"], day["t_end"], zone["top"], zone["bot"], color))
+
+    idx = bars.index
+    labels = []
+    for direction, where, text in ((1, "below", "▲"), (-1, "above", "▼")):
+        mask = np.zeros(len(bars), dtype=bool)
+        for bar, d, _ in touch_signals(bars):
+            if d == direction:
+                mask[bar] = True
+        labels.append((f"Dotknięcie strefy {text}", pd.Series(mask, index=idx), text, "#8A8F98", where))
+
+    atr = atr_series(bars)
+    atr_line = atr.reindex(idx, method="ffill")
+    return {
+        "trend": None,
+        "zones": zones,
+        "labels": labels,
+        "panel": {
+            "title": "ATR(14) z 4h",
+            "lines": [("ATR(14, 4h)", atr_line, "#B0BEC5")],
+            "levels": (),
+            "range": (0, float(np.nanpercentile(atr_line, 99.5)) * 1.3 or 1.0),
+        },
+    }

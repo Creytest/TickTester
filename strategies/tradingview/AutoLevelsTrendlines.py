@@ -56,7 +56,7 @@ from strategies.tiktok.LuxAlgo_SR_Breaks_MSTS import pivot_high, pivot_low
 from strategies.tiktok.SR_Retest import atr as atr_rma
 
 
-NAME = "Auto Levels & Trendlines"
+NAME = "Auto Levels & Trendlines + Breakout Check"
 
 # Interwał i aktywa: autor ich nie podaje.
 TIMEFRAMES = ["15min", "1h", "4h"]

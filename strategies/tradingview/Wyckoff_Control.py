@@ -23,7 +23,7 @@ from strategies.tradingview import Wyckoff as base
 from strategies.tiktok.SR_Retest import atr as atr_rma
 
 
-NAME = "Wyckoff (LunqFX) – grupa kontrolna"
+NAME = "Wyckoff Accumulation & Distribution, Spring, UTAD, SOS [LunqFX] – grupa kontrolna"
 
 TIMEFRAMES = base.TIMEFRAMES
 OPPOSITE_SIGNAL = "ignore"

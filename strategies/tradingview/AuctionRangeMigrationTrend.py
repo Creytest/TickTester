@@ -41,7 +41,7 @@ from strategies.tiktok.CloudMA_EMA30_74 import ema
 from strategies.tiktok.SR_Retest import atr
 
 
-NAME = "Auction Range Migration Trend"
+NAME = "Auction Range Migration Trend [SchizoQuant]"
 
 TIMEFRAMES = ["15min", "1h", "4h"]
 

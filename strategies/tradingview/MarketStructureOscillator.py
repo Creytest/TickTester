@@ -35,7 +35,7 @@ from strategies.tiktok.CloudMA_EMA30_74 import ema
 from strategies.tiktok.LuxAlgo_SR_Breaks_MSTS import pivot_high, pivot_low
 
 
-NAME = "Market Structure Oscillator"
+NAME = "Market Structure Oscillator [BigBeluga]"
 
 TIMEFRAMES = ["15min", "1h", "4h"]
 

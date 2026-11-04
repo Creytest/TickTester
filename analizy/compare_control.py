@@ -44,17 +44,17 @@ ACTIVE = "AutoLevelsTrendlines"
 PRESETS = {
     "AutoLevelsTrendlines": {
         "control": "AutoLevelsTrendlines_Control",
-        "title": "Auto Levels & Trendlines",
+        "title": "Auto Levels & Trendlines + Breakout Check",
         "strategy_label": "Sygnał TRUE",
     },
     "KeyLevelZones": {
         "control": "KeyLevelZones_Control",
-        "title": "Key Level Zones",
+        "title": "FCP Key Level Zones | Pivots & Daily Weekly Monthly High Low",
         "strategy_label": "Dotknięcie strefy",
     },
     "Wyckoff": {
         "control": "Wyckoff_Control",
-        "title": "Wyckoff (LunqFX)",
+        "title": "Wyckoff Accumulation & Distribution, Spring, UTAD, SOS [LunqFX]",
         "strategy_label": "Wejście na SOS / SOW",
     },
 }

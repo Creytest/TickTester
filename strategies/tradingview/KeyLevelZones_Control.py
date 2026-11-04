@@ -17,7 +17,7 @@ import pandas as pd
 from strategies.tradingview import KeyLevelZones as base
 
 
-NAME = "Key Level Zones – grupa kontrolna"
+NAME = "FCP Key Level Zones | Pivots & Daily Weekly Monthly High Low – grupa kontrolna"
 
 TIMEFRAMES = base.TIMEFRAMES
 OPPOSITE_SIGNAL = "ignore"

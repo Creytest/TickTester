@@ -56,7 +56,7 @@ from strategies.tiktok.LuxAlgo_SR_Breaks_MSTS import pivot_high, pivot_low
 from strategies.tiktok.SR_Retest import atr as atr_rma
 
 
-NAME = "Wyckoff (LunqFX)"
+NAME = "Wyckoff Accumulation & Distribution, Spring, UTAD, SOS [LunqFX]"
 
 # Autor: "15m to 1D". Standard kanału: 15m / 1h / 4h.
 TIMEFRAMES = ["15min", "1h", "4h"]

@@ -56,7 +56,7 @@ import numpy as np
 import pandas as pd
 
 
-NAME = "Key Level Zones"
+NAME = "FCP Key Level Zones | Pivots & Daily Weekly Monthly High Low"
 
 TIMEFRAMES = ["15min", "1h", "4h"]
 

@@ -457,10 +457,12 @@ def generate_signals(bars: pd.DataFrame) -> pd.DataFrame:
 
 def indicators(bars: pd.DataFrame) -> dict:
     """
-    Zakres (prostokąt) od klimaksu do SOS / końca, creek / ice,
-    po SOS: T1, T2 i INVALID do końca schematu. Etykiety zdarzeń
-    jak u autora. Tylko zakresy, które nie zostały skasowane.
-    Panel: ATR(50).
+    Zakres (prostokąt) od klimaksu do SOS / końca i jego krawędź
+    wybicia (creek / ice). Po SOS / SOW: T2 = TP, T1 i INVALID = SL
+    do końca schematu, z podpisami. Etykiety tylko zdarzeń, których
+    używa strategia: SC/BC, AR, ST, SPRING/UTAD, SOS/SOW i FAILED
+    (bez LPS/LPSY i znacznika T2 — nie wpływają na transakcje).
+    Kolory pod jasne tło wykresu HTML. Panel: ATR(50).
     """
     idx = bars.index
     last = len(bars) - 1
@@ -470,18 +472,19 @@ def indicators(bars: pd.DataFrame) -> dict:
     def add(name, bar):
         ev.setdefault(name, []).append(bar)
 
+    BLUE, GREEN, LIGHT_GREEN, RED = "#2962FF", "#00A86B", "#7BC8A4", "#FF3B30"
     for s in _cached_run(bars):
         if s.result == "dropped" or s.range_bar is None:
             continue
         acc = s.dir == 1
         end = s.end_bar if s.end_bar is not None else last
         box_end = s.sos_bar if s.sos_bar is not None else end
-        zones.append((idx[s.ext_bar], idx[box_end], s.top, s.bot, "rgba(124,140,255,0.15)"))
-        edge = "#B4FF39" if acc else "#FF6B2C"
-        lines.append((idx[s.ar_bar], s.bs, idx[box_end], s.bs, edge))
+        zones.append((idx[s.ext_bar], idx[box_end], s.top, s.bot, "rgba(41,98,255,0.10)"))
+        lines.append((idx[s.ar_bar], s.bs, idx[box_end], s.bs, BLUE, "creek" if acc else "ice"))
         if s.sos_bar is not None:
-            for y, c in ((s.t1, edge), (s.t2, edge), (s.inv, "#8A8F9C")):
-                lines.append((idx[s.sos_bar], y, idx[end], y, c))
+            for y, c, text in ((s.t2, GREEN, "T2 = TP"), (s.t1, LIGHT_GREEN, "T1"),
+                               (s.inv, RED, "INVALID = SL")):
+                lines.append((idx[s.sos_bar], y, idx[end], y, c, text))
 
         add("SC" if acc else "BC", s.ext_bar)
         add("AR+" if acc else "AR-", s.ar_bar)
@@ -491,10 +494,6 @@ def indicators(bars: pd.DataFrame) -> dict:
             add("SPRING" if acc else "UTAD", s.spring_bar)
         if s.sos_bar is not None:
             add("SOS" if acc else "SOW", s.sos_bar)
-        if s.lps_bar is not None:
-            add("LPS" if acc else "LPSY", s.lps_bar)
-        if s.t2_bar is not None:
-            add("T2+" if acc else "T2-", s.t2_bar)
         if s.result == "failed":
             add("FAILED+" if acc else "FAILED-", s.end_bar)
 
@@ -503,24 +502,21 @@ def indicators(bars: pd.DataFrame) -> dict:
         m[list(bars_list)] = True
         return pd.Series(m, index=idx)
 
-    # (klucz, nazwa, tekst, kolor, położenie)
+    # (klucz, nazwa w legendzie, tekst, kolor, położenie)
+    GREY, INDIGO = "#455A64", "#3F4BD9"
     spec = [
-        ("SC", "SC", "SC", "#969CAB", "below"),
-        ("BC", "BC", "BC", "#969CAB", "above"),
-        ("AR+", "AR (akumulacja)", "AR", "#969CAB", "above"),
-        ("AR-", "AR (dystrybucja)", "AR", "#969CAB", "below"),
-        ("ST+", "ST (akumulacja)", "ST", "#969CAB", "below"),
-        ("ST-", "ST (dystrybucja)", "ST", "#969CAB", "above"),
-        ("SPRING", "Spring", "SPRING", "#7C8CFF", "below"),
-        ("UTAD", "UTAD", "UTAD", "#7C8CFF", "above"),
-        ("SOS", "SOS", "SOS", "#B4FF39", "above"),
-        ("SOW", "SOW", "SOW", "#FF6B2C", "below"),
-        ("LPS", "LPS", "LPS", "#B4FF39", "below"),
-        ("LPSY", "LPSY", "LPSY", "#FF6B2C", "above"),
-        ("T2+", "T2 ✓ (akumulacja)", "T2 ✓", "#00D084", "above"),
-        ("T2-", "T2 ✓ (dystrybucja)", "T2 ✓", "#00D084", "below"),
-        ("FAILED+", "FAILED (akumulacja)", "FAILED", "#FF3B30", "below"),
-        ("FAILED-", "FAILED (dystrybucja)", "FAILED", "#FF3B30", "above"),
+        ("SC", "SC – klimaks sprzedaży", "SC", GREY, "below"),
+        ("BC", "BC – klimaks kupna", "BC", GREY, "above"),
+        ("AR+", "AR – automatyczne odbicie", "AR", GREY, "above"),
+        ("AR-", "AR – automatyczna reakcja", "AR", GREY, "below"),
+        ("ST+", "ST – test dołka", "ST", GREY, "below"),
+        ("ST-", "ST – test szczytu", "ST", GREY, "above"),
+        ("SPRING", "Spring – fałszywe wybicie dołem", "SPRING", INDIGO, "below"),
+        ("UTAD", "UTAD – fałszywe wybicie górą", "UTAD", INDIGO, "above"),
+        ("SOS", "SOS – wybicie w górę (long)", "SOS", GREEN, "above"),
+        ("SOW", "SOW – wybicie w dół (short)", "SOW", RED, "below"),
+        ("FAILED+", "FAILED – schemat unieważniony", "FAILED", "#B71C1C", "below"),
+        ("FAILED-", "FAILED – schemat unieważniony", "FAILED", "#B71C1C", "above"),
     ]
     labels = [
         (name, mask(ev[key]), text, color, where)

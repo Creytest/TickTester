@@ -75,6 +75,12 @@ PRESETS = {
         "subtitle_note": "te same reguły, standardowa kompensacja Hulla",
         "folder": "porownanie_ze_standardowym_hullem",
     },
+    "SqueezeBreakoutSignals": {
+        "control": "SqueezeBreakoutSignals_Control",
+        "title": "Squeeze Breakout Signals [bitpunk]",
+        "strategy_label": "Wybicie / retest ▲▼",
+        "subtitle_note": "te same kierunki i odległości SL / TP, losowe momenty wejścia",
+    },
 }
 
 # Klucze opcjonalne w PRESETS (domyślnie: grupa kontrolna z losowymi wejściami):

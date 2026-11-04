@@ -92,6 +92,13 @@ from narzedzia.interactive_chart import save_interactive_chart
 #                                 Potem analizy/compare_control.py z ACTIVE = "EfficiencyWeightedHull".
 #                                 Wszystkie trzy naraz: STRATEGY = ["EfficiencyWeightedHull", "EfficiencyWeightedHull_Standard",
 #                                 "EfficiencyWeightedHull_Control"]
+#   "SqueezeBreakoutSignals"    — Squeeze Breakout Signals [bitpunk]: kompresja BB/KC (2×stdev < 1,5×śr. TR, 20) → pudełko,
+#                                 wejście na ▲/▼ autora (pierwsze wybicie zamknięciem + retest krawędzi, filtr Retest Close
+#                                 Progress); SL = przeciwna krawędź, TP = krawędź + wysokość pudełka (nasze założenie, autor:
+#                                 "does not manage exits"), 1% ryzyka, jedna pozycja naraz; 15m/1h/4h (autor nie podaje)
+#   "SqueezeBreakoutSignals_Control" — grupa kontrolna: te same wejścia, kierunki i odległości SL/TP w średnim TR, losowe
+#                                 momenty. Liczyć razem: STRATEGY = ["SqueezeBreakoutSignals", "SqueezeBreakoutSignals_Control"],
+#                                 potem analizy/compare_control.py z ACTIVE = "SqueezeBreakoutSignals".
 # Kolejka: lista nazw, np. ["EMA9", "RSI_90", "HolyGrail"] — strategie
 # liczą się po kolei, każda zapisuje wyniki we własnym podfolderze.
 # Błąd jednej strategii nie zatrzymuje kolejnych.

@@ -50,7 +50,7 @@ from strategies.tiktok.LuxAlgo_SR_Breaks_MSTS import pivot_high, pivot_low
 from strategies.tiktok.SR_Retest import atr
 
 
-NAME = "Liquidity Hunt Pro"
+NAME = "Liquidity Hunt Pro [Viprasol]"
 
 TIMEFRAMES = ["1min", "15min", "1h", "4h", "1D"]
 

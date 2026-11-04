@@ -37,7 +37,7 @@ from strategies.tiktok.LuxAlgo_SR_Breaks_MSTS import pivot_high, pivot_low
 from strategies.tiktok.SR_Retest import atr as atr_rma
 
 
-NAME = "Strong Pressure Signals"
+NAME = "Strong Pressure Signals [ProjectSyndicate]"
 
 # Autor: XAUUSD, interwały intraday (pasek MTF domyślnie 15 i 60 min).
 TIMEFRAMES = ["15min", "1h", "4h"]

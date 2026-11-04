@@ -18,7 +18,7 @@ import pandas as pd
 from strategies.tradingview import AutoLevelsTrendlines as base
 
 
-NAME = "Auto Levels & Trendlines – grupa kontrolna"
+NAME = "Auto Levels & Trendlines + Breakout Check – grupa kontrolna"
 
 TIMEFRAMES = base.TIMEFRAMES
 OPPOSITE_SIGNAL = "ignore"

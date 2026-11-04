@@ -83,6 +83,15 @@ from narzedzia.interactive_chart import save_interactive_chart
 #   "Wyckoff_Control"           — grupa kontrolna: te same liczby wejść, kierunki i odległości SL/TP w ATR, losowe momenty.
 #                                 Liczyć razem z Wyckoff, potem analizy/compare_control.py z ACTIVE = "Wyckoff".
 #                                 Track record autora (% zakresów do T2 vs losowy ruch): analizy/event_study_wyckoff.py
+#   "EfficiencyWeightedHull"    — Efficiency Weighted Hull [BackQuant]: Hull 34 z kompensacją ważoną Efficiency Ratio(20),
+#                                 stan z nachylenia (2 świece) poza martwą strefą 0,2 × szum → bullish / bearish flip;
+#                                 zawsze w rynku (reverse), bez SL, 100% kapitału; 15m/1h/4h (autor nie podaje interwału ani rynku)
+#   "EfficiencyWeightedHull_Standard" — to samo na standardowym Hullu (punkt odniesienia).
+#                                 Potem analizy/compare_control.py z ACTIVE = "EfficiencyWeightedHull_vs_Standard".
+#   "EfficiencyWeightedHull_Control"  — grupa kontrolna: tyle samo odwróceń long/short w losowych momentach.
+#                                 Potem analizy/compare_control.py z ACTIVE = "EfficiencyWeightedHull".
+#                                 Wszystkie trzy naraz: STRATEGY = ["EfficiencyWeightedHull", "EfficiencyWeightedHull_Standard",
+#                                 "EfficiencyWeightedHull_Control"]
 # Kolejka: lista nazw, np. ["EMA9", "RSI_90", "HolyGrail"] — strategie
 # liczą się po kolei, każda zapisuje wyniki we własnym podfolderze.
 # Błąd jednej strategii nie zatrzymuje kolejnych.

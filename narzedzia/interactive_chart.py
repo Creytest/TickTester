@@ -297,17 +297,34 @@ def save_interactive_chart(
         )
 
     # Odcinki linii wskaźnika, np. linie trendu: jeden ślad na kolor.
+    # Opcjonalny 6. element: podpis przy prawym końcu linii (np. "T2").
     by_color = {}
-    for t0, y0, t1, y1, color in lines or []:
+    line_texts = ([], [], [], [])
+    for t0, y0, t1, y1, color, *rest in lines or []:
         x0, x1 = bar_position([t0, t1])
         xs, ys = by_color.setdefault(color, ([], []))
         xs += [x0, x1, None]
         ys += [y0, y1, None]
+        if rest and rest[0]:
+            for part, value in zip(line_texts, (x1 + 1.5, y1, rest[0], color)):
+                part.append(value)
     for color, (xs, ys) in by_color.items():
         fig.add_trace(
             go.Scattergl(
                 x=xs, y=ys, mode="lines", line=dict(color=color, width=2),
                 name="Linie", hoverinfo="skip", showlegend=False,
+            ),
+            row=1,
+            col=1,
+        )
+    if line_texts[0]:
+        fig.add_trace(
+            go.Scatter(
+                x=line_texts[0], y=line_texts[1], mode="text",
+                text=[f"<b>{t}</b>" for t in line_texts[2]],
+                textposition="middle right",
+                textfont=dict(color=line_texts[3], size=13),
+                name="Podpisy linii", hoverinfo="skip", showlegend=False,
             ),
             row=1,
             col=1,
@@ -332,9 +349,27 @@ def save_interactive_chart(
 
     # Etykiety wskaźnika jak w TradingView, np. „B” LuxAlgo.
     # Rysowane jako SVG — WebGL nie obsługuje tekstu na znacznikach.
+    # Dłuższy tekst (np. "SPRING") nie mieści się w kwadracie, więc
+    # jest rysowany jako sam pogrubiony napis w kolorze etykiety.
     for name, mask, text, color, location in bar_labels or []:
         mask = mask.reindex(bars.index).fillna(False).to_numpy(dtype=bool)
         above = location == "above"
+        if len(text) > 2:
+            fig.add_trace(
+                go.Scatter(
+                    x=x[mask],
+                    y=h[mask] + 1.5 * gap if above else lo[mask] - 1.5 * gap,
+                    mode="text",
+                    text=[f"<b>{text}</b>"] * int(mask.sum()),
+                    textposition="middle center",
+                    textfont=dict(color=color, size=14),
+                    name=name,
+                    hoverinfo="skip",
+                ),
+                row=1,
+                col=1,
+            )
+            continue
         fig.add_trace(
             go.Scatter(
                 x=x[mask],
@@ -673,14 +708,14 @@ def clip_shapes(zones, lines, index, start, end):
         out_zones.append((max(t0, start), min(t1, end), top, bot, color))
 
     out_lines = []
-    for t0, y0, t1, y1, color in lines or []:
+    for t0, y0, t1, y1, color, *rest in lines or []:
         if pd.Timestamp(t1) < start or pd.Timestamp(t0) > end:
             continue
         a, b = pos(t0), pos(t1)
         slope = (y1 - y0) / (b - a) if b != a else 0.0
         a2, b2 = max(a, p_start), min(b, p_end)
         out_lines.append(
-            (index[a2], y0 + slope * (a2 - a), index[b2], y0 + slope * (b2 - a), color)
+            (index[a2], y0 + slope * (a2 - a), index[b2], y0 + slope * (b2 - a), color, *rest)
         )
     return out_zones, out_lines
 

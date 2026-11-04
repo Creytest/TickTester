@@ -3,7 +3,7 @@ Strategia vs grupa kontrolna — plansze do filmu (PNG 1920×1080).
 
 Najpierw policz obie wersje w run_all_assets.py, np.:
     STRATEGY = ["AutoLevelsTrendlines", "AutoLevelsTrendlines_Control"]
-(te same aktywa, interwały i daty), potem uruchom ten plik.
+(te same aktywa, interwały i daty), ustaw ACTIVE niżej i uruchom ten plik.
 
 Zapisuje do wyniki/<STRATEGY>/porownanie_z_kontrolna/:
     1_strategia_vs_kontrolna.png — duże liczby obok siebie: ile
@@ -33,15 +33,31 @@ from plansze import (
 # KONFIGURACJA
 # ============================================================
 
-STRATEGY = "AutoLevelsTrendlines"
-CONTROL = "AutoLevelsTrendlines_Control"
+# Która para strategia / grupa kontrolna: klucz z PRESETS.
+ACTIVE = "AutoLevelsTrendlines"
+
+PRESETS = {
+    "AutoLevelsTrendlines": {
+        "control": "AutoLevelsTrendlines_Control",
+        "title": "Auto Levels & Trendlines",
+        "strategy_label": "Sygnał TRUE",
+    },
+    "KeyLevelZones": {
+        "control": "KeyLevelZones_Control",
+        "title": "Key Level Zones",
+        "strategy_label": "Dotknięcie strefy",
+    },
+}
+
+STRATEGY = ACTIVE
+CONTROL = PRESETS[ACTIVE]["control"]
 
 # Te same daty co w run_all_assets.py.
 START_DATE = "2021-01-01"
 END_DATE = "2025-12-31"
 
-TITLE = "Auto Levels & Trendlines"
-STRATEGY_LABEL = "Sygnał TRUE"
+TITLE = PRESETS[ACTIVE]["title"]
+STRATEGY_LABEL = PRESETS[ACTIVE]["strategy_label"]
 CONTROL_LABEL = "Losowe wejścia"
 
 RESULTS = Path(__file__).resolve().parent / "wyniki"

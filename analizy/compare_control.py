@@ -52,6 +52,11 @@ PRESETS = {
         "title": "Key Level Zones",
         "strategy_label": "Dotknięcie strefy",
     },
+    "Wyckoff": {
+        "control": "Wyckoff_Control",
+        "title": "Wyckoff (LunqFX)",
+        "strategy_label": "Wejście na SOS / SOW",
+    },
 }
 
 STRATEGY = ACTIVE

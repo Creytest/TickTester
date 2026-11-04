@@ -76,6 +76,13 @@ from interactive_chart import save_interactive_chart
 #   "KeyLevelZones_Control"     — grupa kontrolna: te same liczby wejść, kierunki i czas trzymania, losowe momenty.
 #                                 Liczyć razem z KeyLevelZones, potem compare_control.py z ACTIVE = "KeyLevelZones".
 #                                 Badanie zdarzeń bez transakcji: event_study_key_levels.py
+#   "Wyckoff"                   — Wyckoff Accumulation & Distribution (LunqFX): maszyna stanów SC/BC → AR → ST → Spring/UTAD
+#                                 → SOS/SOW; wejście na SOS/SOW (nasze założenie, autor: "not an entry"), SL = INVALID autora,
+#                                 TP = T2 autora (2 × zakres od creek/ice), wyjście po wygaśnięciu schematu, 1% ryzyka;
+#                                 15m/1h/4h (autor: forex, złoto, indeksy, krypto, 15m–1D)
+#   "Wyckoff_Control"           — grupa kontrolna: te same liczby wejść, kierunki i odległości SL/TP w ATR, losowe momenty.
+#                                 Liczyć razem z Wyckoff, potem compare_control.py z ACTIVE = "Wyckoff".
+#                                 Track record autora (% zakresów do T2 vs losowy ruch): event_study_wyckoff.py
 # Kolejka: lista nazw, np. ["EMA9", "RSI_90", "HolyGrail"] — strategie
 # liczą się po kolei, każda zapisuje wyniki we własnym podfolderze.
 # Błąd jednej strategii nie zatrzymuje kolejnych.

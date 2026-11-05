@@ -5,8 +5,9 @@ Plansze wyników do filmu (PNG 1920×1080, kolory kanału).
     aktywo × interwał na szaro, mediana grubą linią (zielona
     na plusie, czerwona na minusie).
 2_mediany.png — trzy duże liczby: ile kombinacji na plusie,
-    mediana wyniku netto i mediana Win Rate (gdy autor obiecuje
-    Win Rate) albo mediana Profit Factor.
+    mediana Win Rate (z obietnicą autora, jeśli ją podał)
+    i mediana Profit Factor. Mediana wyniku netto jest tylko
+    na planszy 1.
 3_tabela.png — pełna tabela wyników do pobrania z opisu.
 
 Fonty: Anton (nagłówki, liczby) i Inter (reszta). Jeśli nie są
@@ -167,7 +168,20 @@ def _equity_chart(path, data, equities, title, subtitle):
 def _medians(path, data, title, subtitle, claim_win_rate):
     returns = data["return_%"].astype(float)
     profitable = int((returns > 0).sum())
-    median_return = float(returns.median())
+    win_rate = float(data["win_rate_%"].astype(float).median())
+    profit_factor = float(data["profit_factor"].astype(float).median())
+
+    # Mediana wyniku netto jest już na planszy 1, więc tu jej
+    # nie powtarzamy. Win Rate bez obietnicy autora jest szary
+    # — sam w sobie nie mówi, czy strategia zarabia.
+    if claim_win_rate is not None:
+        win_rate_label = (
+            f"mediana Win Rate\nobiecane: {_num(claim_win_rate, 0)}%"
+        )
+        win_rate_color = GREEN if win_rate >= claim_win_rate else RED
+    else:
+        win_rate_label = "mediana\nWin Rate"
+        win_rate_color = WHITE
 
     items = [
         (
@@ -176,26 +190,16 @@ def _medians(path, data, title, subtitle, claim_win_rate):
             GREEN if profitable > len(data) / 2 else RED,
         ),
         (
-            _pct(median_return),
-            "mediana\nwyniku netto",
-            _sign_color(median_return),
-        ),
-    ]
-
-    if claim_win_rate is not None:
-        win_rate = float(data["win_rate_%"].astype(float).median())
-        items.append((
             _pct(win_rate, 0, sign=False),
-            f"mediana Win Rate\nobiecane: {_num(claim_win_rate, 0)}%",
-            GREEN if win_rate >= claim_win_rate else RED,
-        ))
-    else:
-        profit_factor = float(data["profit_factor"].astype(float).median())
-        items.append((
+            win_rate_label,
+            win_rate_color,
+        ),
+        (
             _num(profit_factor, 2),
             "mediana\nProfit Factor",
             GREEN if profit_factor >= 1 else RED,
-        ))
+        ),
+    ]
 
     fig = plt.figure(figsize=SIZE, dpi=DPI, facecolor=BLACK)
     _header(fig, title, subtitle)

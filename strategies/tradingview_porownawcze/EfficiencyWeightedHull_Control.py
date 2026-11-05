@@ -15,7 +15,7 @@ Wykres pokazuje Hulla, ale znaczniki to losowe wejścia.
 import numpy as np
 import pandas as pd
 
-from strategies.tradingview import EfficiencyWeightedHull as base
+from strategies.tradingview_porownawcze import EfficiencyWeightedHull as base
 
 
 NAME = "Efficiency Weighted Hull – grupa kontrolna"

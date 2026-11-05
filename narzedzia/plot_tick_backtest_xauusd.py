@@ -258,13 +258,14 @@ def draw_stats(fig, stats: dict, left: float, right: float) -> None:
 
 
 # Podfoldery strategii według źródła.
-STRATEGY_SOURCES = ("tiktok", "reddit", "tradingview")
+STRATEGY_SOURCES = ("tiktok", "reddit", "tradingview", "tradingview_porownawcze")
 
 
 def load_strategy(name: str):
     """
     Moduł strategii po samej nazwie pliku, np. "RSI6_80_20".
     Szuka w strategies/tiktok, strategies/reddit, strategies/tradingview,
+    strategies/tradingview_porownawcze,
     potem w strategies.
     Stare nazwy z przedrostkiem "tick_" też działają.
     """

@@ -13,7 +13,7 @@ kompensacja nic nie dodaje ponad zwykłego Hulla.
 
 import pandas as pd
 
-from strategies.tradingview import EfficiencyWeightedHull as base
+from strategies.tradingview_porownawcze import EfficiencyWeightedHull as base
 
 
 NAME = "Efficiency Weighted Hull – standardowy Hull"

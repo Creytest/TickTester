@@ -15,7 +15,7 @@ są losowe — nie mają z nimi związku.
 import numpy as np
 import pandas as pd
 
-from strategies.tradingview import AutoLevelsTrendlines as base
+from strategies.tradingview_porownawcze import AutoLevelsTrendlines as base
 
 
 NAME = "Auto Levels & Trendlines + Breakout Check – grupa kontrolna"

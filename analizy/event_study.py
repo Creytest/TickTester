@@ -2,7 +2,7 @@
 Badanie zdarzeń dla wskaźników bez wejść / SL / TP.
 
 Pierwszy wskaźnik: Auto Levels & Trendlines + Breakout Check
-(strategies/tradingview/AutoLevelsTrendlines.py). Autor nie podaje
+(strategies/tradingview_porownawcze/AutoLevelsTrendlines.py). Autor nie podaje
 zasad handlu, więc nie robimy backtestu z kapitałem, tylko liczymy:
 
 1. Ile było wybić i jaki odsetek skrypt oznaczył jako TRUE,
@@ -42,7 +42,7 @@ from narzedzia.tick_config import ASSETS, REVERSE_BID_ASK
 from narzedzia.tick_data import load_ticks_cached
 from narzedzia.tick_engine import build_bars
 from strategies.tiktok.SR_Retest import atr as atr_rma
-from strategies.tradingview import AutoLevelsTrendlines as indicator
+from strategies.tradingview_porownawcze import AutoLevelsTrendlines as indicator
 
 
 # ============================================================

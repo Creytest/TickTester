@@ -20,7 +20,8 @@ from narzedzia.interactive_chart import save_interactive_chart
 # ============================================================
 
 # Plik strategii (bez .py) — wystarczy sama nazwa, folder
-# (strategies/tiktok, strategies/reddit albo strategies/tradingview) znajdzie się sam.
+# (strategies/tiktok, strategies/reddit, strategies/tradingview albo
+# strategies/tradingview_porownawcze) znajdzie się sam.
 #
 # ---------------- Strategie z TikToka (strategies/tiktok) ----------------
 #   "BigBeluga_Stoch_80percent" — BigBeluga Two-Pole + Stochastic 7,3,3
@@ -64,6 +65,19 @@ from narzedzia.interactive_chart import save_interactive_chart
 #   "LiquidityHuntPro"          — Liquidity Hunt Pro (Viprasol): sweep swing low/high (pivot) + w ciągu kilku świec mocne
 #                                 zamknięcie za przeciwnym swingiem → BUY/SELL; SL za knotem sweepu, po 1/3 na TP 1/2/3 × ryzyko;
 #                                 1m/15m/1h/4h/1D z ustawieniami autora dla interwału (scalping / intraday / swing + EMA 50/200)
+#   "Wyckoff"                   — Wyckoff Accumulation & Distribution (LunqFX): maszyna stanów SC/BC → AR → ST → Spring/UTAD
+#                                 → SOS/SOW; wejście na SOS/SOW (nasze założenie, autor: "not an entry"), SL = INVALID autora,
+#                                 TP = T2 autora (2 × zakres od creek/ice), wyjście po wygaśnięciu schematu, 1% ryzyka;
+#                                 15m/1h/4h (autor: forex, złoto, indeksy, krypto, 15m–1D)
+#   "Wyckoff_Control"           — grupa kontrolna: te same liczby wejść, kierunki i odległości SL/TP w ATR, losowe momenty.
+#                                 Liczyć razem z Wyckoff, potem analizy/compare_control.py z ACTIVE = "Wyckoff".
+#                                 Track record autora (% zakresów do T2 vs losowy ruch): analizy/event_study_wyckoff.py
+#
+# ------- NA INNY ODCINEK: wskaźniki porównawcze (strategies/tradingview_porownawcze) -------
+#   Wskaźniki z TradingView bez reguł handlu autora (wejście albo wyjście to nasze założenie).
+#   Nie oceniamy ich jak zwykłych strategii, tylko porównujemy: strategia vs grupa kontrolna
+#   (*_Control, losowe momenty) albo vs wersja standardowa (*_Standard).
+#   Wyckoff zostaje wyżej, w sekcji TradingView.
 #   "AutoLevelsTrendlines"      — Auto Levels & Trendlines + Breakout Check: strefy S/R i linie trendu z pivotów 5/5,
 #                                 wejście na TRUE breakout (3 zamknięcia za granicą), wyjście po HOLD_BARS = 10 świecach
 #                                 (nasze założenie, autor nie podaje), bez SL/TP, 100% kapitału; 15m/1h/4h
@@ -76,13 +90,6 @@ from narzedzia.interactive_chart import save_interactive_chart
 #   "KeyLevelZones_Control"     — grupa kontrolna: te same liczby wejść, kierunki i czas trzymania, losowe momenty.
 #                                 Liczyć razem z KeyLevelZones, potem analizy/compare_control.py z ACTIVE = "KeyLevelZones".
 #                                 Badanie zdarzeń bez transakcji: analizy/event_study_key_levels.py
-#   "Wyckoff"                   — Wyckoff Accumulation & Distribution (LunqFX): maszyna stanów SC/BC → AR → ST → Spring/UTAD
-#                                 → SOS/SOW; wejście na SOS/SOW (nasze założenie, autor: "not an entry"), SL = INVALID autora,
-#                                 TP = T2 autora (2 × zakres od creek/ice), wyjście po wygaśnięciu schematu, 1% ryzyka;
-#                                 15m/1h/4h (autor: forex, złoto, indeksy, krypto, 15m–1D)
-#   "Wyckoff_Control"           — grupa kontrolna: te same liczby wejść, kierunki i odległości SL/TP w ATR, losowe momenty.
-#                                 Liczyć razem z Wyckoff, potem analizy/compare_control.py z ACTIVE = "Wyckoff".
-#                                 Track record autora (% zakresów do T2 vs losowy ruch): analizy/event_study_wyckoff.py
 #   "EfficiencyWeightedHull"    — Efficiency Weighted Hull [BackQuant]: Hull 34 z kompensacją ważoną Efficiency Ratio(20),
 #                                 stan z nachylenia (2 świece) poza martwą strefą 0,2 × szum → bullish / bearish flip;
 #                                 zawsze w rynku (reverse), bez SL, 100% kapitału; 15m/1h/4h (autor nie podaje interwału ani rynku)
@@ -99,6 +106,7 @@ from narzedzia.interactive_chart import save_interactive_chart
 #   "SqueezeBreakoutSignals_Control" — grupa kontrolna: te same wejścia, kierunki i odległości SL/TP w średnim TR, losowe
 #                                 momenty. Liczyć razem: STRATEGY = ["SqueezeBreakoutSignals", "SqueezeBreakoutSignals_Control"],
 #                                 potem analizy/compare_control.py z ACTIVE = "SqueezeBreakoutSignals".
+#
 # Kolejka: lista nazw, np. ["EMA9", "RSI_90", "HolyGrail"] — strategie
 # liczą się po kolei, każda zapisuje wyniki we własnym podfolderze.
 # Błąd jednej strategii nie zatrzymuje kolejnych.

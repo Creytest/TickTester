@@ -43,7 +43,7 @@ sys.path.insert(0, str(_Path(__file__).resolve().parents[1]))
 from narzedzia.tick_config import ASSETS, REVERSE_BID_ASK
 from narzedzia.tick_data import load_ticks_cached
 from narzedzia.tick_engine import build_bars
-from strategies.tradingview import KeyLevelZones as klz
+from strategies.tradingview_porownawcze import KeyLevelZones as klz
 
 
 ASSETS_TO_TEST = ["XAUUSD", "Bitcoin", "EURUSD", "Brent", "US500"]

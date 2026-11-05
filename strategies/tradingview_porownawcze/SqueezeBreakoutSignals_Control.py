@@ -20,7 +20,7 @@ losowe — nie mają z nimi związku.
 import numpy as np
 import pandas as pd
 
-from strategies.tradingview import SqueezeBreakoutSignals as base
+from strategies.tradingview_porownawcze import SqueezeBreakoutSignals as base
 
 
 NAME = "Squeeze Breakout Signals [bitpunk] – grupa kontrolna"

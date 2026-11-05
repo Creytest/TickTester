@@ -14,7 +14,7 @@ Wykres pokazuje strefy wskaźnika, ale wejścia są losowe.
 import numpy as np
 import pandas as pd
 
-from strategies.tradingview import KeyLevelZones as base
+from strategies.tradingview_porownawcze import KeyLevelZones as base
 
 
 NAME = "FCP Key Level Zones | Pivots & Daily Weekly Monthly High Low – grupa kontrolna"

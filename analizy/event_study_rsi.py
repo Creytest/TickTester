@@ -24,7 +24,8 @@ Bez kosztów (to nie są transakcje). Dla skali w tabeli jest koszt
 transakcji w obie strony w %.
 
 Wyniki: wyniki/event_study_RSI/
-    summary.csv                         — tabela zbiorcza,
+    summary.csv                         — tabela zbiorcza (dopisywana po każdej
+                                          kombinacji, także między biegami),
     path_<aktywo>_<interwał>.csv        — ścieżki i pasy (1–20),
     rsi_<aktywo>_<interwał>.png         — wykres do filmu.
 
@@ -424,16 +425,31 @@ def main():
                 save_chart(path, row, OUTPUT_DIR / f"rsi_{name}.png")
             print_row(row)
             rows.append(row)
+            save_summary(row)
 
-    if rows:
-        summary = pd.DataFrame(rows)
-        for kind in EVENTS:
-            for ctrl in ("A", "B"):
-                col = f"{kind}_p_{ctrl}"
-                if col in summary:
-                    summary[f"{col}_holm"] = holm(summary[col])
-        summary.to_csv(OUTPUT_DIR / "summary.csv", index=False)
-        print(f"\nZapisano: {OUTPUT_DIR / 'summary.csv'}")
+
+def save_summary(row: dict) -> None:
+    """
+    Dopisuje wiersz do summary.csv zaraz po każdej kombinacji.
+    Wyniki z wcześniejszych biegów zostają (ten sam aktywo × interwał
+    jest zastępowany), a korekta Holma liczy się od nowa po wszystkich.
+    """
+    file = OUTPUT_DIR / "summary.csv"
+    new = pd.DataFrame([row])
+    if file.exists():
+        old = pd.read_csv(file)
+        old = old.loc[:, [c for c in old.columns if not c.endswith("_holm")]]
+        same = (old["asset"] == row["asset"]) & (old["timeframe"] == row["timeframe"])
+        summary = pd.concat([old[~same], new], ignore_index=True)
+    else:
+        summary = new
+    for kind in EVENTS:
+        for ctrl in ("A", "B"):
+            col = f"{kind}_p_{ctrl}"
+            if col in summary:
+                summary[f"{col}_holm"] = holm(summary[col])
+    summary.to_csv(file, index=False)
+    print(f"  zapisano summary.csv ({len(summary)} kombinacji)")
 
 
 def print_row(row: dict) -> None:

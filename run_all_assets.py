@@ -63,6 +63,17 @@ from narzedzia.interactive_chart import save_interactive_chart
 #                                 zamknięcia, SL tick za knotem, TP = cegła + knot (TP_FRACTION = 0.5: połowa); EURUSD cegła
 #                                 4 pipsy, reszta: 1 cegła / 5 min handlu (kalibracja na 30 dniach); "5min" = tylko rozgrzewka
 #
+# ---------------- Strategie z książek (strategies/ksiazki) ----------------
+#   "ConnorsCumulativeRSI"      — Cumulative RSI (Connors, „Short Term Trading Strategies That Work”): close > SMA 200,
+#                                 RSI(2) z dziś + wczoraj < 35 → kupno, wyjście RSI(2) > 65; long, bez SL, 100% kapitału, 1D
+#                                 (autor: akcje/indeksy USA → najpierw US500; dłuższa historia: START_DATE wcześniej)
+#   "ConnorsCumulativeRSI_50"   — to samo z progiem wejścia 50
+#   "ConnorsCumulativeRSI_Control" / "ConnorsCumulativeRSI_50_Control" — grupa kontrolna: tyle samo transakcji
+#                                 o tych samych czasach trzymania, losowe momenty wejścia. Liczyć razem, np.
+#                                 STRATEGY = ["ConnorsCumulativeRSI", "ConnorsCumulativeRSI_Control",
+#                                             "ConnorsCumulativeRSI_50", "ConnorsCumulativeRSI_50_Control"],
+#                                 potem analizy/compare_control.py z ACTIVE = "ConnorsCumulativeRSI" (albo "..._50").
+#
 # ---------------- Strategie z TradingView (strategies/tradingview) ----------------
 #   "BressertCycleSignals"      — Bressert Cycle Signals (BY_Tse, Community Scripts): Double Stochastic 10 skręca spod 40 /
 #                                 znad 70, trend z wyższego interwału, buy/sell stop za świecą setupu (4 świece),

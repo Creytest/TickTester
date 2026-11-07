@@ -81,6 +81,19 @@ PRESETS = {
         "strategy_label": "Wybicie / retest ▲▼",
         "subtitle_note": "te same kierunki i odległości SL / TP, losowe momenty wejścia",
     },
+    "ConnorsCumulativeRSI": {
+        "control": "ConnorsCumulativeRSI_Control",
+        "title": "Connors Cumulative RSI (próg 35)",
+        "strategy_label": "Cumulative RSI < 35",
+        "subtitle_note": "tyle samo transakcji, te same czasy trzymania, losowe momenty wejścia",
+    },
+    "ConnorsCumulativeRSI_50": {
+        "control": "ConnorsCumulativeRSI_50_Control",
+        "title": "Connors Cumulative RSI (próg 50)",
+        "strategy_label": "Cumulative RSI < 50",
+        "subtitle_note": "tyle samo transakcji, te same czasy trzymania, losowe momenty wejścia",
+        "folder": "porownanie_z_kontrolna",
+    },
 }
 
 # Klucze opcjonalne w PRESETS (domyślnie: grupa kontrolna z losowymi wejściami):

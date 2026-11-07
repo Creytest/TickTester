@@ -258,7 +258,7 @@ def draw_stats(fig, stats: dict, left: float, right: float) -> None:
 
 
 # Podfoldery strategii według źródła.
-STRATEGY_SOURCES = ("tiktok", "reddit", "tradingview", "tradingview_porownawcze")
+STRATEGY_SOURCES = ("tiktok", "reddit", "tradingview", "tradingview_porownawcze", "ksiazki")
 
 
 def load_strategy(name: str):

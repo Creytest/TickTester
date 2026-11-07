@@ -166,6 +166,7 @@ def run_backtest(
     same_signal: str = "ignore",
     max_entries: int = 1,
     tp_split: tuple | None = None,
+    bar_builder: Callable[[pd.DataFrame], pd.DataFrame] | None = None,
 ) -> dict:
     """
     Backtest strategii na tickach Bid/Ask.
@@ -233,6 +234,12 @@ def run_backtest(
     strategy.close): zamykają otwartą pozycję long / short na
     pierwszym ticku po zamknięciu świecy, bez otwierania nowej.
 
+    bar_builder: opcjonalna funkcja ticki → świece zamiast świec
+    czasowych (np. cegły Renko). Świece muszą mieć kolumnę
+    close_time: chwilę zamknięcia; sygnał wykonuje się na pierwszym
+    ticku od tej chwili. timeframe służy wtedy tylko do krzywej
+    kapitału.
+
     Zamiast przechodzić w Pythonie przez każdy tick, silnik
     wyszukuje na tablicach numpy tylko ticki, na których coś
     się dzieje: wejście po sygnale oraz pierwsze trafienie SL/TP.
@@ -272,7 +279,10 @@ def run_backtest(
     # 2. Budowa świec i generowanie sygnałów
     # ========================================================
 
-    bars = build_bars([ticks], timeframe)
+    if bar_builder is not None:
+        bars = bar_builder(ticks)
+    else:
+        bars = build_bars([ticks], timeframe)
 
     if bars.empty:
         raise ValueError("Nie udało się utworzyć świec z ticków.")
@@ -293,7 +303,10 @@ def run_backtest(
     # i tak byłyby pominięte w pętli egzekucji.
     buy = signals["buy"].astype(bool).to_numpy()
     sell = signals["sell"].astype(bool).to_numpy()
-    close_times = bars.index + pd.Timedelta(timeframe)
+    if "close_time" in bars.columns:
+        close_times = pd.DatetimeIndex(bars["close_time"])
+    else:
+        close_times = bars.index + pd.Timedelta(timeframe)
     stop_losses = (
         signals["stop_loss"].to_numpy()
         if "stop_loss" in signals.columns
@@ -329,7 +342,7 @@ def run_backtest(
     )
     # Zlecenie stop ważne do końca następnej świecy.
     stop_until = np.append(
-        (bars.index[1:] + pd.Timedelta(timeframe)).to_numpy(),
+        close_times[1:].to_numpy(),
         np.datetime64("NaT"),
     )
 

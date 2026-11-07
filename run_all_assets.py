@@ -58,6 +58,10 @@ from narzedzia.interactive_chart import save_interactive_chart
 #   "SecondEntry"               — Second Entry (thefakeab, „75% WR”): H2 / L2 Ala Brooksa — EMA 21 rośnie, cofnięcie w dwóch
 #                                 nogach z wyższym dołkiem, wzrostowa świeca sygnałowa → buy stop nad nią, SL pod nią, TP 1:1;
 #                                 1min/5min (autor: wykres 2000 ticków)
+#   "Renko_EMA9_20"             — Renko EMA 9/20 (PauloMinozo, „70–80% WR”): cegły Renko z ticków (z knotami), EMA 9 > 20,
+#                                 cofnięcie knotem do EMA 20, cegła zamyka się z powrotem przez EMA 9 → wejście na ticku
+#                                 zamknięcia, SL tick za knotem, TP = cegła + knot (TP_FRACTION = 0.5: połowa); EURUSD cegła
+#                                 4 pipsy, reszta: 1 cegła / 5 min handlu (kalibracja na 30 dniach); "5min" = tylko rozgrzewka
 #
 # ---------------- Strategie z TradingView (strategies/tradingview) ----------------
 #   "BressertCycleSignals"      — Bressert Cycle Signals (BY_Tse, Community Scripts): Double Stochastic 10 skręca spod 40 /

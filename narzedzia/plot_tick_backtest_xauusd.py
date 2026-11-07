@@ -398,6 +398,11 @@ def main(
     if hasattr(strategy_module, "TICK"):
         strategy_module.TICK = TICK_SIZE[asset]
 
+    # Strategie z własnymi świecami (np. Renko, atrybut BUILD_BARS)
+    # dostają nazwę aktywa (atrybut ASSET), np. do wielkości cegły.
+    if hasattr(strategy_module, "ASSET"):
+        strategy_module.ASSET = asset
+
     # ========================================================
     # 2. BACKTEST
     # ========================================================
@@ -431,6 +436,8 @@ def main(
         equity_fraction=getattr(strategy_module, "EQUITY_FRACTION", None),
         # Częściowe wyjścia na TP1/TP2/TP3, np. (1/3, 1/3, 1/3).
         tp_split=getattr(strategy_module, "TP_SPLIT", None),
+        # Własne świece zamiast czasowych, np. cegły Renko.
+        bar_builder=getattr(strategy_module, "BUILD_BARS", None),
     )
 
     bars_all = result["bars"].copy()

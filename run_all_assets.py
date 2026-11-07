@@ -49,6 +49,9 @@ from narzedzia.interactive_chart import save_interactive_chart
 #                                 tylko long, 1% ryzyka; szczyt liczony z całego pliku danych, nie tylko z okresu
 #   "HolyGrail"                 — Holy Grail (Connors & Raschke "Street Smarts" 1995): ADX 14 > 30 i rośnie, dotyk EMA 20,
 #                                 buy/sell stop za poprzednią świecą, SL dołek cofnięcia, TP ostatni szczyt; 15m/1h/4h + 1D
+#   "ElephantBar_MA200"         — Elephant Bar + MA200 + Volume Spike (Trade-Clearly): wzrostowa świeca ≥ 2 × średni zakres 20,
+#                                 korpus ≥ 70%, low ≤ SMA 200 < close, wolumen (ticki) ≥ 2 × średnia 20; long, SL low świecy,
+#                                 TP 2:1, 1% ryzyka (wyjście i progi nasze — autor ich nie podaje)
 #
 # ---------------- Strategie z TradingView (strategies/tradingview) ----------------
 #   "BressertCycleSignals"      — Bressert Cycle Signals (BY_Tse, Community Scripts): Double Stochastic 10 skręca spod 40 /

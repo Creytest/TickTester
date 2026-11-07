@@ -55,6 +55,9 @@ from narzedzia.interactive_chart import save_interactive_chart
 #   "EMA9_19_Scalping"          — EMA 9/19 scalping (Reddit r/Daytrading): 3 zamknięcia nad / pod obiema EMA → wejście rynkowe
 #                                 na dotyku EMA 9 w trakcie świecy, SL za EMA 19 (+0,1 ATR, pomija SL > 1,5 ATR), TP 2:1,
 #                                 SL na wejście przy 1:1; 1min, tylko 9:30–10:00 NY (SESSION_ONLY = False: cała doba)
+#   "SecondEntry"               — Second Entry (thefakeab, „75% WR”): H2 / L2 Ala Brooksa — EMA 21 rośnie, cofnięcie w dwóch
+#                                 nogach z wyższym dołkiem, wzrostowa świeca sygnałowa → buy stop nad nią, SL pod nią, TP 1:1;
+#                                 1min/5min (autor: wykres 2000 ticków)
 #
 # ---------------- Strategie z TradingView (strategies/tradingview) ----------------
 #   "BressertCycleSignals"      — Bressert Cycle Signals (BY_Tse, Community Scripts): Double Stochastic 10 skręca spod 40 /

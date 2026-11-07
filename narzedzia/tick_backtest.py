@@ -70,6 +70,37 @@ def _find_exit(
     return -1, None
 
 
+def _find_exit_breakeven(
+    side: str,
+    stop_loss: float | None,
+    take_profit: float | None,
+    break_even: float,
+    entry_price: float,
+    bid: np.ndarray,
+    ask: np.ndarray,
+    start: int,
+) -> tuple[int, str | None]:
+    """
+    SL/TP z przesunięciem SL na cenę wejścia (break even), gdy cena
+    (Bid dla longa, Ask dla shorta) dojdzie do poziomu break_even.
+
+    Najpierw szukamy SL albo poziomu break_even. Jeśli pierwszy
+    był break_even, od tego ticku SL = cena wejścia, a TP bez zmian.
+    Wyjście na przesuniętym SL ma powód "breakeven".
+    """
+    index, reason = _find_exit(side, stop_loss, break_even, bid, ask, start)
+
+    if index == -1 or reason == "stop_loss":
+        return index, reason
+
+    # Na ticku index cena jest już za break_even, więc SL na wejściu
+    # nie zadziała na nim, a TP tak.
+    index, reason = _find_exit(side, entry_price, take_profit, bid, ask, index)
+    if reason == "stop_loss":
+        reason = "breakeven"
+    return index, reason
+
+
 def _find_trailing_exit(
     side: str,
     levels: np.ndarray,
@@ -187,6 +218,17 @@ def run_backtest(
     zlecenie wygasa wraz z tą świecą — strategia ponawia je
     sygnałem na kolejnej świecy. NaN: wejście jak zwykle.
 
+    Opcjonalna kolumna entry_touch (wejście na dotyku poziomu):
+    sygnał buy / sell z ceną entry_touch wchodzi rynkowo na
+    pierwszym ticku następnej świecy, na którym Bid (cena świec)
+    spadnie do tej ceny (long) albo wzrośnie do niej (short) —
+    np. dotknięcie średniej od góry przy longu. Wygasa jak
+    entry_stop. NaN: wejście jak zwykle.
+
+    Opcjonalna kolumna break_even: gdy cena dojdzie do tego poziomu,
+    SL przesuwa się na cenę wejścia (wyjście z powodem "breakeven").
+    Działa przy stałym SL/TP, bez trailing stopu i tp_split.
+
     Opcjonalne kolumny exit_long / exit_short (odpowiednik
     strategy.close): zamykają otwartą pozycję long / short na
     pierwszym ticku po zamknięciu świecy, bez otwierania nowej.
@@ -275,6 +317,16 @@ def run_backtest(
         if "entry_stop" in signals.columns
         else None
     )
+    entry_touches = (
+        signals["entry_touch"].to_numpy(dtype=float)
+        if "entry_touch" in signals.columns
+        else None
+    )
+    break_evens = (
+        signals["break_even"].to_numpy(dtype=float)
+        if "break_even" in signals.columns
+        else None
+    )
     # Zlecenie stop ważne do końca następnej świecy.
     stop_until = np.append(
         (bars.index[1:] + pd.Timedelta(timeframe)).to_numpy(),
@@ -315,6 +367,16 @@ def run_backtest(
                 "entry_stop": (
                     entry_stops[i]
                     if entry_stops is not None
+                    else np.nan
+                ),
+                "entry_touch": (
+                    entry_touches[i]
+                    if entry_touches is not None
+                    else np.nan
+                ),
+                "break_even": (
+                    break_evens[i]
+                    if break_evens is not None
                     else np.nan
                 ),
                 "stop_until": stop_until[i],
@@ -468,7 +530,11 @@ def run_backtest(
 
         # Zlecenie stop: wejście na pierwszym ticku, który dojdzie
         # do ceny zlecenia przed końcem następnej świecy.
-        if not np.isnan(event["entry_stop"]):
+        # Wejście na dotyku: to samo okno, cena z drugiej strony.
+        has_stop = not np.isnan(event["entry_stop"])
+        has_touch = not np.isnan(event["entry_touch"])
+
+        if has_stop or has_touch:
             last = (
                 n_ticks
                 if pd.isna(event["stop_until"])
@@ -478,10 +544,14 @@ def run_backtest(
                     side="left",
                 ))
             )
-            if desired_side == "long":
+            if has_stop and desired_side == "long":
                 hit = asks[i:last] >= event["entry_stop"]
-            else:
+            elif has_stop:
                 hit = bids[i:last] <= event["entry_stop"]
+            elif desired_side == "long":
+                hit = bids[i:last] <= event["entry_touch"]
+            else:
+                hit = bids[i:last] >= event["entry_touch"]
 
             if not hit.any():
                 continue
@@ -635,6 +705,15 @@ def run_backtest(
                 index, reason, _ = find_exit(desired_side, sl, level, i + 1)
                 leg_exits.append((index, reason, level))
             exit_index, exit_reason = leg_exits[0][0], leg_exits[0][1]
+            exit_stop = None
+        elif (
+            not np.isnan(event["break_even"])
+            and trail_levels[desired_side] is None
+        ):
+            exit_index, exit_reason = _find_exit_breakeven(
+                desired_side, sl, tp, float(event["break_even"]),
+                engine.position.entry_price, bids, asks, i + 1,
+            )
             exit_stop = None
         else:
             exit_index, exit_reason, exit_stop = find_exit(

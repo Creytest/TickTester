@@ -52,6 +52,9 @@ from narzedzia.interactive_chart import save_interactive_chart
 #   "ElephantBar_MA200"         — Elephant Bar + MA200 + Volume Spike (Trade-Clearly): wzrostowa świeca ≥ 2 × średni zakres 20,
 #                                 korpus ≥ 70%, low ≤ SMA 200 < close, wolumen (ticki) ≥ 2 × średnia 20; long, SL low świecy,
 #                                 TP 2:1, 1% ryzyka (wyjście i progi nasze — autor ich nie podaje)
+#   "EMA9_19_Scalping"          — EMA 9/19 scalping (Reddit r/Daytrading): 3 zamknięcia nad / pod obiema EMA → wejście rynkowe
+#                                 na dotyku EMA 9 w trakcie świecy, SL za EMA 19 (+0,1 ATR, pomija SL > 1,5 ATR), TP 2:1,
+#                                 SL na wejście przy 1:1; 1min, tylko 9:30–10:00 NY (SESSION_ONLY = False: cała doba)
 #
 # ---------------- Strategie z TradingView (strategies/tradingview) ----------------
 #   "BressertCycleSignals"      — Bressert Cycle Signals (BY_Tse, Community Scripts): Double Stochastic 10 skręca spod 40 /

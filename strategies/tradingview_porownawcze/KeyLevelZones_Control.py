@@ -23,6 +23,8 @@ TIMEFRAMES = base.TIMEFRAMES
 OPPOSITE_SIGNAL = "ignore"
 SAME_SIGNAL = "ignore"
 EQUITY_FRACTION = 1.0
+# Ta sama rozgrzewka co strategia (poprzedni miesiąc).
+WARMUP_DAYS = base.WARMUP_DAYS
 
 SEED = 42
 

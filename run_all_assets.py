@@ -8,7 +8,7 @@ matplotlib.use("Agg")
 import numpy as np
 import pandas as pd
 
-from narzedzia.tick_config import ASSETS, COMMISSION
+from narzedzia.tick_config import COMMISSION
 from narzedzia import plot_tick_backtest_xauusd as single
 from narzedzia.summary_chart import save_summary_chart
 from narzedzia.plansze import save_plansze
@@ -189,7 +189,8 @@ def main():
     print(f"Strategia: {strategy_name}")
     print(f"Interwały: {', '.join(timeframes)}")
 
-    # Najdłuższy interwał wyznacza zapas ticków na rozgrzewkę.
+    # Najdłuższy interwał (albo WARMUP_DAYS strategii) wyznacza
+    # zapas ticków na rozgrzewkę.
     longest = max(timeframes, key=pd.Timedelta)
 
     for asset in assets:
@@ -213,7 +214,9 @@ def main():
             # a nie raz na interwał.
             try:
                 print("Wczytywanie danych tickowych...")
-                ticks = single.load_period_ticks(asset, longest, start, end)
+                ticks = single.load_period_ticks(
+                    asset, longest, start, end, strategy_module
+                )
                 ticks = ticks.sort_values("timestamp").reset_index(drop=True)
             except FileNotFoundError as error:
                 print(f"POMINIĘTO {asset}: {error}")

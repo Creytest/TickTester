@@ -197,7 +197,13 @@ _CACHE = {}
 
 
 def cached(bars: pd.DataFrame) -> dict:
-    key = (id(bars), len(bars), bars.index[0], bars.index[-1])
+    """generate_signals i indicators liczą to samo — liczymy raz."""
+    key = (
+        len(bars),
+        bars.index[0] if len(bars) else None,
+        bars.index[-1] if len(bars) else None,
+        float(bars["close"].sum()) if len(bars) else 0.0,
+    )
     if key not in _CACHE:
         _CACHE.clear()
         _CACHE[key] = compute(bars)

@@ -89,7 +89,6 @@ def support_resistance(bars: pd.DataFrame) -> pd.DataFrame:
         level_out = resistance if sign > 0 else support
         break_out = break_up if sign > 0 else break_down
         retest_out = retest_up if sign > 0 else retest_down
-        price = high if sign > 0 else low
 
         def step(n):
             points = state["points"]

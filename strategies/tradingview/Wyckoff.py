@@ -47,7 +47,7 @@ zamkniętych świecach i dopiero, gdy ATR(50) ma wartość:
    % FAILED; mianownik obejmuje też zakresy bez wybicia.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd

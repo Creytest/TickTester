@@ -1,7 +1,3 @@
-from pathlib import Path
-
-import pandas as pd
-
 # Uruchamianie bezpośrednio z tego folderu: dodaj folder repo do ścieżki importów.
 import sys
 from pathlib import Path as _Path

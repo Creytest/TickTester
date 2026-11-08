@@ -52,7 +52,7 @@ from narzedzia.tick_data import load_ticks_cached
 from narzedzia.tick_engine import build_bars
 from narzedzia.plansze import (
     BLACK, WHITE, GREEN, RED, GRAY, SIZE, DPI,
-    _body_font, _heading_font, _heading_weight,
+    _body_font, _heading_font, _heading_weight, count_text,
 )
 from strategies.tiktok.RSI6_80_20 import rsi
 from strategies.tiktok.SR_Retest import atr as atr_rma
@@ -373,7 +373,9 @@ def save_chart(path: pd.DataFrame, row: dict, file: Path) -> None:
 
         p = row.get(f"{kind}_p_A")
         ax.set_title(
-            f"Po {EVENTS[kind]}  ·  {row[f'{kind}_n']} sygnałów  ·  p = {p:.3f}".replace(".", ","),
+            f"Po {EVENTS[kind]}  ·  "
+            f"{count_text(row[f'{kind}_n'], 'sygnał', 'sygnały', 'sygnałów')}  ·  "
+            f"p = {p:.3f}".replace(".", ","),
             color=WHITE, fontsize=22, fontfamily=font, loc="left", pad=14,
         )
         ax.set_xlabel("świece po sygnale", color=GRAY, fontsize=16, fontfamily=font)

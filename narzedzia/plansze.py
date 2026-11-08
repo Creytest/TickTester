@@ -34,6 +34,30 @@ SIZE = (19.2, 10.8)
 DPI = 100
 
 
+def count_text(n, one: str, few: str, many: str) -> str:
+    """
+    Liczba z rzeczownikiem w poprawnej formie, np.
+    count_text(5, "aktywo", "aktywa", "aktywów") daje "5 aktywów".
+    """
+    n = int(n)
+    if n == 1:
+        word = one
+    elif n % 10 in (2, 3, 4) and n % 100 not in (12, 13, 14):
+        word = few
+    else:
+        word = many
+    return f"{n} {word}"
+
+
+def combinations_text(data: pd.DataFrame) -> str:
+    """Np. "5 aktywów × 3 interwały" z kolumn asset i timeframe."""
+    return (
+        count_text(data["asset"].nunique(), "aktywo", "aktywa", "aktywów")
+        + " × "
+        + count_text(data["timeframe"].nunique(), "interwał", "interwały", "interwałów")
+    )
+
+
 def save_plansze(
     folder,
     summary: pd.DataFrame,
@@ -56,10 +80,7 @@ def save_plansze(
     folder.mkdir(parents=True, exist_ok=True)
 
     data = summary.reset_index(drop=True)
-    subtitle = (
-        f"{data['asset'].nunique()} aktywa × "
-        f"{data['timeframe'].nunique()} interwały  |  {period}  |  po kosztach"
-    )
+    subtitle = f"{combinations_text(data)}  |  {period}  |  po kosztach"
 
     paths = [
         folder / "1_wykres_kapitalu.png",

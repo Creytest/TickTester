@@ -15,7 +15,6 @@ Wariant z progiem 50: ConnorsCumulativeRSI_50.py.
 Grupa kontrolna: ConnorsCumulativeRSI_Control.py.
 """
 
-import numpy as np
 import pandas as pd
 
 from strategies.tiktok.RSI6_80_20 import rsi

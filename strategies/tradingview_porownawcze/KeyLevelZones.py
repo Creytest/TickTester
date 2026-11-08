@@ -68,6 +68,11 @@ OPPOSITE_SIGNAL = "ignore"
 SAME_SIGNAL = "ignore"
 EQUITY_FRACTION = 1.0
 
+# Rozgrzewka w dniach: poziomy z CAŁEGO poprzedniego miesiąca i ATR 4h
+# już w pierwszym miesiącu testu. Samo 300 świec to na 15 min ok. 3 dni,
+# na 1 h 12,5 dnia — za mało na miesiąc (jak w event_study_key_levels).
+WARMUP_DAYS = 70
+
 COLORS = {2: "rgba(47,227,198,0.30)", 3: "rgba(255,216,77,0.30)", 4: "rgba(255,97,82,0.30)"}
 
 # Ustawienia domyślne skryptu.
@@ -284,7 +289,13 @@ _CACHE = {}
 
 
 def _cached_days(bars: pd.DataFrame) -> list:
-    key = (id(bars), len(bars), bars.index[0], bars.index[-1])
+    """generate_signals i indicators liczą to samo — liczymy raz."""
+    key = (
+        len(bars),
+        bars.index[0] if len(bars) else None,
+        bars.index[-1] if len(bars) else None,
+        float(bars["close"].sum()) if len(bars) else 0.0,
+    )
     if key not in _CACHE:
         _CACHE.clear()
         _CACHE[key] = daily_zones(bars)

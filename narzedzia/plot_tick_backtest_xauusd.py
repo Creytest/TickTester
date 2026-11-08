@@ -51,22 +51,34 @@ WARMUP_BARS = 300
 # DANE TICKOWE
 # ============================================================
 
+def warmup_span(timeframe: str, strategy_module=None) -> pd.Timedelta:
+    """
+    Długość rozgrzewki: WARMUP_BARS świec interwału albo dłużej, gdy
+    strategia ma atrybut WARMUP_DAYS (np. Key Level Zones potrzebuje
+    całego poprzedniego miesiąca także na świecach 15 min).
+    """
+    span = pd.Timedelta(timeframe) * WARMUP_BARS
+    days = getattr(strategy_module, "WARMUP_DAYS", 0)
+    return max(span, pd.Timedelta(days=days))
+
+
 def load_period_ticks(
     asset: str,
     timeframe: str,
     start_date: str,
     end_date: str,
+    strategy_module=None,
 ) -> pd.DataFrame:
     """
     Wczytuje ticki od początku rozgrzewki do końca okresu.
 
+    strategy_module: moduł strategii — jej WARMUP_DAYS wydłuża
+    rozgrzewkę (patrz warmup_span).
+
     Przy pierwszym uruchomieniu dla danego roku tworzy pamięć
     podręczną w folderze cache, kolejne uruchomienia są szybkie.
     """
-    start = (
-        pd.Timestamp(start_date)
-        - pd.Timedelta(timeframe) * WARMUP_BARS
-    )
+    start = pd.Timestamp(start_date) - warmup_span(timeframe, strategy_module)
 
     end = pd.Timestamp(end_date) + pd.Timedelta(days=1)
 
@@ -265,7 +277,7 @@ def load_strategy(name: str):
     """
     Moduł strategii po samej nazwie pliku, np. "RSI6_80_20".
     Szuka w strategies/tiktok, strategies/reddit, strategies/tradingview,
-    strategies/tradingview_porownawcze,
+    strategies/tradingview_porownawcze, strategies/ksiazki,
     potem w strategies.
     Stare nazwy z przedrostkiem "tick_" też działają.
     """
@@ -349,7 +361,7 @@ def main(
         print("Wczytywanie danych tickowych...")
 
         all_ticks = load_period_ticks(
-            asset, timeframe, start_date, end_date
+            asset, timeframe, start_date, end_date, strategy_module
         )
         all_ticks = all_ticks.sort_values("timestamp").reset_index(
             drop=True
@@ -377,9 +389,9 @@ def main(
     first_selected_bar = first_selected_tick.floor(timeframe)
 
     # Potrzebujemy świec poprzedzających wybrany okres.
-    warmup_start = first_selected_bar - pd.Timedelta(
-        timeframe
-    ) * WARMUP_BARS
+    warmup_start = first_selected_bar - warmup_span(
+        timeframe, strategy_module
+    )
 
     print(f"Okres backtestu: {start_date} – {end_date}")
     print(f"Pierwszy tick w okresie: {first_selected_tick}")
@@ -699,13 +711,22 @@ def main(
     if panel2:
         panel_plots(panel2, 2, None)
 
-    # mplfinance nie rysuje pustej serii punktów (np. strategia
-    # bez ani jednego sygnału short w danym okresie) — pomijamy ją.
+    # mplfinance wywraca się na serii bez ani jednej wartości: przy
+    # automatycznym wyborze osi Y liczy maksimum z pustej listy.
+    # Puste serie punktów (np. brak sygnałów short) pomijamy, puste
+    # linie (np. trailing stop bez transakcji w okresie) rysujemy na
+    # głównej osi panelu — nic nie widać, a panel zostaje.
+    def has_values(data) -> bool:
+        return bool(pd.DataFrame(data).notna().any().all())
+
     addplots = [
         plot
         for plot in addplots
-        if plot["type"] != "scatter" or pd.Series(plot["data"]).notna().any()
+        if plot["type"] != "scatter" or has_values(plot["data"])
     ]
+    for plot in addplots:
+        if not has_values(plot["data"]):
+            plot["secondary_y"] = False
 
     fig, axes = mpf.plot(
         bars,

@@ -36,9 +36,7 @@ import numpy as np
 import pandas as pd
 
 # Uruchamianie bezpośrednio z tego folderu: dodaj folder repo do ścieżki importów.
-import sys
-from pathlib import Path as _Path
-sys.path.insert(0, str(_Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from narzedzia.tick_config import ASSETS, REVERSE_BID_ASK
 from narzedzia.tick_data import load_ticks_cached

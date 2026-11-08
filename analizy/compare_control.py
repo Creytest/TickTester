@@ -30,7 +30,7 @@ sys.path.insert(0, str(_Path(__file__).resolve().parents[1]))
 from narzedzia.plansze import (
     BLACK, DPI, GRAY, GREEN, RED, SIZE, WHITE,
     _body_font, _fit_width, _header, _heading_font, _heading_weight,
-    _pct, _save, _sign_color, _timeframe,
+    _pct, _save, _sign_color, _timeframe, combinations_text,
 )
 
 
@@ -230,8 +230,7 @@ def main():
     folder = RESULTS / STRATEGY / FOLDER
     folder.mkdir(parents=True, exist_ok=True)
     subtitle = (
-        f"{strategy['asset'].nunique()} aktywa × "
-        f"{strategy['timeframe'].nunique()} interwały  |  "
+        f"{combinations_text(strategy)}  |  "
         f"{START_DATE[:4]}–{END_DATE[:4]}  |  po kosztach  |  "
         f"{SUBTITLE_NOTE}"
     )

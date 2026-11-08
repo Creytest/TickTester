@@ -44,7 +44,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from narzedzia.tick_config import COMMISSION
 from narzedzia.plansze import (
     BLACK, WHITE, GREEN, RED, GRAY, SIZE, DPI,
-    _body_font, _heading_font, _heading_weight,
+    _body_font, _heading_font, _heading_weight, count_text,
 )
 from strategies.tiktok.SR_Retest import atr as atr_rma
 from analizy.formacje_swiecowe import PATTERNS, detect_patterns, context_mask
@@ -358,7 +358,8 @@ def save_grid(path: pd.DataFrame, rows: list, variant: str, file: Path) -> None:
             ax.plot(h, path[f"{key}|losowe_pct"], color=GRAY, linewidth=1.2)
             ax.plot(h, obs, color=color, linewidth=3)
             ax.axhline(0, color=GRAY, linewidth=0.8, alpha=0.6)
-            ax.text(0, 1.03, f"{row['n']} sygnałów · {row['wynik']}", color=GRAY,
+            signals = count_text(row["n"], "sygnał", "sygnały", "sygnałów")
+            ax.text(0, 1.03, f"{signals} · {row['wynik']}", color=GRAY,
                     fontsize=11, fontfamily=font, transform=ax.transAxes)
             ax.set_xlim(1, HORIZON)
             ax.set_xticks([1, 10, 20])

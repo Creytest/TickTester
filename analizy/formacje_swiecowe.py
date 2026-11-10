@@ -51,7 +51,33 @@ def _shift(x: np.ndarray, k: int) -> np.ndarray:
     return out
 
 
-def detect_patterns(bars: pd.DataFrame, atr: np.ndarray) -> dict:
+# Wersja „kolory jak na planszy”: kolor każdej świecy dokładnie jak na rysunku
+# (Kamil, 2026-11-10). Klucz = formacja, wartość = kolory świec od najstarszej
+# (+1 zielona, -1 czerwona). Różnice względem wersji podręcznikowej:
+# doji i młoty mają kolor, Tweezer Top to czerwona + zielona (podręcznik:
+# zielona + czerwona), środkowa świeca gwiazd ma kolor.
+PLANSZA_COLORS = {
+    "Dragonfly Doji": (+1,),
+    "Gravestone Doji": (-1,),
+    "Hammer": (+1,),
+    "Inverted Hammer": (-1,),
+    "Tweezer Bottom": (-1, +1),
+    "Tweezer Top": (-1, +1),
+    "Morning Star": (-1, -1, +1),
+    "Evening Star": (+1, +1, -1),
+    "Bullish Engulfing": (-1, +1),
+    "Bearish Engulfing": (+1, -1),
+    "Three White Soldiers": (+1, +1, +1),
+    "Three Black Crows": (-1, -1, -1),
+}
+
+
+def detect_patterns(bars: pd.DataFrame, atr: np.ndarray, plansza: bool = False) -> dict:
+    """
+    plansza=False: definicje podręcznikowe (event_study_candles_zasady.md).
+    plansza=True:  te same definicje + kolor każdej świecy jak na planszy
+                   (PLANSZA_COLORS); Tweezer Top = czerwona, potem zielona.
+    """
     o = bars["open"].to_numpy(dtype=float)
     h = bars["high"].to_numpy(dtype=float)
     l = bars["low"].to_numpy(dtype=float)
@@ -97,7 +123,8 @@ def detect_patterns(bars: pd.DataFrame, atr: np.ndarray) -> dict:
     with np.errstate(invalid="ignore"):
         out["Tweezer Bottom"] = (red1 & green & not_doji1 & not_doji
                                  & (np.abs(l - l1) <= tol))
-        out["Tweezer Top"] = (green1 & red & not_doji1 & not_doji
+        top_colors = (red1 & green) if plansza else (green1 & red)
+        out["Tweezer Top"] = (top_colors & not_doji1 & not_doji
                               & (np.abs(h - h1) <= tol))
         out["Bullish Engulfing"] = (red1 & green & (o <= c1) & (c >= o1)
                                     & (body > body1))
@@ -137,6 +164,13 @@ def detect_patterns(bars: pd.DataFrame, atr: np.ndarray) -> dict:
             & (lower1 <= SOLDIER_SHADOW * body1)
             & (lower <= SOLDIER_SHADOW * body)
         )
+
+    if plansza:
+        for name, colors in PLANSZA_COLORS.items():
+            for k, col in enumerate(colors):
+                lag = len(colors) - 1 - k
+                ok = green if col > 0 else red
+                out[name] = out[name] & (_shift(ok, lag) if lag else ok)
 
     return {name: np.asarray(out[name], dtype=bool) for name in PATTERNS}
 

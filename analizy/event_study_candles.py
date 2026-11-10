@@ -24,6 +24,8 @@ Wyniki: wyniki/event_study_candles/
 
 Uruchomienie:
     python analizy/event_study_candles.py
+Wersja „kolory jak na planszy” (wyniki/event_study_candles_plansza/):
+    python analizy/event_study_candles.py --plansza
 Sam ranking z istniejącego summary.csv:
     python analizy/event_study_candles.py --ranking
 """
@@ -87,6 +89,11 @@ VARIANTS = {
 
 OUTPUT_DIR = Path(__file__).resolve().parents[1] / "wyniki" / "event_study_candles"
 
+# Wersja „kolory jak na planszy” (każda świeca w kolorze z rysunku,
+# formacje_swiecowe.PLANSZA_COLORS). Wyniki idą wtedy do folderu z dopiskiem
+# _plansza. To samo daje uruchomienie z parametrem --plansza.
+KOLORY_JAK_NA_PLANSZY = False
+
 # Funkcje z event_study_rsi czytają te stałe ze swojego modułu.
 rsi_study.PERIODS = PERIODS
 rsi_study.HORIZON = HORIZON
@@ -112,7 +119,7 @@ def study(bars: pd.DataFrame, asset: str, tf: str, spread_pct: float, rng):
     start, end = PERIODS[tf]
     close = bars["close"].to_numpy(dtype=float)
     atr = atr_rma(bars, 14)
-    signals = detect_patterns(bars, atr)
+    signals = detect_patterns(bars, atr, plansza=KOLORY_JAK_NA_PLANSZY)
     context = context_mask(bars, SMA_CONTEXT)
 
     first = int(bars.index.searchsorted(pd.Timestamp(start))) if start else 0
@@ -307,6 +314,10 @@ def _median(values) -> float:
 # WYKRESY
 # ============================================================
 
+def _version_text() -> str:
+    return "kolory jak na planszy · " if KOLORY_JAK_NA_PLANSZY else ""
+
+
 def _style(ax, font):
     ax.set_facecolor(BLACK)
     ax.tick_params(colors=GRAY, labelsize=11)
@@ -329,7 +340,7 @@ def save_grid(path: pd.DataFrame, rows: list, variant: str, file: Path) -> None:
              color=WHITE, fontsize=44, fontfamily=_heading_font(),
              fontweight=_heading_weight(), va="center")
     fig.text(0.04, 0.865,
-             f"{VARIANTS[variant]} · {first['start']} – {first['end']} · "
+             f"{_version_text()}{VARIANTS[variant]} · {first['start']} – {first['end']} · "
              f"średnia zmiana ceny w % · szary pas = 95% wyników losowych świec",
              color=GRAY, fontsize=18, fontfamily=font, va="center")
 
@@ -380,7 +391,7 @@ def save_ranking_chart(rank: pd.DataFrame, variant: str, file: Path) -> None:
              color=WHITE, fontsize=44, fontfamily=_heading_font(),
              fontweight=_heading_weight(), va="center")
     fig.text(0.04, 0.865,
-             f"{VARIANTS[variant]} · liczba kombinacji (aktywo × interwał), w których cena "
+             f"{_version_text()}{VARIANTS[variant]} · liczba kombinacji (aktywo × interwał), w których cena "
              f"wyszła z pasu losowego w obiecanym kierunku",
              color=GRAY, fontsize=18, fontfamily=font, va="center")
     ax.set_facecolor(BLACK)
@@ -429,7 +440,17 @@ def print_rows(rows: list) -> None:
 # START
 # ============================================================
 
+def _apply_version() -> None:
+    global KOLORY_JAK_NA_PLANSZY, OUTPUT_DIR
+    if "--plansza" in sys.argv:
+        KOLORY_JAK_NA_PLANSZY = True
+    if KOLORY_JAK_NA_PLANSZY and not OUTPUT_DIR.name.endswith("_plansza"):
+        OUTPUT_DIR = OUTPUT_DIR.with_name(OUTPUT_DIR.name + "_plansza")
+    print("Wersja:", "kolory jak na planszy" if KOLORY_JAK_NA_PLANSZY else "podręcznikowa")
+
+
 def main():
+    _apply_version()
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     if "--ranking" in sys.argv:
         save_ranking(pd.read_csv(OUTPUT_DIR / "summary.csv"))

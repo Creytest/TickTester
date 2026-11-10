@@ -17,6 +17,8 @@ Wyniki: wyniki/podglad_formacji/<aktywo>_<interwał>/<formacja>.html
 
 Uruchomienie:
     python analizy/podglad_formacji.py
+Wersja „kolory jak na planszy” (wyniki/podglad_formacji_plansza/):
+    python analizy/podglad_formacji.py --plansza
 """
 
 from pathlib import Path
@@ -50,6 +52,11 @@ WINDOW_AFTER = 25      # i po niej (żeby było widać, co stało się dalej)
 WARMUP_DAYS = 30
 
 OUTPUT_DIR = Path(__file__).resolve().parents[1] / "wyniki" / "podglad_formacji"
+
+# Wersja „kolory jak na planszy” (każda świeca w kolorze z rysunku,
+# formacje_swiecowe.PLANSZA_COLORS). Wyniki idą wtedy do folderu z dopiskiem
+# _plansza. To samo daje uruchomienie z parametrem --plansza.
+KOLORY_JAK_NA_PLANSZY = False
 
 BLACK, WHITE, GREEN, RED, GRAY = "#0B0D10", "#F2F2F2", "#00D084", "#FF3B30", "#8A8F98"
 
@@ -132,7 +139,7 @@ def save_pattern_html(bars: pd.DataFrame, name: str, signal: np.ndarray,
     n_ctx = int(in_context[hits].sum()) if len(hits) else 0
     fig.update_layout(
         title=dict(
-            text=(f"<b>{name}</b>  ·  {ASSET} {TIMEFRAME}  ·  {START_DATE} – {END_DATE}  ·  "
+            text=(f"<b>{name}</b>{' (kolory jak na planszy)' if KOLORY_JAK_NA_PLANSZY else ''}  ·  {ASSET} {TIMEFRAME}  ·  {START_DATE} – {END_DATE}  ·  "
                   f"{len(hits)} wykryć, w tym {n_ctx} w kontekście (ramka ciągła)"),
             font=dict(color=WHITE, size=18), x=0.01,
         ),
@@ -217,11 +224,17 @@ show(1);
 # ============================================================
 
 def main(bars: pd.DataFrame | None = None):
+    global KOLORY_JAK_NA_PLANSZY, OUTPUT_DIR
+    if "--plansza" in sys.argv:
+        KOLORY_JAK_NA_PLANSZY = True
+    if KOLORY_JAK_NA_PLANSZY and not OUTPUT_DIR.name.endswith("_plansza"):
+        OUTPUT_DIR = OUTPUT_DIR.with_name(OUTPUT_DIR.name + "_plansza")
+    print("Wersja:", "kolory jak na planszy" if KOLORY_JAK_NA_PLANSZY else "podręcznikowa")
     if bars is None:
         print(f"Wczytywanie {ASSET} {TIMEFRAME} {START_DATE} – {END_DATE} ...")
         bars = load_bars()
     atr = atr_rma(bars, 14)
-    signals = detect_patterns(bars, atr)
+    signals = detect_patterns(bars, atr, plansza=KOLORY_JAK_NA_PLANSZY)
     context = context_mask(bars, SMA_CONTEXT)
     sma = bars["close"].rolling(SMA_CONTEXT).mean().to_numpy()
 

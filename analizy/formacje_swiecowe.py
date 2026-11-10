@@ -54,15 +54,16 @@ def _shift(x: np.ndarray, k: int) -> np.ndarray:
 # Wersja „kolory jak na planszy”: kolor każdej świecy dokładnie jak na rysunku
 # (Kamil, 2026-11-10). Klucz = formacja, wartość = kolory świec od najstarszej
 # (+1 zielona, -1 czerwona). Różnice względem wersji podręcznikowej:
-# doji i młoty mają kolor, Tweezer Top to czerwona + zielona (podręcznik:
-# zielona + czerwona), środkowa świeca gwiazd ma kolor.
+# doji i młoty mają kolor, środkowa świeca gwiazd ma kolor. Tweezer Top
+# zostaje zielona + czerwona: plansza rysuje odwrotnie, ale to błąd autora
+# (Kamil, 2026-11-10).
 PLANSZA_COLORS = {
     "Dragonfly Doji": (+1,),
     "Gravestone Doji": (-1,),
     "Hammer": (+1,),
     "Inverted Hammer": (-1,),
     "Tweezer Bottom": (-1, +1),
-    "Tweezer Top": (-1, +1),
+    "Tweezer Top": (+1, -1),
     "Morning Star": (-1, -1, +1),
     "Evening Star": (+1, +1, -1),
     "Bullish Engulfing": (-1, +1),
@@ -76,7 +77,7 @@ def detect_patterns(bars: pd.DataFrame, atr: np.ndarray, plansza: bool = False) 
     """
     plansza=False: definicje podręcznikowe (event_study_candles_zasady.md).
     plansza=True:  te same definicje + kolor każdej świecy jak na planszy
-                   (PLANSZA_COLORS); Tweezer Top = czerwona, potem zielona.
+                   (PLANSZA_COLORS).
     """
     o = bars["open"].to_numpy(dtype=float)
     h = bars["high"].to_numpy(dtype=float)
@@ -123,8 +124,7 @@ def detect_patterns(bars: pd.DataFrame, atr: np.ndarray, plansza: bool = False) 
     with np.errstate(invalid="ignore"):
         out["Tweezer Bottom"] = (red1 & green & not_doji1 & not_doji
                                  & (np.abs(l - l1) <= tol))
-        top_colors = (red1 & green) if plansza else (green1 & red)
-        out["Tweezer Top"] = (top_colors & not_doji1 & not_doji
+        out["Tweezer Top"] = (green1 & red & not_doji1 & not_doji
                               & (np.abs(h - h1) <= tol))
         out["Bullish Engulfing"] = (red1 & green & (o <= c1) & (c >= o1)
                                     & (body > body1))

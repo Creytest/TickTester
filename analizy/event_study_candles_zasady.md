@@ -157,7 +157,7 @@ z rysunku (od najstarszej):
 | Hammer | zielona |
 | Inverted Hammer | czerwona |
 | Tweezer Bottom | czerwona, zielona (bez zmian) |
-| Tweezer Top | **czerwona, zielona** (podręcznik: zielona, czerwona) |
+| Tweezer Top | zielona, czerwona (bez zmian; plansza rysuje czerwoną, potem zieloną, ale to błąd autora — każde inne źródło i sens formacji mówią odwrotnie, decyzja Kamila 2026-11-10) |
 | Morning Star | czerwona, **czerwona**, zielona |
 | Evening Star | zielona, **zielona**, czerwona |
 | Bullish / Bearish Engulfing | bez zmian |

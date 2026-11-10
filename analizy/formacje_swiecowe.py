@@ -51,7 +51,34 @@ def _shift(x: np.ndarray, k: int) -> np.ndarray:
     return out
 
 
-def detect_patterns(bars: pd.DataFrame, atr: np.ndarray) -> dict:
+# Wersja „kolory jak na planszy”: kolor każdej świecy dokładnie jak na rysunku
+# (Kamil, 2026-11-10). Klucz = formacja, wartość = kolory świec od najstarszej
+# (+1 zielona, -1 czerwona). Różnice względem wersji podręcznikowej:
+# doji i młoty mają kolor, środkowa świeca gwiazd ma kolor. Tweezer Top
+# zostaje zielona + czerwona: plansza rysuje odwrotnie, ale to błąd autora
+# (Kamil, 2026-11-10).
+PLANSZA_COLORS = {
+    "Dragonfly Doji": (+1,),
+    "Gravestone Doji": (-1,),
+    "Hammer": (+1,),
+    "Inverted Hammer": (-1,),
+    "Tweezer Bottom": (-1, +1),
+    "Tweezer Top": (+1, -1),
+    "Morning Star": (-1, -1, +1),
+    "Evening Star": (+1, +1, -1),
+    "Bullish Engulfing": (-1, +1),
+    "Bearish Engulfing": (+1, -1),
+    "Three White Soldiers": (+1, +1, +1),
+    "Three Black Crows": (-1, -1, -1),
+}
+
+
+def detect_patterns(bars: pd.DataFrame, atr: np.ndarray, plansza: bool = False) -> dict:
+    """
+    plansza=False: definicje podręcznikowe (event_study_candles_zasady.md).
+    plansza=True:  te same definicje + kolor każdej świecy jak na planszy
+                   (PLANSZA_COLORS).
+    """
     o = bars["open"].to_numpy(dtype=float)
     h = bars["high"].to_numpy(dtype=float)
     l = bars["low"].to_numpy(dtype=float)
@@ -137,6 +164,13 @@ def detect_patterns(bars: pd.DataFrame, atr: np.ndarray) -> dict:
             & (lower1 <= SOLDIER_SHADOW * body1)
             & (lower <= SOLDIER_SHADOW * body)
         )
+
+    if plansza:
+        for name, colors in PLANSZA_COLORS.items():
+            for k, col in enumerate(colors):
+                lag = len(colors) - 1 - k
+                ok = green if col > 0 else red
+                out[name] = out[name] & (_shift(ok, lag) if lag else ok)
 
     return {name: np.asarray(out[name], dtype=bool) for name in PATTERNS}
 

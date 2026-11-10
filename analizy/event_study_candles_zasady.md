@@ -140,4 +140,29 @@ Tweezer Bottom i Bullish Engulfing). Każda formacja liczona jest osobno.
 
 ## Zmiany
 
-(brak)
+### 2026-11-10: druga wersja „kolory jak na planszy”
+
+Powód: plansza rysuje każdą świecę w konkretnym kolorze, a definicje
+podręcznikowe (wyżej) dla doji i młotów kolor pomijają. Kamil poprosił
+o drugą, osobną wersję całego testu wierną rysunkowi. Wersja podręcznikowa
+zostaje bez zmian, obie są raportowane.
+
+Wersja „kolory jak na planszy” = definicje jak wyżej + kolor każdej świecy
+z rysunku (od najstarszej):
+
+| Formacja | Kolory na planszy |
+|---|---|
+| Dragonfly Doji | zielona |
+| Gravestone Doji | czerwona |
+| Hammer | zielona |
+| Inverted Hammer | czerwona |
+| Tweezer Bottom | czerwona, zielona (bez zmian) |
+| Tweezer Top | zielona, czerwona (bez zmian; plansza rysuje czerwoną, potem zieloną, ale to błąd autora — każde inne źródło i sens formacji mówią odwrotnie, decyzja Kamila 2026-11-10) |
+| Morning Star | czerwona, **czerwona**, zielona |
+| Evening Star | zielona, **zielona**, czerwona |
+| Bullish / Bearish Engulfing | bez zmian |
+| Three White Soldiers / Black Crows | bez zmian |
+
+Wszystkie pozostałe zasady (dane, warianty, kontrole, pas, werdykt) bez
+zmian. Wyniki: `wyniki/event_study_candles_plansza/`, uruchomienie
+`python analizy/event_study_candles.py --plansza`.

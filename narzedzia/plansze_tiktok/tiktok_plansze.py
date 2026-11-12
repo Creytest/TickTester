@@ -202,7 +202,7 @@ class Seg:
         pts = [(x - s, y0 - d), (x + s, y0 - d), (x, y0)] if up else [(x - s, y0 + d), (x + s, y0 + d), (x, y0)]
         ax.add_patch(Polygon(pts, closed=True, facecolor=col, edgecolor=col, zorder=7))
 
-    def signal_tri(self, x, y, col, up, w_px=46, gap_px=6):
+    def signal_tri(self, x, y, col, up, w_px=184, gap_px=10):
         """Duży trójkąt sygnału jak we wskaźniku Cloud MA na TradingView:
         pełny, czubkiem przy przecięciu średnich, pod nim (long) albo nad nim (short)."""
         ax = self.ax

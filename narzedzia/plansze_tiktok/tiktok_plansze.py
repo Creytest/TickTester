@@ -25,6 +25,7 @@ for f in (HERE / "fonts").glob("*.[ot]tf"):
 BG, FG, GREEN, RED = "#0B0D10", "#F2F2F2", "#00D084", "#FF3B30"
 GREY, DIM, PANEL = "#6B7280", "#3A3F47", "#14181E"
 BLUE, YELLOW = "#4C8DFF", "#F5C542"
+TV_GREEN, TV_RED = "#4CAF50", "#FF5252"   # kolory trójkątów Cloud MA z TradingView
 plt.rcParams["font.family"] = ["Inter", "DejaVu Sans"]
 TITLE_FONT = "Anton" if any(f.name == "Anton" for f in font_manager.fontManager.ttflist) else "DejaVu Sans"
 
@@ -201,9 +202,9 @@ class Seg:
         pts = [(x - s, y0 - d), (x + s, y0 - d), (x, y0)] if up else [(x - s, y0 + d), (x + s, y0 + d), (x, y0)]
         ax.add_patch(Polygon(pts, closed=True, facecolor=col, edgecolor=col, zorder=7))
 
-    def signal_tri(self, x, y, col, up, w_px=22, gap_px=10):
-        """Trójkąt sygnału jak plotshape w TradingView: pełny, równoboczny,
-        pod dołkiem świecy (long) albo nad szczytem (short)."""
+    def signal_tri(self, x, y, col, up, w_px=115, gap_px=8):
+        """Duży trójkąt sygnału jak we wskaźniku Cloud MA na TradingView:
+        pełny, czubkiem przy przecięciu średnich, pod nim (long) albo nad nim (short)."""
         ax = self.ax
         bb = ax.get_window_extent()
         (x0, x1), (y0, y1) = ax.get_xlim(), ax.get_ylim()
@@ -323,15 +324,15 @@ def cloud_ma():
     s = Seg(fig, 1, "2. PRZECIĘCIE W GÓRĘ = LONG", "Zielony trójkąt: EMA 30 przecina EMA 74.\nShort: czerwony trójkąt, przecięcie w dół", n, (lo, hi))
     s.candles(B, up + 1, {up: GREEN})
     cloud(s, up + 1)
-    s.signal_tri(up, B[up][2], GREEN, True)
+    s.signal_tri(up, e30[up], TV_GREEN, True)
     s.entry(up, B[up][3], GREEN)
     s.level(SL, sw, up + 1, YELLOW, ls="-", lw=2.2)
 
     s = Seg(fig, 2, "3. SL NA DOŁKU, ODWRÓCENIE", "SL na najniższym dołku. Brak TP.\nPrzeciwny trójkąt zamyka longa i otwiera shorta", n, (lo, hi))
     s.candles(B, n, {up: GREEN, dn: RED})
     cloud(s, n)
-    s.signal_tri(up, B[up][2], GREEN, True)
-    s.signal_tri(dn, B[dn][1], RED, False)
+    s.signal_tri(up, e30[up], TV_GREEN, True)
+    s.signal_tri(dn, e30[dn], TV_RED, False)
     s.ax.plot([up + 0.5], [B[up][3]], "o", ms=13, color=GREEN, mec=FG, mew=2, zorder=8)
     s.level(SL, sw, dn, RED, None, ls="-", lw=2.6)
     s.tag(sw + 4, SL, "SL", RED, True)

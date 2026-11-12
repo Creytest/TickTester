@@ -201,6 +201,20 @@ class Seg:
         pts = [(x - s, y0 - d), (x + s, y0 - d), (x, y0)] if up else [(x - s, y0 + d), (x + s, y0 + d), (x, y0)]
         ax.add_patch(Polygon(pts, closed=True, facecolor=col, edgecolor=col, zorder=7))
 
+    def signal_tri(self, x, y, col, up, w_px=22, gap_px=10):
+        """Trójkąt sygnału jak plotshape w TradingView: pełny, równoboczny,
+        pod dołkiem świecy (long) albo nad szczytem (short)."""
+        ax = self.ax
+        bb = ax.get_window_extent()
+        (x0, x1), (y0, y1) = ax.get_xlim(), ax.get_ylim()
+        ux, uy = (x1 - x0) / bb.width, (y1 - y0) / bb.height
+        hw, h, g = w_px / 2 * ux, w_px * 0.87 * uy, gap_px * uy
+        if up:
+            pts = [(x - hw, y - g - h), (x + hw, y - g - h), (x, y - g)]
+        else:
+            pts = [(x - hw, y + g + h), (x + hw, y + g + h), (x, y + g)]
+        ax.add_patch(Polygon(pts, closed=True, facecolor=col, edgecolor="none", zorder=7))
+
     def entry(self, x, y, col, text="wejście", below=False):
         self.ax.plot([x + 0.5], [y], "o", ms=13, color=col, mec=FG, mew=2, zorder=8)
         self.ax.text(x + 1.3, y, text, color=col, fontsize=17, fontweight="bold", va="center", zorder=8)
@@ -309,15 +323,15 @@ def cloud_ma():
     s = Seg(fig, 1, "2. PRZECIĘCIE W GÓRĘ = LONG", "Zielony trójkąt: EMA 30 przecina EMA 74.\nShort: czerwony trójkąt, przecięcie w dół", n, (lo, hi))
     s.candles(B, up + 1, {up: GREEN})
     cloud(s, up + 1)
-    s.tri(up, B[up][2], GREEN, True)
+    s.signal_tri(up, B[up][2], GREEN, True)
     s.entry(up, B[up][3], GREEN)
     s.level(SL, sw, up + 1, YELLOW, ls="-", lw=2.2)
 
     s = Seg(fig, 2, "3. SL NA DOŁKU, ODWRÓCENIE", "SL na najniższym dołku. Brak TP.\nPrzeciwny trójkąt zamyka longa i otwiera shorta", n, (lo, hi))
     s.candles(B, n, {up: GREEN, dn: RED})
     cloud(s, n)
-    s.tri(up, B[up][2], GREEN, True)
-    s.tri(dn, B[dn][1], RED, False)
+    s.signal_tri(up, B[up][2], GREEN, True)
+    s.signal_tri(dn, B[dn][1], RED, False)
     s.ax.plot([up + 0.5], [B[up][3]], "o", ms=13, color=GREEN, mec=FG, mew=2, zorder=8)
     s.level(SL, sw, dn, RED, None, ls="-", lw=2.6)
     s.tag(sw + 4, SL, "SL", RED, True)

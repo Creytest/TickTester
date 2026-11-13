@@ -23,6 +23,7 @@ from narzedzia.tick_config import (
 from narzedzia.tick_data import daily_max_bid, load_ticks_cached
 from narzedzia.tick_backtest import run_backtest
 from narzedzia.interactive_chart import _marker_gap, clip_shapes, reindex_panel, save_interactive_chart
+from narzedzia.odcinki import folder_wynikow
 import importlib
 
 
@@ -1091,8 +1092,8 @@ def main(
 
 if __name__ == "__main__":
     # Obok okna matplotlib zapisujemy interaktywny wykres HTML.
-    output_dir = Path(__file__).resolve().parents[1] / "wyniki"
-    output_dir.mkdir(exist_ok=True)
+    output_dir = folder_wynikow(STRATEGY)
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     main(
         html_path=output_dir / (

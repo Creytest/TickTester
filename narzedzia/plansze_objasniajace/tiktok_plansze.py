@@ -4,7 +4,8 @@ Każda plansza: JEDEN PNG 1920x1080 z 3 segmentami obok siebie (1 setup, 2 wejś
 W montażu prawe segmenty są zasłonięte i odsłaniane po kolei. Świece są ilustracyjne (nie dane rynkowe),
 ale wskaźniki (EMA, VWAP, RSI, Stochastic, Two-Pole) są liczone z tych świec zgodnie z regułami strategii.
 
-Uruchomienie:  python tiktok_plansze.py [folder_wyjściowy]   (domyślnie folder skryptu)
+Uruchomienie:  python tiktok_plansze.py [folder_wyjściowy]
+(domyślnie każda plansza do nagrania/TikTok/<Strategia>/plansza_zasady.png)
 Fonty Anton i Inter są ładowane z podfolderu fonts/ (nie trzeba ich instalować).
 """
 import sys
@@ -18,7 +19,20 @@ from matplotlib import font_manager
 from matplotlib.patches import Rectangle, Polygon
 
 HERE = Path(__file__).resolve().parent
-OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else HERE
+OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else None
+TIKTOK = HERE.parents[1] / "nagrania" / "TikTok"
+# Nazwa planszy → folder strategii w nagrania/TikTok/.
+STRATEGIE = {
+    "01_luxalgo_sr_breaks_msts": "LuxAlgo_SR_Breaks_MSTS",
+    "02_cloud_ma_ema30_74": "CloudMA_EMA30_74",
+    "03_sfp_volume": "SFP_Volume",
+    "04_ema9_vwap": "EMA9_VWAP",
+    "05_ema9": "EMA9",
+    "06_rsi6_80_20": "RSI6_80_20",
+    "07_bigbeluga_two_pole_stoch": "BigBeluga_Stoch_80percent",
+    "08_sr_retest": "SR_Retest",
+    "09_ssl_ifvg": "SSL_IFVG",
+}
 for f in (HERE / "fonts").glob("*.[ot]tf"):
     font_manager.fontManager.addfont(str(f))
 
@@ -234,7 +248,9 @@ def figure():
 
 
 def save(fig, name):
-    fig.savefig(OUT / f"{name}.png", facecolor=BG)
+    path = OUT / f"{name}.png" if OUT else TIKTOK / STRATEGIE[name] / "plansza_zasady.png"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(path, facecolor=BG)
     plt.close(fig)
     print("ok", name)
 
@@ -686,6 +702,7 @@ def ssl_ifvg():
 ALL = [luxalgo, cloud_ma, sfp, ema9_vwap, ema9, rsi6, bigbeluga, sr_retest, ssl_ifvg]
 
 if __name__ == "__main__":
-    OUT.mkdir(parents=True, exist_ok=True)
+    if OUT:
+        OUT.mkdir(parents=True, exist_ok=True)
     for fn in ALL:
         fn()

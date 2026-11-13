@@ -41,6 +41,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from narzedzia.tick_config import ASSETS, REVERSE_BID_ASK
 from narzedzia.tick_data import load_ticks_cached
 from narzedzia.tick_engine import build_bars
+from narzedzia.odcinki import folder_strategii
 from strategies.tradingview_porownawcze import KeyLevelZones as klz
 
 
@@ -56,7 +57,7 @@ SEED = 42
 # Zapas danych przed START_DATE na poprzedni miesiąc i ATR.
 WARMUP_DAYS = 70
 
-OUTPUT_DIR = Path(__file__).resolve().parents[1] / "wyniki" / "KeyLevelZones"
+OUTPUT_DIR = folder_strategii("KeyLevelZones") / "wyniki_event_study"
 
 GROUPS = [
     "Strefy: 2 poziomy (turkus)",

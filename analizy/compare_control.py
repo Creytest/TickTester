@@ -5,7 +5,7 @@ Najpierw policz obie wersje w run_all_assets.py, np.:
     STRATEGY = ["AutoLevelsTrendlines", "AutoLevelsTrendlines_Control"]
 (te same aktywa, interwały i daty), ustaw ACTIVE niżej i uruchom ten plik.
 
-Zapisuje do wyniki/<STRATEGY>/porownanie_z_kontrolna/ (albo folderu z presetu):
+Zapisuje do nagrania/<Odcinek>/<STRATEGY>/wyniki/porownanie_z_kontrolna/ (albo folderu z presetu):
     1_strategia_vs_kontrolna.png — duże liczby obok siebie: ile
         kombinacji na plusie, mediana wyniku netto, mediana Win Rate,
         łączna liczba transakcji,
@@ -27,6 +27,7 @@ import sys
 from pathlib import Path as _Path
 sys.path.insert(0, str(_Path(__file__).resolve().parents[1]))
 
+from narzedzia.odcinki import folder_wynikow
 from narzedzia.plansze import (
     BLACK, DPI, GRAY, GREEN, RED, SIZE, WHITE,
     _body_font, _fit_width, _header, _heading_font, _heading_weight,
@@ -116,11 +117,10 @@ BETTER_TEXT = _P.get("better_text", "Strategia lepsza od grupy kontrolnej")
 SUBTITLE_NOTE = _P.get("subtitle_note", "te same kierunki i czas trzymania, losowe momenty wejścia")
 FOLDER = _P.get("folder", "porownanie_z_kontrolna")
 
-RESULTS = Path(__file__).resolve().parents[1] / "wyniki"
 
 
 def load_summary(name: str) -> pd.DataFrame:
-    path = RESULTS / name / f"podsumowanie_{name}_{START_DATE}_{END_DATE}.csv"
+    path = folder_wynikow(name) / f"podsumowanie_{name}_{START_DATE}_{END_DATE}.csv"
     if not path.exists():
         raise FileNotFoundError(
             f"Brak {path} — najpierw policz {name} w run_all_assets.py "
@@ -227,7 +227,7 @@ def main():
     strategy = load_summary(STRATEGY)
     control = load_summary(CONTROL)
 
-    folder = RESULTS / STRATEGY / FOLDER
+    folder = folder_wynikow(STRATEGY) / FOLDER
     folder.mkdir(parents=True, exist_ok=True)
     subtitle = (
         f"{combinations_text(strategy)}  |  "

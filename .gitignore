@@ -8,3 +8,7 @@ __pycache__/
 
 # Wykresy i tabele z run_all_assets.py
 wyniki/
+
+# Wyniki liczone u siebie (backtesty, event study, porównania):
+# nagrania/<Odcinek>/<Strategia>/wyniki*/ — w gicie zostają plansze, grafiki i zasady.
+nagrania/**/wyniki*/

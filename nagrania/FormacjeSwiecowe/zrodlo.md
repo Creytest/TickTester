@@ -1,0 +1,6 @@
+- **Źródło:** infografika „Candlestick Patterns — Complete Guide for Traders”, autor TredWithRahul (Kamil przesłał zrzut 2026-11-08; link do posta: do uzupełnienia).
+- **Claim:** kolumna Bullish (Dragonfly Doji, Hammer, Tweezer Bottom, Morning Star, Bullish Engulfing, Three White Soldiers) i Bearish (Gravestone Doji, Inverted Hammer, Tweezer Top, Evening Star, Bearish Engulfing, Three Black Crows). Bez wejść, wyjść, SL/TP.
+- **Timeframe autora:** nie podaje. **Aktywa autora:** nie podaje.
+- **Uwaga:** Inverted Hammer na planszy jest w kolumnie bearish (zwykle to kształt bullish po spadku; bearish odpowiednik to shooting star).
+- **Duplikaty:** żadnej formacji nie testowaliśmy; blisko: SFP_Volume (knot przez swing), ElephantBar.
+- **Test:** badanie zdarzeń (jak RSI), zasady w `analizy/event_study_candles_zasady.md`, kod `analizy/event_study_candles.py` + `analizy/formacje_swiecowe.py`. Definicje wzorowane na TA-Lib; nasze założenia: tweezer (≤ 5% ATR), gwiazdy bez wymogu luki, wariant z kontekstem SMA 20.

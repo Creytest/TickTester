@@ -23,7 +23,7 @@ Sygnały:
 Bez kosztów (spread, prowizja): to nie są transakcje. Dla skali:
 typowy spread z danych jest wypisywany obok w ATR.
 
-Wyniki: wyniki/event_study_<wskaźnik>/
+Wyniki: nagrania/<Odcinek>/<wskaźnik>/wyniki_event_study/
     events_<aktywo>_<interwał>.csv — każde wybicie,
     summary.csv                     — tabela zbiorcza.
 """
@@ -41,6 +41,7 @@ sys.path.insert(0, str(_Path(__file__).resolve().parents[1]))
 from narzedzia.tick_config import ASSETS, REVERSE_BID_ASK
 from narzedzia.tick_data import load_ticks_cached
 from narzedzia.tick_engine import build_bars
+from narzedzia.odcinki import folder_strategii
 from strategies.tiktok.SR_Retest import atr as atr_rma
 from strategies.tradingview_porownawcze import AutoLevelsTrendlines as indicator
 
@@ -64,7 +65,7 @@ HORIZONS = [5, 10, 20]
 # Ustawienia wskaźnika inne niż domyślne autora, np. {"conf_bars": 2}.
 PARAMS = {}
 
-OUTPUT_DIR = Path(__file__).resolve().parents[1] / "wyniki" / "event_study_AutoLevels"
+OUTPUT_DIR = folder_strategii("AutoLevelsTrendlines") / "wyniki_event_study"
 
 
 # ============================================================

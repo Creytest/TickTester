@@ -1,4 +1,3 @@
-from pathlib import Path
 
 import matplotlib
 
@@ -13,6 +12,7 @@ from narzedzia import plot_tick_backtest_xauusd as single
 from narzedzia.summary_chart import save_summary_chart
 from narzedzia.plansze import save_plansze
 from narzedzia.interactive_chart import save_interactive_chart
+from narzedzia.odcinki import folder_wynikow
 
 
 # ============================================================
@@ -169,13 +169,13 @@ SAVE_PLANSZE = True
 # None: na planszy 2 zamiast Win Rate jest Profit Factor.
 CLAIM_WIN_RATE = None
 
-# Folder na wykresy, transakcje i tabelę wyników.
-OUTPUT_DIR = Path(__file__).resolve().parent / "wyniki"
+# Wykresy, transakcje i tabela wyników trafiają do
+# nagrania/<Odcinek>/<Strategia>/wyniki/ (narzedzia/odcinki.py).
 
 
 def main():
-    # Każda strategia ma własny podfolder w wyniki/.
-    out_dir = OUTPUT_DIR / STRATEGY
+    # Każda strategia ma własny folder w nagrania/<Odcinek>/.
+    out_dir = folder_wynikow(STRATEGY)
     out_dir.mkdir(parents=True, exist_ok=True)
 
     rows = []

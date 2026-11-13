@@ -20,7 +20,7 @@ Do tego punkt odniesienia dla zakresów z SOS / SOW:
   wygaśnięcie po 300 świecach), ale pokazuje, ile T2 „należy się”
   samej geometrii celów. Przewaga = t2_of_sos_pct − random_t2_pct.
 
-Wyniki: wyniki/event_study_Wyckoff/
+Wyniki: nagrania/TradingView/Wyckoff/wyniki_event_study/
     schematics_<aktywo>_<interwał>.csv — każdy zakres,
     summary.csv                        — tabela zbiorcza.
 """
@@ -35,6 +35,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from analizy import event_study
+from narzedzia.odcinki import folder_strategii
 from strategies.tradingview import Wyckoff as indicator
 
 
@@ -54,7 +55,7 @@ WARMUP_DAYS = 90
 # Ustawienia wskaźnika inne niż domyślne autora, np. {"side": "Accumulation"}.
 PARAMS = {}
 
-OUTPUT_DIR = Path(__file__).resolve().parents[1] / "wyniki" / "event_study_Wyckoff"
+OUTPUT_DIR = folder_strategii("Wyckoff") / "wyniki_event_study"
 
 
 # ============================================================

@@ -1,7 +1,7 @@
 """
 Czy rynek wie, że jest wyprzedany? Badanie zdarzeń dla RSI 14.
 
-Zasady testu (ustalone przed wynikami): analizy/event_study_rsi_zasady.md
+Zasady testu (ustalone przed wynikami): nagrania/RSI/zasady_testu.md
 
 Zdarzenia:
 - "wyprzedanie": RSI przecina 30 w dół,
@@ -23,7 +23,7 @@ największe odchylenie (w odchyleniach standardowych) na świecach
 Bez kosztów (to nie są transakcje). Dla skali w tabeli jest koszt
 transakcji w obie strony w %.
 
-Wyniki: wyniki/event_study_RSI/
+Wyniki: nagrania/RSI/wyniki_event_study/
     summary.csv                         — tabela zbiorcza (dopisywana po każdej
                                           kombinacji, także między biegami),
     path_<aktywo>_<interwał>.csv        — ścieżki i pasy (1–20),
@@ -50,6 +50,7 @@ sys.path.insert(0, str(_Path(__file__).resolve().parents[1]))
 from narzedzia.tick_config import ASSETS, COMMISSION, REVERSE_BID_ASK
 from narzedzia.tick_data import load_ticks_cached
 from narzedzia.tick_engine import build_bars
+from narzedzia.odcinki import folder_badania
 from narzedzia.plansze import (
     BLACK, WHITE, GREEN, RED, GRAY, SIZE, DPI,
     _body_font, _heading_font, _heading_weight, count_text,
@@ -59,7 +60,7 @@ from strategies.tiktok.SR_Retest import atr as atr_rma
 
 
 # ============================================================
-# KONFIGURACJA (zgodnie z event_study_rsi_zasady.md)
+# KONFIGURACJA (zgodnie z nagrania/RSI/zasady_testu.md)
 # ============================================================
 
 ASSETS_TO_TEST = ["XAUUSD", "Bitcoin", "EURUSD", "Brent", "US500"]
@@ -89,7 +90,7 @@ MIN_EVENTS = 20      # mniej zdarzeń = brak wniosku
 WARMUP_DAYS = 30
 SAVE_PNG = True
 
-OUTPUT_DIR = Path(__file__).resolve().parents[1] / "wyniki" / "event_study_RSI"
+OUTPUT_DIR = folder_badania("RSI", "wyniki_event_study")
 
 EVENTS = {
     "wyprzedanie": f"RSI < {OVERSOLD}",

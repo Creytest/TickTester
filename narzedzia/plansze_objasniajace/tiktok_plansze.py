@@ -447,17 +447,15 @@ def ema9_vwap():
     lo, hi = ylim_of(B, n, pad=0.1)
 
     def lines(s, upto, lab=False):
-        s.ax.axvline(-0.5, color=DIM, lw=1.5, ls=(0, (3, 3)))
         s.line(e9, upto, FG, lw=2.6, label="EMA 9" if lab else None)
         s.line(vw, upto, YELLOW, lw=2.6, label="VWAP" if lab else None)
 
     fig = figure()
-    s = Seg(fig, 0, "1. EMA 9 I VWAP SESJI", "VWAP liczony od początku sesji\n(17:00 czasu NY)", n, (lo, hi))
+    s = Seg(fig, 0, "1. EMA 9 I VWAP", "", n, (lo, hi))
     s.candles(B, dn)
     lines(s, dn)
     s.ax.text(dn - 0.5, e9[dn - 1] + s.dy * 0.6, "EMA 9", color=FG, fontsize=16, fontweight="bold", va="bottom")
     s.ax.text(dn - 0.5, vw[dn - 1] - s.dy * 0.6, "VWAP", color=YELLOW, fontsize=16, fontweight="bold", va="top")
-    s.ax.text(-0.3, hi, "start sesji", color=GREY, fontsize=15, va="top")
 
     s = Seg(fig, 1, "2. EMA 9 POD VWAP = SHORT", "EMA 9 przecina VWAP od góry.\nLongów w tej strategii nie ma.", n, (lo, hi))
     s.candles(B, dn + 1, {dn: RED})

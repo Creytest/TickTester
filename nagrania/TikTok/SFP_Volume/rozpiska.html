@@ -46,7 +46,7 @@ footer{color:var(--mut);font-size:12.5px;border-top:1px solid var(--line);paddin
 <section class="strat" id="sfp">
 <header><span class="no">03/09</span><h2>SFP + Volume</h2><p class="src"><span class="miss">do uzupełnienia</span> · <code>SFP_Volume.py</code></p></header>
 <div class="grid"><div class="txt"><p class="none claimnone">Claim autora: brak w źródłach</p>
-<dl><dt>Wejście</dt><dd>Short: potwierdzony bearish SFP (▼, knot nad ostatnim swing high, zamknięcie pod nim) na świecy z przewagą sprzedaży w Volume Delta. Long odwrotnie.</dd><dt>Wyjście, SL, TP</dt><dd>SL na high świecy sygnałowej (dla longa low). TP 2:1 od zamknięcia, jak na filmie autora.</dd>
+<dl><dt>Wejście</dt><dd>Short: na samej świecy bearish SFP (knot nad ostatnim swing high, open i close pod nim), jeśli ta świeca ma przewagę sprzedaży w Volume Delta. Bez linii potwierdzenia LuxAlgo. Long odwrotnie.</dd><dt>Wyjście, SL, TP</dt><dd>SL na high świecy SFP (dla longa low). TP 2:1 od zamknięcia, jak na filmie autora.</dd>
 <dt>Interwał</dt><dd>Autor: 30 min. Test: tylko 30 min.</dd><dt>Pozycja</dt><dd>1% ryzyka</dd></dl>
 <h3>Nasze założenia</h3><ul><li>Wskaźnik Swing Failure Pattern [LuxAlgo], swings 5, bez filtra wolumenu z niższego interwału.</li><li>Delta: liczy się tylko znak, bez progu („more selling pressure”).</li><li>Wyjście tylko na SL lub TP, nowe sygnały w trakcie pozycji ignorowane.</li></ul>
 <p class="status"><span class="dot"></span>Kod gotowy (PR #8, #11) · wyniki: <span class="miss">brak w plikach projektu</span></p></div>

@@ -625,38 +625,45 @@ def bigbeluga():
 
 # ───────────────────────── 08 SR Retest ─────────────────────────
 def sr_retest():
-    n = 38
-    cl = path([(0, 102), (5, 109.5), (9, 103), (14, 109.6), (18, 104.5), (21, 108.8), (22, 112.4), (23, 113),
-               (24, 111.6), (25, 112.6), (31, 120), (33, 119), (37, 123)], n, 0.4)
-    P1, P2, BRK, RT = 5, 14, 22, 25
-    over = {P1: (108.8, 110.4, 108.3, 109.6), P2: (109.2, 110.5, 108.9, 109.7),
-            RT: (111.7, 112.9, 110.1, 112.6), RT - 1: (113.0, 113.3, 111.3, 111.7)}
-    B = bars_from(cl, wick=0.55, over=over)
-    R = (B[P1][1] + B[P2][1]) / 2
-    entry, sl = B[RT][3], B[RT][2] - 0.3
+    # Jak na kadrze z filmu: rajd, konsolidacja z kilkoma knotami na jednym poziomie,
+    # zamknięcie nad oporem, następna świeca wraca knotem do linii = long.
+    B = [(103.4, 104.6, 103.1, 104.3), (104.3, 105.7, 104.0, 105.4),
+         (105.4, 107.3, 105.1, 107.0), (107.0, 109.0, 106.6, 108.4), (108.4, 109.9, 107.5, 109.3),   # 4: dotknięcie
+         (109.3, 109.6, 107.2, 107.6), (107.6, 108.6, 106.9, 108.1), (108.1, 110.0, 107.7, 108.0),   # 7: dotknięcie
+         (108.0, 108.5, 106.5, 106.8), (106.8, 108.2, 106.4, 107.9), (107.9, 109.95, 107.4, 108.3),  # 10: dotknięcie
+         (108.3, 108.6, 107.6, 107.9), (107.9, 111.6, 107.7, 111.3),                                   # 12: wybicie
+         (111.3, 111.7, 110.0, 111.1)]                                                                 # 13: retest
+    TOUCH, BRK, RT = (4, 7, 10), 12, 13
+    R = 110.0
+    entry, sl = B[RT][3], B[RT][2] - 0.2
     tp = entry + 2 * (entry - sl)
-    EXIT = next(i for i in range(RT + 1, n) if B[i][1] >= tp)
+    for c in (112.3, 113.0, 114.2, 115.1, 116.6):
+        o = B[-1][3]
+        B.append((o, max(o, c) + 0.3, min(o, c) - 0.35, c))
+    EXIT = next(i for i in range(RT + 1, len(B)) if B[i][1] >= tp)
     B[EXIT] = (B[EXIT][0], tp + 0.4, B[EXIT][2], max(B[EXIT][3], tp - 0.3))
     n = EXIT + 1
     lo, hi = ylim_of(B, n, pad=0.12)
 
     fig = figure()
-    s = Seg(fig, 0, "1. OPÓR Z DWÓCH SZCZYTÓW", "Min. 2 szczyty blisko siebie (do 0,25 ATR)\nz ostatnich 50 świec", n, (lo, hi))
+    s = Seg(fig, 0, "1. OPÓR Z KNOTÓW",
+            "Min. 2 knoty w ostatnich 20 świecach na tym samym\npoziomie (do 0,25 ATR), z odbiciem pomiędzy", n, (lo, hi))
     s.candles(B, BRK)
-    s.level(R, P1 - 0.5, BRK + 1, FG, "opór")
-    for p in (P1, P2):
+    s.level(R, TOUCH[0] - 0.5, BRK + 1, FG, "opór")
+    for p in TOUCH:
         s.ax.plot([p], [B[p][1] + s.dy * 0.8], "o", ms=9, color=FG, zorder=7)
 
-    s = Seg(fig, 1, "2. WYBICIE I RETEST = LONG", "Zamknięcie nad oporem, powrót do poziomu\nw ciągu 5 świec. Short lustrzanie.", n, (lo, hi))
+    s = Seg(fig, 1, "2. WYBICIE I RETEST = LONG", "Zamknięcie nad oporem, knot wraca do poziomu\nw ciągu 5 świec. Short lustrzanie.", n, (lo, hi))
     s.candles(B, RT + 1, {BRK: FG, RT: GREEN})
-    s.level(R, P1 - 0.5, RT + 2, FG)
+    s.level(R, TOUCH[0] - 0.5, RT + 2, FG)
     s.tag(BRK, B[BRK][1], "wybicie", FG, False, size=16, off=0.6)
     s.ax.text(RT + 0.7, B[RT][2] - s.dy * 0.3, "retest", color=GREEN, fontsize=16, fontweight="bold", va="top", zorder=8)
-    s.entry(RT, entry, GREEN, "long")
+    s.ax.plot([RT + 0.5], [entry], "o", ms=13, color=GREEN, mec=FG, mew=2, zorder=8)
+    s.ax.text(RT + 1.2, entry + s.dy * 0.9, "long", color=GREEN, fontsize=17, fontweight="bold", va="bottom", zorder=8)
 
     s = Seg(fig, 2, "3. SL I TP: NASZE ZAŁOŻENIE", "Autor nie podał wyjścia.\nSL za świecą retestu, TP 2:1.", n, (lo, hi))
     s.candles(B, n, {BRK: FG, RT: GREEN})
-    s.level(R, P1 - 0.5, RT, FG, ls=(0, (6, 4)), lw=1.6)
+    s.level(R, TOUCH[0] - 0.5, RT, FG, ls=(0, (6, 4)), lw=1.6)
     s.ax.add_patch(Rectangle((RT + 0.5, sl), EXIT - RT, entry - sl, facecolor=RED, alpha=0.14, lw=0, zorder=1))
     s.ax.add_patch(Rectangle((RT + 0.5, entry), EXIT - RT, tp - entry, facecolor=GREEN, alpha=0.14, lw=0, zorder=1))
     s.level(tp, RT - 0.5, EXIT + 0.5, GREEN, "TP", ls="-")

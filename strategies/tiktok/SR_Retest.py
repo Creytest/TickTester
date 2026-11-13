@@ -1,8 +1,6 @@
 import numpy as np
 import pandas as pd
 
-from strategies.tiktok.LuxAlgo_SR_Breaks_MSTS import pivot_high, pivot_low
-
 
 NAME = "SR Retest"
 
@@ -14,11 +12,9 @@ TIMEFRAMES = ["5min"]
 OPPOSITE_SIGNAL = "ignore"
 SAME_SIGNAL = "ignore"
 
-PIVOT_LEFT = 3
-PIVOT_RIGHT = 3
-LOOKBACK = 50       # pivoty z ostatnich 50 świec
-MIN_TOUCHES = 2     # ile pivotów musi tworzyć poziom
-TOLERANCE = 0.25    # odległość pivotów w ATR(14)
+LOOKBACK = 20       # poziom szukany w ostatnich 20 świecach
+MIN_TOUCHES = 2     # ile knotów musi dotknąć poziomu
+TOLERANCE = 0.25    # dotknięcie = knot do 0,25 ATR(14) od poziomu
 RETEST_BARS = 5     # na retest czekamy najwyżej 5 świec
 
 
@@ -46,13 +42,18 @@ def atr(bars: pd.DataFrame, length: int = 14) -> np.ndarray:
 
 def support_resistance(bars: pd.DataFrame) -> pd.DataFrame:
     """
-    Mechaniczna wersja ręcznie rysowanych S/R z filmu.
+    Mechaniczna wersja ręcznie rysowanych S/R z filmu (kadr:
+    kilka knotów zatrzymuje się na jednej poziomej linii, świeca
+    zamyka się nad nią, następna wraca knotem do linii = long).
 
-    Opór: co najmniej 2 pivoty high (3 świece w lewo, 3 w prawo)
-    z ostatnich 50 świec, leżące w odległości do 0,25 ATR(14) od
-    siebie. Poziom to najwyższy z nich. Pivot jest znany dopiero
-    3 świece po szczycie, więc nie podglądamy przyszłości.
-    Wsparcie odwrotnie, z pivotów low.
+    Opór na świecy n: najwyższe high z ostatnich 20 świec (bez n).
+    Liczy się jako opór, gdy co najmniej 2 świece z tego okna mają
+    high nie niżej niż 0,25 ATR(14) pod nim (dotknięcia knotem),
+    i między dotknięciami jest choć jedna świeca, która do poziomu
+    nie doszła (cena odbiła i wróciła) — inaczej każdy spokojny
+    trend świeca po świecy robiłby „opór”. To nie jest double top:
+    liczba dotknięć jest dowolna (≥ 2), a gramy wybicie.
+    Wsparcie odwrotnie, z low.
 
     Wybicie: zamknięcie nad oporem. Retest: w ciągu 5 kolejnych
     świec low dotyka poziomu, a świeca zamyka się nad nim — to
@@ -61,8 +62,8 @@ def support_resistance(bars: pd.DataFrame) -> pd.DataFrame:
 
     Wyjście: kolumny resistance, support (aktywny poziom, także
     w oknie retestu), break_up, break_down, retest_up,
-    retest_down, pivot_high, pivot_low (cena pivota na świecy
-    szczytu — tylko do rysowania).
+    retest_down, touch_high, touch_low (cena knota na świecach,
+    które utworzyły wybity poziom — tylko do rysowania).
     """
     high = bars["high"].to_numpy(dtype=float)
     low = bars["low"].to_numpy(dtype=float)
@@ -70,35 +71,28 @@ def support_resistance(bars: pd.DataFrame) -> pd.DataFrame:
     size = len(close)
     tol = TOLERANCE * atr(bars)
 
-    ph = pivot_high(bars["high"], PIVOT_LEFT, PIVOT_RIGHT).to_numpy()
-    pl = pivot_low(bars["low"], PIVOT_LEFT, PIVOT_RIGHT).to_numpy()
-
     resistance = np.full(size, np.nan)
     support = np.full(size, np.nan)
     break_up = np.zeros(size, dtype=bool)
     break_down = np.zeros(size, dtype=bool)
     retest_up = np.zeros(size, dtype=bool)
     retest_down = np.zeros(size, dtype=bool)
+    touch_high = np.full(size, np.nan)
+    touch_low = np.full(size, np.nan)
 
-    def side(pivots, sign):
+    def side(sign):
         """
         Jedna strona (sign=1 opór, -1 wsparcie). Zwraca funkcję
         kroku, która trzyma własny stan między świecami.
         """
-        state = {"points": [], "retest": np.nan, "until": -1}
+        state = {"retest": np.nan, "until": -1}
+        wick = high if sign > 0 else -low   # wsparcie liczymy na -low
         level_out = resistance if sign > 0 else support
         break_out = break_up if sign > 0 else break_down
         retest_out = retest_up if sign > 0 else retest_down
+        touch_out = touch_high if sign > 0 else touch_low
 
         def step(n):
-            points = state["points"]
-
-            # Pivot potwierdzony na tej świecy (szczyt 3 świece wcześniej).
-            if not np.isnan(pivots[n]):
-                points.append((n - PIVOT_RIGHT, pivots[n]))
-
-            points[:] = [p for p in points if p[0] >= n - LOOKBACK]
-
             # Okno retestu po wybiciu.
             if n <= state["until"]:
                 level = state["retest"]
@@ -111,59 +105,35 @@ def support_resistance(bars: pd.DataFrame) -> pd.DataFrame:
                     state["until"] = -1
                 return
 
-            if np.isnan(tol[n]) or len(points) < MIN_TOUCHES:
+            if n < LOOKBACK or np.isnan(tol[n]):
                 return
 
-            # Najnowszy pivot, który ma w pobliżu inne pivoty.
-            level = np.nan
-            members = []
+            window = wick[n - LOOKBACK:n]
+            top = window.max()
+            touches = np.flatnonzero(window >= top - tol[n])
 
-            for bar, value in reversed(points):
-                near = [p for p in points if abs(p[1] - value) <= tol[n]]
-
-                if len(near) >= MIN_TOUCHES:
-                    members = near
-                    values = [p[1] for p in near]
-                    level = max(values) if sign > 0 else min(values)
-                    break
-
-            if np.isnan(level):
+            # Dotknięcia muszą być rozdzielone świecą bez dotknięcia.
+            if len(touches) < MIN_TOUCHES or not (np.diff(touches) > 1).any():
                 return
 
-            # Poziom już przebity zamknięciem przed tą świecą — nieważny.
-            first = min(p[0] for p in members)
-            past = close[first:n]
-
-            if len(past) and (
-                past.max() > level if sign > 0 else past.min() < level
-            ):
-                points[:] = [p for p in points if p not in members]
-                return
-
+            level = top * sign
             level_out[n] = level
 
             if (close[n] > level) if sign > 0 else (close[n] < level):
                 break_out[n] = True
                 state["retest"] = level
                 state["until"] = n + RETEST_BARS
-                # Przebite pivoty nie tworzą już poziomu.
-                points[:] = [p for p in points if p not in members]
+                idx = n - LOOKBACK + touches
+                touch_out[idx] = window[touches] * sign
 
         return step
 
-    step_up = side(ph, 1)
-    step_down = side(pl, -1)
+    step_up = side(1)
+    step_down = side(-1)
 
     for n in range(size):
         step_up(n)
         step_down(n)
-
-    pivot_high_at = np.full(size, np.nan)
-    pivot_low_at = np.full(size, np.nan)
-    confirmed = np.flatnonzero(~np.isnan(ph))
-    pivot_high_at[confirmed - PIVOT_RIGHT] = ph[confirmed]
-    confirmed = np.flatnonzero(~np.isnan(pl))
-    pivot_low_at[confirmed - PIVOT_RIGHT] = pl[confirmed]
 
     return pd.DataFrame(
         {
@@ -173,8 +143,8 @@ def support_resistance(bars: pd.DataFrame) -> pd.DataFrame:
             "break_down": break_down,
             "retest_up": retest_up,
             "retest_down": retest_down,
-            "pivot_high": pivot_high_at,
-            "pivot_low": pivot_low_at,
+            "touch_high": touch_high,
+            "touch_low": touch_low,
         },
         index=bars.index,
     )
@@ -217,7 +187,8 @@ def generate_signals(bars: pd.DataFrame, rr_ratio: float = 2.0) -> pd.DataFrame:
 def indicators(bars: pd.DataFrame) -> dict:
     """
     Opór (fioletowy) i wsparcie (niebieskie) jako linie na cenie,
-    pivoty jako kropki (pomarańczowe high, turkusowe low),
+    dotknięcia wybitego poziomu jako kropki (pomarańczowe high,
+    turkusowe low),
     etykiety B przy wybiciu. Panel: ATR(14).
     """
     sr = support_resistance(bars)
@@ -231,8 +202,8 @@ def indicators(bars: pd.DataFrame) -> dict:
             ("Wsparcie", _split(sr["support"]), "#2979FF"),
         ],
         "markers": [
-            ("Pivot high", sr["pivot_high"], "#FF9100", "above"),
-            ("Pivot low", sr["pivot_low"], "#00BFA5", "below"),
+            ("Dotknięcie oporu", sr["touch_high"], "#FF9100", "above"),
+            ("Dotknięcie wsparcia", sr["touch_low"], "#00BFA5", "below"),
         ],
         "labels": [
             ("Wybicie oporu", sr["break_up"], "B", "#D500F9", "above"),

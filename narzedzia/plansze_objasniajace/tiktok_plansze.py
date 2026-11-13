@@ -378,7 +378,7 @@ def sfp():
     share = [0.15 + 0.55 * abs(sin(i * 1.9)) for i in range(len(B))]
     sign[SIG], share[SIG] = -1, 0.9
     # mniej świec na planszy = szersze korpusy i czytelniejsze wypełnienie
-    K = 7
+    K = 4   # zostaje 5 świec przed szczytem (definicja pivota: 5 przed, 1 po)
     B, sign, share = B[K:], sign[K:], share[K:]
     SIG, PIV, EXIT, n = SIG - K, PIV - K, EXIT - K, n - K
     lo, hi = ylim_of(B, n, pad=0.1)
@@ -406,6 +406,8 @@ def sfp():
             n, (lo, hi))
     vcandles(s, SIG)
     s.level(SH, PIV, SIG + 1.5, FG, "swing high")
+    s.ax.text(SIG + 1.9, SH - s.dy * 0.9, "szczyt: 5 świec przed nim\ni 1 świeca po nim niżej",
+              color=GREY, fontsize=15, va="top", linespacing=1.4, zorder=6)
 
     s = Seg(fig, 1, "2. SFP + PRZEWAGA SPRZEDAŻY", "Knot nad szczytem, zamknięcie pod nim (SFP)\ni przewaga sprzedaży = short. Long lustrzanie.",
             n, (lo, hi))

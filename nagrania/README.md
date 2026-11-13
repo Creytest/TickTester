@@ -7,7 +7,7 @@ Wszystko do jednego odcinka w jednym miejscu: `nagrania/<Odcinek>/<Strategia>/`.
 | Plansza „jak działa strategia” (1-2-3) | `<Strategia>/plansza_zasady.png` | tak |
 | Inne grafiki objaśniające, plansza rynków | `<Strategia>/*.png`, `<Odcinek>/plansza_rynki.png` | tak |
 | Źródło: autor, link, dokładny tekst, nasze założenia | `<Strategia>/zrodlo.md` (TikTok: `TikTok/zrodla_strategii.md`) | tak |
-| Rozpiska wszystkich strategii odcinka | `<Odcinek>/rozpiska_strategii.html` | tak |
+| Rozpiska „działanie strategii” (schemat + reguły) | `<Strategia>/rozpiska.html`, całość: `<Odcinek>/rozpiska_strategii.html` | tak |
 | Backtest z `run_all_assets.py` (HTML, CSV, plansze wyników) | `<Strategia>/wyniki/` | nie (liczone u Ciebie) |
 | Grupa kontrolna / wersja standardowa | `<Strategia>/wyniki_Control/`, `wyniki_Standard/` | nie |
 | Badanie zdarzeń, porównanie z kontrolną, koszty spreadu | `<Strategia>/wyniki_event_study/`, `wyniki/porownanie_*`, `wyniki/koszty_spread/` | nie |

@@ -33,6 +33,8 @@ def swing_failure_pattern(bars: pd.DataFrame, length: int = 5) -> pd.DataFrame:
     Wyjście: kolumny sfp_bear, sfp_bull (etykieta SFP),
     confirm_bear (▼), confirm_bull (▲), oppos_bear, oppos_bull
     (aktywna linia potwierdzenia na danej świecy).
+    Strategia używa tylko sfp_bear / sfp_bull — potwierdzenie
+    zostaje dla zgodności z oryginałem, ale nie wchodzi w reguły.
     """
     open_ = bars["open"].to_numpy(dtype=float)
     high = bars["high"].to_numpy(dtype=float)
@@ -147,12 +149,17 @@ def volume_delta(bars: pd.DataFrame) -> pd.Series:
 
 def generate_signals(bars: pd.DataFrame, rr_ratio: float = 2.0) -> pd.DataFrame:
     """
-    Short: ▼ (potwierdzony bearish SFP) na świecy z czerwoną
-    deltą (delta < 0). Long: ▲ na świecy z zieloną deltą.
+    Reguła autora: wejście na samej świecy SFP, jeśli wypełnienie
+    świecy (delta wolumenu) jest zgodne z kierunkiem — bez linii
+    potwierdzenia i bez ▼/▲ z LuxAlgo.
 
-    SL na high świecy sygnałowej (dla longa low), TP = 2 × ryzyko,
-    liczone od ceny zamknięcia świecy sygnałowej — jak na filmie
-    autora. Wielkość pozycji: 1% kapitału ryzykowany przy SL.
+    Short: etykieta SFP nad świecą (bearish SFP) i czerwone
+    wypełnienie (delta < 0). Long: SFP pod świecą (bullish SFP)
+    i zielone wypełnienie (delta > 0).
+
+    SL na high świecy SFP (dla longa low), TP = 2 × ryzyko,
+    liczone od ceny zamknięcia świecy SFP — jak na filmie autora.
+    Wielkość pozycji: 1% kapitału ryzykowany przy SL.
 
     Wyjście:
         buy, sell, stop_loss, take_profit.
@@ -172,8 +179,8 @@ def generate_signals(bars: pd.DataFrame, rr_ratio: float = 2.0) -> pd.DataFrame:
 
     # Zamknięcie na samym high / low daje ryzyko 0 — nie da się
     # policzyć wielkości pozycji przy 1% ryzyka, więc pomijamy.
-    buy = sfp["confirm_bull"] & (delta > 0) & (close > low)
-    sell = sfp["confirm_bear"] & (delta < 0) & (close < high)
+    buy = sfp["sfp_bull"] & (delta > 0) & (close > low)
+    sell = sfp["sfp_bear"] & (delta < 0) & (close < high)
 
     result = pd.DataFrame(index=bars.index)
     result["buy"] = buy
@@ -189,8 +196,9 @@ def generate_signals(bars: pd.DataFrame, rr_ratio: float = 2.0) -> pd.DataFrame:
 
 def indicators(bars: pd.DataFrame) -> dict:
     """
-    Etykiety SFP i ▼/▲ jak w TradingView, linie potwierdzenia
-    na cenie, delta wolumenu w panelu.
+    Etykiety SFP jak w TradingView, wypełnienie świec deltą
+    wolumenu, delta % w panelu. Bez linii potwierdzenia i ▼/▲ —
+    autor ich nie używa.
     """
     sfp = swing_failure_pattern(bars)
     delta = volume_delta(bars)
@@ -221,10 +229,6 @@ def indicators(bars: pd.DataFrame) -> dict:
     return {
         "trend": None,
         "candle_fill": fill,
-        "overlays": [
-            ("Potwierdzenie short", sfp["oppos_bear"], "#F23645"),
-            ("Potwierdzenie long", sfp["oppos_bull"], "#089981"),
-        ],
         "panel": {
             "title": "Volume Delta % (delta / wolumen)",
             "lines": [("Delta %", norm, "#7E57C2")],
@@ -234,7 +238,5 @@ def indicators(bars: pd.DataFrame) -> dict:
         "labels": [
             ("SFP short", sfp["sfp_bear"], "SFP", "#F23645", "above"),
             ("SFP long", sfp["sfp_bull"], "SFP", "#089981", "below"),
-            ("▼", sfp["confirm_bear"], "▼", "#F23645", "above"),
-            ("▲", sfp["confirm_bull"], "▲", "#089981", "below"),
         ],
     }

@@ -407,11 +407,11 @@ def sfp():
     vcandles(s, SIG)
     s.level(SH, PIV, SIG + 1.5, FG, "swing high")
 
-    s = Seg(fig, 1, "2. SFP + PRZEWAGA SPRZEDAŻY", "Knot nad szczytem, zamknięcie pod nim (▼)\ni świeca z przewagą sprzedaży = short. Long lustrzanie.",
+    s = Seg(fig, 1, "2. SFP + PRZEWAGA SPRZEDAŻY", "Knot nad szczytem, zamknięcie pod nim (SFP)\ni przewaga sprzedaży = short. Long lustrzanie.",
             n, (lo, hi))
     vcandles(s, SIG + 1, (SIG,))
     s.level(SH, PIV, SIG + 1.5, FG)
-    s.tri(SIG, B[SIG][1] + s.dy * 0.2, RED, False)
+    s.tag(SIG, B[SIG][1], "SFP", RED, False, off=0.4)
     s.entry(SIG, entry, RED, "short")
 
     s = Seg(fig, 2, "3. SL NA HIGH, TP 2:1", "Wyjście tylko na SL albo TP.\nNowe sygnały w trakcie pozycji są ignorowane.",

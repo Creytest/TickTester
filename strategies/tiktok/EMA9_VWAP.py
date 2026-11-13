@@ -6,8 +6,10 @@ from strategies.tiktok.CloudMA_EMA30_74 import ema
 
 NAME = "EMA 9 × VWAP"
 
-# Autor pokazuje strategię na 30 minutach (day trading).
-TIMEFRAMES = ["15min", "1h", "4h"]
+# Autor pokazuje strategię na 30 minutach (day trading). Interwały
+# intraday wokół 30 min (Kamil, 2026-11-13): na 1h/4h sesyjny VWAP ma
+# za mało świec na sesję.
+TIMEFRAMES = ["5min", "15min", "30min"]
 
 # Tylko shorty. Brak SL i TP: przecięcie w górę zamyka shorta
 # (exit_short), bez otwierania longa.
@@ -19,26 +21,25 @@ SAME_SIGNAL = "ignore"
 EQUITY_FRACTION = 1.0
 
 
-# Kotwica VWAP (nasze założenie, autor jej nie podaje):
-#   "none"    — VWAP ciągły, bez resetu: liczony od pierwszej świecy
-#               danych (początek rozgrzewki przed testem). Domyślnie
-#               (Kamil, 2026-11-13): sesyjny VWAP na 4h ma 1–6 świec na
-#               sesję, skacze za ceną i daje sztuczne przecięcia.
+# Kotwica VWAP (autor jej nie podaje):
 #   "session" — reset na początku każdej sesji (doba w czasie danych,
 #               od 17:00 w Nowym Jorku), jak domyślny VWAP w TradingView.
+#               Domyślnie (Kamil, 2026-11-13), razem z interwałami 5/15/30 min.
+#   "none"    — VWAP ciągły, bez resetu: liczony od pierwszej świecy
+#               danych (początek rozgrzewki przed testem).
 #   "week"    — reset na początku tygodnia (poniedziałek 00:00 w czasie
 #               danych = niedziela 17:00 NY), jak kotwica "Week" w TV.
 #   "month"   — reset na początku miesiąca, jak kotwica "Month" w TV.
 # Uwaga: ciągły VWAP z czasem robi się bardzo wolny (średnia z całej
 # historii), więc wynik zależy od daty startu danych.
-VWAP_ANCHOR = "none"
+VWAP_ANCHOR = "session"
 
-# Rozgrzewka = 300 świec, czyli 3 dni na 15 min i 50 dni na 4h. Przy
-# ciągłym VWAP to także jego punkt startu, więc wyrównujemy rozgrzewkę
-# do 50 dni na każdym interwale: VWAP startuje w tym samym dniu
-# (START_DATE − 50 dni) na 15 min, 1h i 4h.
-# Przy CHUNK_YEARS VWAP startuje od nowa w każdym kawałku.
-WARMUP_DAYS = 50
+# Rozgrzewka = 300 świec (na 5 min ~1 dzień). Przy ciągłym VWAP to
+# także jego punkt startu, więc wtedy wyrównujemy rozgrzewkę do 50 dni
+# na każdym interwale: VWAP startuje w tym samym dniu (START_DATE − 50
+# dni). Przy CHUNK_YEARS ciągły VWAP startuje od nowa w każdym kawałku.
+# Sesyjny VWAP nie potrzebuje dłuższej rozgrzewki.
+WARMUP_DAYS = 50 if VWAP_ANCHOR == "none" else 0
 
 _ANCHORS = ("none", "session", "week", "month")
 
@@ -89,7 +90,7 @@ def session_vwap(bars: pd.DataFrame) -> pd.Series:
 def generate_signals(bars: pd.DataFrame, length: int = 9) -> pd.DataFrame:
     """
     Short: EMA 9 przecina VWAP od góry (VWAP wg VWAP_ANCHOR,
-    domyślnie ciągły).
+    domyślnie sesyjny).
     Wyjście: EMA 9 przecina VWAP od dołu. Brak SL i TP, brak longów.
 
     Wyjście:

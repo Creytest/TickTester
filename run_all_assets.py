@@ -25,6 +25,9 @@ from narzedzia.odcinki import folder_wynikow
 # strategies/tradingview_porownawcze) znajdzie się sam.
 #
 # ---------------- Strategie z TikToka (strategies/tiktok) ----------------
+# Wszystkie naraz:
+# STRATEGY = ["BigBeluga_Stoch_80percent", "RSI6_80_20", "LuxAlgo_SR_Breaks_MSTS", "CloudMA_EMA30_74", "SFP_Volume",
+#             "EMA9_VWAP", "EMA9", "SR_Retest", "SSL_IFVG"]
 #   "BigBeluga_Stoch_80percent" — BigBeluga Two-Pole + Stochastic 7,3,3
 #   "RSI6_80_20"                — RSI 6 (80/20) RR 2:1
 #   "LuxAlgo_SR_Breaks_MSTS"    — LuxAlgo S/R Breaks + Market Structure Trailing Stop
@@ -36,6 +39,9 @@ from narzedzia.odcinki import folder_wynikow
 #   "SSL_IFVG"                  — SSL + IFVG (ICT: sweep płynności + odwrócony FVG, SL za luką, TP 2:1), 1min
 #
 # ---------------- Strategie z Reddita (strategies/reddit) ----------------
+# Wszystkie naraz:
+# STRATEGY = ["IBS_MeanReversion", "IBS_GoldFutures", "RSI_90", "MOC_MOO", "RSI_MACD", "Gold_ThuFri", "ATH_ATR",
+#             "HolyGrail", "ElephantBar_MA200", "EMA9_19_Scalping", "SecondEntry", "Renko_EMA9_20"]
 #   "IBS_MeanReversion"         — IBS Mean Reversion (zamknięcie pod progiem + IBS < 0,3, wyjście nad wczorajszym high), 1D
 #                                 wariant wyjścia: EXIT_MODE w pliku strategii ("high" / "close")
 #   "IBS_GoldFutures"           — IBS - gold futures (wybicie Initial Balance 8:20–9:20 NY, SL za IB, TP = szerokość IB,
@@ -65,6 +71,9 @@ from narzedzia.odcinki import folder_wynikow
 #                                 4 pipsy, reszta: 1 cegła / 5 min handlu (kalibracja na 30 dniach); "5min" = tylko rozgrzewka
 #
 # ---------------- Strategie z książek (strategies/ksiazki) ----------------
+# Wszystkie naraz:
+# STRATEGY = ["ConnorsCumulativeRSI", "ConnorsCumulativeRSI_50", "ConnorsCumulativeRSI_Control",
+#             "ConnorsCumulativeRSI_50_Control"]
 #   "ConnorsCumulativeRSI"      — Cumulative RSI (Connors, „Short Term Trading Strategies That Work”): close > SMA 200,
 #                                 RSI(2) z dziś + wczoraj < 35 → kupno, wyjście RSI(2) > 65; long, bez SL, 100% kapitału, 1D
 #                                 (autor: akcje/indeksy USA → najpierw US500; dłuższa historia: START_DATE wcześniej)
@@ -76,6 +85,9 @@ from narzedzia.odcinki import folder_wynikow
 #                                 potem analizy/compare_control.py z ACTIVE = "ConnorsCumulativeRSI" (albo "..._50").
 #
 # ---------------- Strategie z TradingView (strategies/tradingview) ----------------
+# Wszystkie naraz:
+# STRATEGY = ["BressertCycleSignals", "StrongPressureSignals", "MarketStructureOscillator",
+#             "AuctionRangeMigrationTrend", "LiquidityHuntPro", "Wyckoff", "Wyckoff_Control"]
 #   "BressertCycleSignals"      — Bressert Cycle Signals (BY_Tse, Community Scripts): Double Stochastic 10 skręca spod 40 /
 #                                 znad 70, trend z wyższego interwału, buy/sell stop za świecą setupu (4 świece),
 #                                 SL za dołkiem/szczytem, trailing 2 świece od 70/40, reverse; 15m/1h/4h + 1D (autor: D1)
@@ -99,6 +111,10 @@ from narzedzia.odcinki import folder_wynikow
 #                                 Track record autora (% zakresów do T2 vs losowy ruch): analizy/event_study_wyckoff.py
 #
 # ------- NA INNY ODCINEK: wskaźniki porównawcze (strategies/tradingview_porownawcze) -------
+# Wszystkie naraz:
+# STRATEGY = ["AutoLevelsTrendlines", "AutoLevelsTrendlines_Control", "KeyLevelZones", "KeyLevelZones_Control",
+#             "EfficiencyWeightedHull", "EfficiencyWeightedHull_Standard", "EfficiencyWeightedHull_Control",
+#             "SqueezeBreakoutSignals", "SqueezeBreakoutSignals_Control"]
 #   Wskaźniki z TradingView bez reguł handlu autora (wejście albo wyjście to nasze założenie).
 #   Nie oceniamy ich jak zwykłych strategii, tylko porównujemy: strategia vs grupa kontrolna
 #   (*_Control, losowe momenty) albo vs wersja standardowa (*_Standard).

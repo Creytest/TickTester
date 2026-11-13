@@ -34,7 +34,7 @@ from narzedzia.plansze_objasniajace.rynki_plansza import period_text, plansza as
 #   "LuxAlgo_SR_Breaks_MSTS"    — LuxAlgo S/R Breaks + Market Structure Trailing Stop
 #   "CloudMA_EMA30_74"          — Triangles. Cloud MA EMA 30/74 + SL na swingu
 #   "SFP_Volume"                — SFP+Volume (LuxAlgo SFP + Volume Delta), tylko 30min
-#   "EMA9_VWAP"                 — EMA 9 × VWAP (sesyjny), tylko short, wyjście na przecięciu w górę, 30min
+#   "EMA9_VWAP"                 — EMA 9 × VWAP (ciągły, VWAP_ANCHOR), tylko short, wyjście na przecięciu w górę, 30min
 #   "EMA9"                      — EMA9 (zamknięcie nad/pod EMA 9, reverse), 30min
 #   "SR_Retest"                 — SR Retest (opór/wsparcie z pivotów, wybicie + retest, SL/TP 2:1), 5min
 #   "SSL_IFVG"                  — SSL + IFVG (ICT: sweep płynności + odwrócony FVG, SL za luką, TP 2:1), 1min

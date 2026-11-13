@@ -372,42 +372,57 @@ def sfp():
     EXIT = next(i for i in range(SIG + 1, n) if B[i][2] <= tp)
     B[EXIT] = (B[EXIT][0], B[EXIT][1], tp - 0.6, min(B[EXIT][3], tp + 0.3))
     n = EXIT + 1
-    delta = [(1 if b[3] >= b[0] else -1) * (0.3 + 0.5 * abs(sin(i * 1.9))) for i, b in enumerate(B)]
-    delta[SIG] = -1.0
+    # Volume Delta: znak = przewaga kupna/sprzedaży, udział = |delta| / wolumen (0–1).
+    # Zwykle zgodny z kierunkiem świecy, ale nie zawsze (świece 6, 15, 19).
+    sign = [(1 if b[3] >= b[0] else -1) * (-1 if i in (6, 15, 19) else 1) for i, b in enumerate(B)]
+    share = [0.15 + 0.55 * abs(sin(i * 1.9)) for i in range(len(B))]
+    sign[SIG], share[SIG] = -1, 0.9
+    # mniej świec na planszy = szersze korpusy i czytelniejsze wypełnienie
+    K = 7
+    B, sign, share = B[K:], sign[K:], share[K:]
+    SIG, PIV, EXIT, n = SIG - K, PIV - K, EXIT - K, n - K
     lo, hi = ylim_of(B, n, pad=0.1)
 
-    def dpanel(s, upto, hl=False):
-        s.sx.axhline(0, color=DIM, lw=1.2)
+    def vcandles(s, upto, hl=()):
+        """Świece jak Volume Delta Candles: pusty korpus z ramką w kolorze ceny,
+        w środku pasek |delta|/wolumen: zielony od dołu (kupno), czerwony od góry (sprzedaż)."""
         for i in range(upto):
-            col = (RED if delta[i] < 0 else GREEN) if (hl and i == SIG) else DIM
-            s.sx.add_patch(Rectangle((i - 0.32, min(0, delta[i])), 0.64, abs(delta[i]), facecolor=col, zorder=3))
+            o, h, l, c = B[i]
+            a = 1.0 if (i in hl or not hl) else 0.45
+            pc = GREEN if c >= o else RED
+            lw = 2.6 if i in hl else 1.8
+            lo_b, hi_b = min(o, c), max(o, c)
+            body = max(hi_b - lo_b, s.dy * 0.15)
+            s.ax.plot([i, i], [l, lo_b], color=pc, lw=lw, alpha=a, zorder=3, solid_capstyle="round")
+            s.ax.plot([i, i], [lo_b + body, h], color=pc, lw=lw, alpha=a, zorder=3, solid_capstyle="round")
+            s.ax.add_patch(Rectangle((i - 0.38, lo_b), 0.76, body, facecolor=BG, edgecolor=pc, lw=lw, alpha=a, zorder=4))
+            fc = GREEN if sign[i] > 0 else RED
+            fh = share[i] * body
+            y0 = lo_b if sign[i] > 0 else lo_b + body - fh
+            s.ax.add_patch(Rectangle((i - 0.38, y0), 0.76, fh, facecolor=fc, edgecolor="none", alpha=a, zorder=5))
 
     fig = figure()
-    s = Seg(fig, 0, "1. OSTATNI SWING HIGH", "Swing Failure Pattern [LuxAlgo]\nzaznacza ostatni szczyt (swings 5)",
-            n, (lo, hi), (-1.2, 1.3), "Volume Delta")
-    s.candles(B, SIG)
+    s = Seg(fig, 0, "1. ŚWIECE WOLUMENOWE", "Kolor wypełnienia = przewaga kupna lub sprzedaży,\nwysokość wypełnienia = siła tej przewagi",
+            n, (lo, hi))
+    vcandles(s, SIG)
     s.level(SH, PIV, SIG + 1.5, FG, "swing high")
-    dpanel(s, SIG)
 
-    s = Seg(fig, 1, "2. SFP + PRZEWAGA SPRZEDAŻY", "Knot nad szczytem, zamknięcie pod nim (▼)\ni ujemna delta = short. Long lustrzanie.",
-            n, (lo, hi), (-1.2, 1.3), "Volume Delta")
-    s.candles(B, SIG + 1, {SIG: RED})
+    s = Seg(fig, 1, "2. SFP + PRZEWAGA SPRZEDAŻY", "Knot nad szczytem, zamknięcie pod nim (▼)\ni świeca z przewagą sprzedaży = short. Long lustrzanie.",
+            n, (lo, hi))
+    vcandles(s, SIG + 1, (SIG,))
     s.level(SH, PIV, SIG + 1.5, FG)
     s.tri(SIG, B[SIG][1] + s.dy * 0.2, RED, False)
     s.entry(SIG, entry, RED, "short")
-    dpanel(s, SIG + 1, True)
-    s.sx.text(SIG + 0.8, delta[SIG], "sprzedaż", color=RED, fontsize=16, fontweight="bold", va="center")
 
     s = Seg(fig, 2, "3. SL NA HIGH, TP 2:1", "Wyjście tylko na SL albo TP.\nNowe sygnały w trakcie pozycji są ignorowane.",
-            n, (lo, hi), (-1.2, 1.3), "Volume Delta")
-    s.candles(B, n, {SIG: RED})
+            n, (lo, hi))
+    vcandles(s, n, (SIG,))
     s.ax.add_patch(Rectangle((SIG + 0.5, entry), EXIT - SIG, sl - entry, facecolor=RED, alpha=0.14, lw=0, zorder=1))
     s.ax.add_patch(Rectangle((SIG + 0.5, tp), EXIT - SIG, entry - tp, facecolor=GREEN, alpha=0.14, lw=0, zorder=1))
     s.level(sl, SIG - 0.5, EXIT + 0.5, RED, "SL", ls="-")
     s.level(entry, SIG + 0.5, EXIT + 0.5, FG, "wejście", ls=(0, (2, 3)), lw=2)
     s.level(tp, SIG - 0.5, EXIT + 0.5, GREEN, "TP 2:1", ls="-")
     s.ax.plot([SIG + 0.5], [entry], "o", ms=13, color=RED, mec=FG, mew=2, zorder=8)
-    dpanel(s, n, True)
     s.note("1% kapitału ryzyka do SL", y=lo)
     save(fig, "03_sfp_volume")
 

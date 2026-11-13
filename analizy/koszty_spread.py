@@ -11,7 +11,7 @@ Warianty (logika strategii bez zmian, świece Bid te same):
   C_binance        Ask = Bid + 0,01 USD (1 tick BTCUSDT) + 1 tick + 0,05%/stronę
   D_tylko_spread   spread z ticków + 1 tick, bez prowizji
 
-Zapisuje do wyniki/<STRATEGY>/koszty_spread/:
+Zapisuje do nagrania/<Odcinek>/<STRATEGY>/wyniki/koszty_spread/:
   <STRATEGY>_<aktywo>_<interwał>_<wariant>.html — wykres jak z run_all_assets,
   koszty_<aktywo>_<interwał>.csv — tabela porównania.
 
@@ -30,6 +30,7 @@ from pathlib import Path as _Path
 sys.path.insert(0, str(_Path(__file__).resolve().parents[1]))
 
 from narzedzia import plot_tick_backtest_xauusd as single
+from narzedzia.odcinki import folder_wynikow
 
 
 # ============================================================
@@ -55,7 +56,6 @@ BINANCE_COMMISSION = 0.0005
 
 SAVE_HTML = True
 
-OUTPUT_DIR = Path(__file__).resolve().parents[1] / "wyniki"
 
 
 # ============================================================
@@ -106,7 +106,7 @@ def main(strategy: str = STRATEGY, ticks: pd.DataFrame | None = None) -> pd.Data
 
     timeframe = TESTS[strategy]
     strategy_module = single.load_strategy(strategy)
-    out_dir = OUTPUT_DIR / strategy / "koszty_spread"
+    out_dir = folder_wynikow(strategy) / "koszty_spread"
     out_dir.mkdir(parents=True, exist_ok=True)
 
     if ticks is None:

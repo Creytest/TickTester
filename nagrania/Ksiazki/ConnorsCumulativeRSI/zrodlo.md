@@ -1,0 +1,5 @@
+- **Źródło:** Larry Connors, „Short Term Trading Strategies That Work” (2008), strategia Cumulative RSI. Pomysł Kamila (2026-11-07) do odcinka o RSI („Czy rynek wie, że jest wyprzedany?”), jako część „a może RSI działa, tylko inaczej używane”.
+- **Timeframe i aktywa u autora:** świece dzienne, akcje i indeksy USA (S&P 500) → najpierw US500 D1, reszta koszyka jako sprawdzenie poza rynkiem autora.
+- **Zasady (potwierdzone przez Kamila):** close > SMA 200; cumulative RSI = RSI(2) dziś + RSI(2) wczoraj; wejście na zamknięciu, gdy cumulative RSI < 35 (wariant 2: < 50); wyjście, gdy RSI(2) > 65. Tylko long, bez SL/TP → 100% kapitału.
+- **Duplikat?** Nie. W repo są RSI 14 (RSI 90%), RSI 6 80/20 i RSI MA + MACD, ale nie RSI(2) z filtrem SMA 200.
+- **Status (2026-11-07):** strategies/ksiazki/ConnorsCumulativeRSI(.py, _50, _Control, _50_Control), PR z wątku „Ocenić serię o popularnych wskaźnikach”. Dane US500 tylko od 11.2020 — Kamil dociąga starsze lata.

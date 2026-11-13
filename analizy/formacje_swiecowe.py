@@ -1,6 +1,6 @@
 """
 Wykrywanie 12 formacji świecowych z planszy „Candlestick Patterns”
-(TredWithRahul). Definicje: analizy/event_study_candles_zasady.md.
+(TredWithRahul). Definicje: nagrania/FormacjeSwiecowe/zasady_testu.md.
 
 detect_patterns(bars) -> dict {nazwa: tablica bool}, True na ostatniej
 świecy formacji (sygnał na jej zamknięciu). Bez zaglądania w przyszłość.
@@ -75,7 +75,7 @@ PLANSZA_COLORS = {
 
 def detect_patterns(bars: pd.DataFrame, atr: np.ndarray, plansza: bool = False) -> dict:
     """
-    plansza=False: definicje podręcznikowe (event_study_candles_zasady.md).
+    plansza=False: definicje podręcznikowe (nagrania/FormacjeSwiecowe/zasady_testu.md).
     plansza=True:  te same definicje + kolor każdej świecy jak na planszy
                    (PLANSZA_COLORS).
     """

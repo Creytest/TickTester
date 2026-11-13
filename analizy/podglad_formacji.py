@@ -13,11 +13,11 @@ Na wykresie:
 Pokazuje WSZYSTKIE wykrycia (bez odstępu 20 świec z badania zdarzeń),
 żeby można było ocenić same definicje.
 
-Wyniki: wyniki/podglad_formacji/<aktywo>_<interwał>/<formacja>.html
+Wyniki: nagrania/FormacjeSwiecowe/wyniki_podglad/<aktywo>_<interwał>/<formacja>.html
 
 Uruchomienie:
     python analizy/podglad_formacji.py
-Wersja „kolory jak na planszy” (wyniki/podglad_formacji_plansza/):
+Wersja „kolory jak na planszy” (nagrania/FormacjeSwiecowe/wyniki_podglad_plansza/):
     python analizy/podglad_formacji.py --plansza
 """
 
@@ -34,6 +34,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from narzedzia.tick_config import ASSETS, REVERSE_BID_ASK
 from narzedzia.tick_data import load_ticks_cached
 from narzedzia.tick_engine import build_bars
+from narzedzia.odcinki import folder_badania
 from strategies.tiktok.SR_Retest import atr as atr_rma
 from analizy.formacje_swiecowe import PATTERNS, detect_patterns, context_mask
 
@@ -51,7 +52,7 @@ WINDOW_BEFORE = 40     # świece widoczne przed formacją po przeskoku
 WINDOW_AFTER = 25      # i po niej (żeby było widać, co stało się dalej)
 WARMUP_DAYS = 30
 
-OUTPUT_DIR = Path(__file__).resolve().parents[1] / "wyniki" / "podglad_formacji"
+OUTPUT_DIR = folder_badania("FormacjeSwiecowe", "wyniki_podglad")
 
 # Wersja „kolory jak na planszy” (każda świeca w kolorze z rysunku,
 # formacje_swiecowe.PLANSZA_COLORS). Wyniki idą wtedy do folderu z dopiskiem

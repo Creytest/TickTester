@@ -13,6 +13,7 @@ from narzedzia import plot_tick_backtest_xauusd as single
 from narzedzia.summary_chart import save_summary_chart
 from narzedzia.plansze import save_plansze
 from narzedzia.interactive_chart import save_interactive_chart
+from narzedzia.odcinki import folder_wynikow
 
 
 # ============================================================
@@ -169,13 +170,13 @@ SAVE_PLANSZE = True
 # None: na planszy 2 zamiast Win Rate jest Profit Factor.
 CLAIM_WIN_RATE = None
 
-# Folder na wykresy, transakcje i tabelę wyników.
-OUTPUT_DIR = Path(__file__).resolve().parent / "wyniki"
+# Wykresy, transakcje i tabela wyników trafiają do
+# nagrania/<Odcinek>/<Strategia>/wyniki/ (narzedzia/odcinki.py).
 
 
 def main():
-    # Każda strategia ma własny podfolder w wyniki/.
-    out_dir = OUTPUT_DIR / STRATEGY
+    # Każda strategia ma własny folder w nagrania/<Odcinek>/.
+    out_dir = folder_wynikow(STRATEGY)
     out_dir.mkdir(parents=True, exist_ok=True)
 
     rows = []
@@ -288,6 +289,9 @@ def main():
             # Statystyki całego okresu ze sklejonych kawałków.
             stats = single.period_stats(trades, equity, single.INITIAL_CAPITAL)
             equities[(asset, timeframe)] = equity
+            # Dzienna krzywa kapitału — żeby plansze przy teście jednego
+            # aktywa mogły pokazać też wcześniej policzone kombinacje.
+            _save_daily_equity(equity, out_dir / f"{name}_kapital.csv")
 
             # Jeden wykres całego okresu na świecach dziennych —
             # wykresy kawałków pokazują szczegóły.
@@ -330,11 +334,16 @@ def main():
 
     summary = pd.DataFrame(rows)
 
+    name = f"podsumowanie_{STRATEGY}_{START_DATE}_{END_DATE}"
+    table = out_dir / f"{name}.csv"
+
+    # Test tylko części aktywów/interwałów: nowe wyniki nadpisują te same
+    # kombinacje, a pozostałe zostają z poprzedniego podsumowania.
+    summary = _merge_previous(summary, table, out_dir, equities)
+
     if "trades" in summary.columns:
         summary["trades"] = summary["trades"].astype("Int64")
 
-    name = f"podsumowanie_{STRATEGY}_{START_DATE}_{END_DATE}"
-    table = out_dir / f"{name}.csv"
     summary.to_csv(table, index=False, sep=";", decimal=",")
 
     costs = "spread z danych + prowizja " + ", ".join(
@@ -382,6 +391,67 @@ def main():
         )
 
     print(f"\nWykresy i tabela zapisane w: {out_dir}")
+
+
+def _save_daily_equity(equity: pd.DataFrame, path: Path) -> None:
+    if equity.empty:
+        return
+    values = (
+        equity.assign(timestamp=pd.to_datetime(equity["timestamp"]))
+        .set_index("timestamp")["equity"]
+        .astype(float)
+        .sort_index()
+    )
+    # Pierwszy punkt (kapitał startowy) + zamknięcie każdego dnia.
+    daily = pd.concat([values.iloc[:1], values.resample("1D").last().dropna()])
+    daily = daily[~daily.index.duplicated(keep="first")]
+    daily.rename("equity").rename_axis("timestamp").reset_index().to_csv(
+        path, index=False, sep=";", decimal=","
+    )
+
+
+def _merge_previous(summary, table, out_dir, equities):
+    """
+    Dokleja z poprzedniego podsumowania kombinacje (aktywo, interwał),
+    których nie było w tym teście. Ich krzywe kapitału czyta z *_kapital.csv.
+    """
+    if not table.exists():
+        return summary
+
+    old = pd.read_csv(table, sep=";", decimal=",")
+    done = set(zip(summary.get("asset", []), summary.get("timeframe", [])))
+    keep = old[[
+        (asset, timeframe) not in done
+        for asset, timeframe in zip(old["asset"], old["timeframe"])
+    ]]
+    if keep.empty:
+        return summary
+
+    print(
+        "\nZ poprzedniego podsumowania zostają: "
+        + ", ".join(f"{a} {tf}" for a, tf in zip(keep["asset"], keep["timeframe"]))
+    )
+    for asset, timeframe in zip(keep["asset"], keep["timeframe"]):
+        name = (
+            f"{STRATEGY}_{str(asset).replace(' ', '_')}_{timeframe}"
+            f"_{START_DATE}_{END_DATE}"
+        )
+        path = out_dir / f"{name}_kapital.csv"
+        if path.exists():
+            equities[(asset, timeframe)] = pd.read_csv(path, sep=";", decimal=",")
+
+    merged = pd.concat([summary, keep], ignore_index=True)
+    if "trades" in merged.columns:
+        merged["trades"] = pd.to_numeric(merged["trades"], errors="coerce").astype("Int64")
+    # Kolejność jak w ustawieniach: aktywa, potem interwały.
+    order_a = {a: i for i, a in enumerate(ASSETS_TO_TEST)}
+    order_t = {t: i for i, t in enumerate(TIMEFRAMES_TO_TEST)}
+    merged = merged.sort_values(
+        by=["asset", "timeframe"],
+        key=lambda col: col.map(order_a if col.name == "asset" else order_t).fillna(99),
+        kind="stable",
+    ).reset_index(drop=True)
+    return merged
 
 
 def _save_combined_html(path, title, daily, trades, equity, stats) -> None:

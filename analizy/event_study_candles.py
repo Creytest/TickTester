@@ -2,7 +2,7 @@
 Czy formacje świecowe przewidują kierunek? Badanie zdarzeń dla 12 formacji
 z planszy „Candlestick Patterns” (TredWithRahul).
 
-Zasady testu (ustalone przed wynikami): analizy/event_study_candles_zasady.md
+Zasady testu (ustalone przed wynikami): nagrania/FormacjeSwiecowe/zasady_testu.md
 Definicje formacji: analizy/formacje_swiecowe.py
 
 Dla każdej formacji i wariantu (bez kontekstu / z kontekstem SMA 20):
@@ -14,7 +14,7 @@ Kontrole (N_SIM losowań, metoda jak w event_study_rsi.py):
 - B: (tylko wariant z kontekstem) świece z takim samym ruchem ceny
      w ostatnich 14 świecach, bez formacji.
 
-Wyniki: wyniki/event_study_candles/
+Wyniki: nagrania/FormacjeSwiecowe/wyniki_event_study/
     summary.csv                          — wiersz = aktywo × interwał × formacja ×
                                            wariant (dopisywany po każdej kombinacji),
     ranking.csv, ranking.png             — w ilu kombinacjach formacja wychodzi
@@ -24,7 +24,7 @@ Wyniki: wyniki/event_study_candles/
 
 Uruchomienie:
     python analizy/event_study_candles.py
-Wersja „kolory jak na planszy” (wyniki/event_study_candles_plansza/):
+Wersja „kolory jak na planszy” (nagrania/FormacjeSwiecowe/wyniki_event_study_plansza/):
     python analizy/event_study_candles.py --plansza
 Sam ranking z istniejącego summary.csv:
     python analizy/event_study_candles.py --ranking
@@ -44,6 +44,7 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from narzedzia.tick_config import COMMISSION
+from narzedzia.odcinki import folder_badania
 from narzedzia.plansze import (
     BLACK, WHITE, GREEN, RED, GRAY, SIZE, DPI,
     _body_font, _heading_font, _heading_weight, count_text,
@@ -58,7 +59,7 @@ import analizy.event_study_rsi as rsi_study
 
 
 # ============================================================
-# KONFIGURACJA (zgodnie z event_study_candles_zasady.md)
+# KONFIGURACJA (zgodnie z nagrania/FormacjeSwiecowe/zasady_testu.md)
 # ============================================================
 
 ASSETS_TO_TEST = ["XAUUSD", "Bitcoin", "EURUSD", "Brent", "US500"]
@@ -87,7 +88,7 @@ VARIANTS = {
     "z_kontekstem": f"po spadku / wzroście (SMA {SMA_CONTEXT})",
 }
 
-OUTPUT_DIR = Path(__file__).resolve().parents[1] / "wyniki" / "event_study_candles"
+OUTPUT_DIR = folder_badania("FormacjeSwiecowe", "wyniki_event_study")
 
 # Wersja „kolory jak na planszy” (każda świeca w kolorze z rysunku,
 # formacje_swiecowe.PLANSZA_COLORS). Wyniki idą wtedy do folderu z dopiskiem

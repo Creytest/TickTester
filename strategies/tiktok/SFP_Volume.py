@@ -14,6 +14,13 @@ TIMEFRAMES = ["30min"]
 OPPOSITE_SIGNAL = "ignore"
 SAME_SIGNAL = "ignore"
 
+# Kolory na wykresie: SFP z sygnałem (wypełnienie zgodne),
+# SFP bez sygnału (wypełnienie przeciwne), wybity szczyt / dołek.
+SFP_SHORT = "#F23645"
+SFP_LONG = "#089981"
+SFP_BAD = "#9AA0A6"
+SWING_COLOUR = "#FFA000"
+
 
 # ============================================================
 # SWING FAILURE PATTERN [LuxAlgo]
@@ -33,6 +40,9 @@ def swing_failure_pattern(bars: pd.DataFrame, length: int = 5) -> pd.DataFrame:
     Wyjście: kolumny sfp_bear, sfp_bull (etykieta SFP),
     confirm_bear (▼), confirm_bull (▲), oppos_bear, oppos_bull
     (aktywna linia potwierdzenia na danej świecy).
+    swing_bear_bar / swing_bull_bar: numer świecy szczytu (dołka),
+    który SFP wybił (-1 poza świecami SFP), swing_bear / swing_bull:
+    jego cena.
     Strategia używa tylko sfp_bear / sfp_bull — potwierdzenie
     zostaje dla zgodności z oryginałem, ale nie wchodzi w reguły.
     """
@@ -52,6 +62,10 @@ def swing_failure_pattern(bars: pd.DataFrame, length: int = 5) -> pd.DataFrame:
     confirm_bull = np.zeros(size, dtype=bool)
     oppos_bear = np.full(size, np.nan)
     oppos_bull = np.full(size, np.nan)
+    swing_bear_bar = np.full(size, -1)
+    swing_bull_bar = np.full(size, -1)
+    swing_bear = np.full(size, np.nan)
+    swing_bull = np.full(size, np.nan)
 
     # Ostatni swing i aktywny wzór (piv w Pine) dla obu stron.
     swh_prc, swh_bix = np.nan, 0
@@ -77,6 +91,7 @@ def swing_failure_pattern(bars: pd.DataFrame, length: int = 5) -> pd.DataFrame:
                 oppos = min(sw, low[bx + 1:n].min())
 
             sfp_bear[n] = True
+            swing_bear_bar[n], swing_bear[n] = bx, sw
             h_swing, h_bix, h_oppos = sw, bx, oppos
             h_active, h_confirmed = True, False
 
@@ -101,6 +116,7 @@ def swing_failure_pattern(bars: pd.DataFrame, length: int = 5) -> pd.DataFrame:
                 oppos = max(sw, high[bx + 1:n].max())
 
             sfp_bull[n] = True
+            swing_bull_bar[n], swing_bull[n] = bx, sw
             l_swing, l_bix, l_oppos = sw, bx, oppos
             l_active, l_confirmed = True, False
 
@@ -121,6 +137,10 @@ def swing_failure_pattern(bars: pd.DataFrame, length: int = 5) -> pd.DataFrame:
             "confirm_bull": confirm_bull,
             "oppos_bear": oppos_bear,
             "oppos_bull": oppos_bull,
+            "swing_bear_bar": swing_bear_bar,
+            "swing_bull_bar": swing_bull_bar,
+            "swing_bear": swing_bear,
+            "swing_bull": swing_bull,
         },
         index=bars.index,
     )
@@ -196,13 +216,46 @@ def generate_signals(bars: pd.DataFrame, rr_ratio: float = 2.0) -> pd.DataFrame:
 
 def indicators(bars: pd.DataFrame) -> dict:
     """
-    Etykiety SFP jak w TradingView, wypełnienie świec deltą
-    wolumenu, delta % w panelu. Bez linii potwierdzenia i ▼/▲ —
-    autor ich nie używa.
+    Wykres pod czytelność reguły:
+    - kropka na szczycie (dołku), który SFP wybił, i linia od niej
+      do świecy SFP,
+    - etykieta SFP w kolorze kierunku, gdy wypełnienie się zgadza
+      (sygnał), szara, gdy świeca ma przeciwne wypełnienie (brak
+      wejścia),
+    - wypełnienie świec deltą wolumenu, delta % w panelu.
+    Bez małych trójkątów sygnału — ich rolę pełnią kolorowe SFP.
+    Pozycja otwiera się na pierwszym ticku po zamknięciu dobrego SFP,
+    o ile nie trwa już inna pozycja.
     """
     sfp = swing_failure_pattern(bars)
     delta = volume_delta(bars)
     norm = 100 * delta / bars["volume"].astype(float)
+
+    high = bars["high"].astype(float)
+    low = bars["low"].astype(float)
+    good_bear = sfp["sfp_bear"] & (delta < 0) & (bars["close"] < high)
+    good_bull = sfp["sfp_bull"] & (delta > 0) & (bars["close"] > low)
+    bad_bear = sfp["sfp_bear"] & ~good_bear
+    bad_bull = sfp["sfp_bull"] & ~good_bull
+
+    # Kropki na wybitych szczytach / dołkach i linie do świecy SFP.
+    index = bars.index
+    swing_high = pd.Series(np.nan, index=index)
+    swing_low = pd.Series(np.nan, index=index)
+    lines = []
+    for side, good, colour in (
+        ("bear", good_bear, SFP_SHORT),
+        ("bull", good_bull, SFP_LONG),
+    ):
+        dots = swing_high if side == "bear" else swing_low
+        for n in np.flatnonzero(sfp["sfp_" + side].to_numpy()):
+            bx = int(sfp["swing_%s_bar" % side].iat[n])
+            level = float(sfp["swing_" + side].iat[n])
+            dots.iat[bx] = level
+            lines.append((
+                index[bx], level, index[n], level,
+                colour if good.iat[n] else SFP_BAD,
+            ))
 
     # Wypełnienie korpusu jak Volume Delta Candles (full bar):
     # pasek o wysokości |delta| / wolumen korpusu, zielony przy
@@ -229,6 +282,12 @@ def indicators(bars: pd.DataFrame) -> dict:
     return {
         "trend": None,
         "candle_fill": fill,
+        "signal_markers": False,
+        "markers": [
+            ("Szczyt", swing_high, SWING_COLOUR, "above"),
+            ("Dołek", swing_low, SWING_COLOUR, "below"),
+        ],
+        "lines": lines,
         "panel": {
             "title": "Volume Delta % (delta / wolumen)",
             "lines": [("Delta %", norm, "#7E57C2")],
@@ -236,7 +295,9 @@ def indicators(bars: pd.DataFrame) -> dict:
             "range": (-100, 100),
         },
         "labels": [
-            ("SFP short", sfp["sfp_bear"], "SFP", "#F23645", "above"),
-            ("SFP long", sfp["sfp_bull"], "SFP", "#089981", "below"),
+            ("SFP short (sygnał)", good_bear, "SFP", SFP_SHORT, "above"),
+            ("SFP long (sygnał)", good_bull, "SFP", SFP_LONG, "below"),
+            ("SFP short (zła świeca)", bad_bear, "SFP", SFP_BAD, "above"),
+            ("SFP long (zła świeca)", bad_bull, "SFP", SFP_BAD, "below"),
         ],
     }

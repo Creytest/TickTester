@@ -45,6 +45,7 @@ def save_interactive_chart(
     panel2: dict | None = None,
     zones: list | None = None,
     lines: list | None = None,
+    show_signals: bool = True,
 ) -> None:
     # Import tutaj, aby brak plotly nie blokował reszty programu.
     import plotly.graph_objects as go
@@ -231,6 +232,9 @@ def save_interactive_chart(
 
     buy = signals["buy"].fillna(False).astype(bool).to_numpy()
     sell = signals["sell"].fillna(False).astype(bool).to_numpy()
+    if not show_signals:
+        buy = np.zeros_like(buy)
+        sell = np.zeros_like(sell)
 
     # Odstęp znaczników od świecy: ułamek typowej wysokości świecy,
     # a nie procent ceny — inaczej na EURUSD 30 min znaczniki

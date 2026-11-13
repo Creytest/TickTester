@@ -14,6 +14,7 @@ from narzedzia.summary_chart import save_summary_chart
 from narzedzia.plansze import save_plansze
 from narzedzia.interactive_chart import save_interactive_chart
 from narzedzia.odcinki import folder_wynikow
+from narzedzia.plansze_objasniajace.rynki_plansza import period_text, plansza as rynki_plansza
 
 
 # ============================================================
@@ -378,8 +379,16 @@ def main():
         )
 
     if SAVE_PLANSZE and not ok.empty:
+        plansze_dir = out_dir / f"plansze_{STRATEGY}_{START_DATE}_{END_DATE}"
+        # Plansza „na czym testuję”: aktywa i interwały z podsumowania.
+        rynki_plansza(
+            list(dict.fromkeys(summary["asset"])),
+            list(dict.fromkeys(summary["timeframe"])),
+            plansze_dir / "0_rynki.png",
+            period_text(START_DATE, END_DATE),
+        )
         save_plansze(
-            out_dir / f"plansze_{STRATEGY}_{START_DATE}_{END_DATE}",
+            plansze_dir,
             ok,
             equities,
             title=strategy_name,

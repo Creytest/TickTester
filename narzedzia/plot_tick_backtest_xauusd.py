@@ -548,6 +548,13 @@ def main(
     # Liczone na świecach z rozgrzewką, pokazywane tylko w okresie.
     indicators = strategy_module.indicators(bars_all.copy())
 
+    # indicators()["signal_markers"] = False: bez małych trójkątów
+    # sygnału (strategia oznacza świece sygnałowe sama, np. SFP).
+    show_signals = indicators.get("signal_markers", True)
+    if not show_signals:
+        raw_buy[:] = np.nan
+        raw_sell[:] = np.nan
+
     trend = indicators.get("trend")
 
     if trend is not None:
@@ -1016,6 +1023,7 @@ def main(
                 bars=bars,
                 signals=signals,
                 trades=trades,
+                show_signals=show_signals,
                 trend=trend,
                 panel=panel,
                 panel2=panel2,

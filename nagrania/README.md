@@ -19,4 +19,7 @@ Badania bez jednej strategii: `FormacjeSwiecowe/`, `RSI/`. Wyjątki: `ODCINEK_ST
 Kod zostaje w `narzedzia/`, `analizy/`, `strategies/` — tutaj nie ma plików `.py`.
 Plansze objaśniające robią skrypty z `narzedzia/plansze_objasniajace/` i same zapisują się tutaj.
 
+Ponowny test tych samych aktywów, interwałów i dat nadpisuje pliki w `wyniki/` (nie tworzy nowego folderu).
+Test tylko części aktywów aktualizuje ich wiersze w podsumowaniu i planszach, reszta zostaje z poprzedniego testu.
+
 Stare wyniki z `wyniki/`: `python narzedzia/przenies_wyniki.py` (podgląd), potem `--tak`.

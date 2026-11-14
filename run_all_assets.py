@@ -173,6 +173,8 @@ CHUNK_YEARS = None
 # USA 100 pominięte: dane kończą się w 2014 roku.
 # US500: dane od 2020-11-01.
 # Wszystkie aktywa z narzedzia/tick_config.py: list(ASSETS).
+# BTCUSDT: Binance Futures (pobieranie: narzedzia/binance_ticks.py) zamiast
+# "Bitcoin" z CFD. Strategie z wolumenem na razie zostają na "Bitcoin".
 ASSETS_TO_TEST = ["XAUUSD", "Bitcoin", "EURUSD", "Brent", "US500"]
 
 # Interaktywny wykres HTML (otwierany w przeglądarce)

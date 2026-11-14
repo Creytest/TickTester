@@ -15,7 +15,7 @@ Wszystko do jednego odcinka w jednym miejscu: `nagrania/<Odcinek>/<Strategia>/`.
 
 Odcinek wynika z folderu strategii: `strategies/tiktok/` → `TikTok`, `reddit` → `Reddit`,
 `tradingview` → `TradingView`, `tradingview_porownawcze` → `TradingViewPorownawcze`, `ksiazki` → `Ksiazki`.
-Badania bez jednej strategii: `FormacjeSwiecowe/`, `RSI/`. Wyjątki: `ODCINEK_STRATEGII` w `narzedzia/odcinki.py`.
+Badania bez jednej strategii: `FormacjeSwiecowe/`, `RSI/`, `Trend/` (czy trend istnieje, Murphy). Wyjątki: `ODCINEK_STRATEGII` w `narzedzia/odcinki.py`.
 
 Kod zostaje w `narzedzia/`, `analizy/`, `strategies/` — tutaj nie ma plików `.py`.
 Plansze objaśniające robią skrypty z `narzedzia/plansze_objasniajace/` i same zapisują się tutaj.

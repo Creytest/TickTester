@@ -188,11 +188,11 @@ ZASTEPUJE = {"BTCUSDT": "Bitcoin"}
 SAVE_HTML = True
 SAVE_PNG = False
 
-# Plansze PNG do filmu (1 wykres kapitału, 2 mediany, 3 tabela).
+# Plansze PNG do filmu (0 rynki, 1 mediany, 2 wykres kapitału, 3 tabela).
 SAVE_PLANSZE = True
 
 # Win Rate obiecany przez autora w procentach, np. 90.
-# None: na planszy 2 zamiast Win Rate jest Profit Factor.
+# None: na planszy 1 zamiast Win Rate jest Profit Factor.
 CLAIM_WIN_RATE = None
 
 # Wykresy, transakcje i tabela wyników trafiają do

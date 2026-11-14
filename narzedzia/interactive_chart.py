@@ -626,7 +626,9 @@ def save_interactive_chart(
     )
 
     # Rząd statystyk nad wykresem, jak na wykresie PNG:
-    # szara etykieta, pod nią duża kolorowa wartość.
+    # szara etykieta, pod nią duża kolorowa wartość. Domyślnie
+    # schowany (żeby nie zdradzić wyniku na nagraniu) — przycisk
+    # „Pokaż wyniki” w lewym górnym rogu go odsłania.
     items = _stats_items(stats)
     width = 1 / len(items)
 
@@ -636,17 +638,20 @@ def save_interactive_chart(
             text=label,
             x=center, y=1.115, xref="paper", yref="paper",
             showarrow=False, font=dict(size=12, color="gray"),
+            name="stats", visible=False,
         )
         fig.add_annotation(
             text=f"<b>{value}</b>",
             x=center, y=1.08, xref="paper", yref="paper",
             showarrow=False, font=dict(size=19, color=color),
+            name="stats", visible=False,
         )
 
     fig.add_annotation(
         text="W nawiasach: bez prowizji (gross). Avg trade: % kapitału.",
         x=1, y=1.045, xref="paper", yref="paper", xanchor="right",
         showarrow=False, font=dict(size=10, color="gray"),
+        name="stats", visible=False,
     )
     fig.update_xaxes(showgrid=True, gridcolor="#eee", range=[-1, n])
     # Skalę Y ustawia skrypt poniżej, więc zoom działa tylko w poziomie.
@@ -895,6 +900,30 @@ gd.on('plotly_relayout', function (ev) {
 });
 
 update();
+
+// Przycisk „Pokaż wyniki”: statystyki nad wykresem są domyślnie
+// schowane, żeby nie zdradzić wyniku przed czasem.
+(function () {
+    var idx = [];
+    (gd.layout.annotations || []).forEach(function (a, i) {
+        if (a.name === 'stats') idx.push(i);
+    });
+    if (!idx.length) return;
+    var shown = false;
+    var btn = document.createElement('button');
+    btn.textContent = 'Pokaż wyniki';
+    btn.style.cssText = 'position:fixed;top:8px;left:8px;z-index:1000;' +
+        'padding:4px 10px;font:13px sans-serif;cursor:pointer;' +
+        'background:#fff;border:1px solid #bbb;border-radius:4px;opacity:0.85';
+    btn.onclick = function () {
+        shown = !shown;
+        var rel = {};
+        idx.forEach(function (i) { rel['annotations[' + i + '].visible'] = shown; });
+        Plotly.relayout(gd, rel);
+        btn.textContent = shown ? 'Schowaj wyniki' : 'Pokaż wyniki';
+    };
+    document.body.appendChild(btn);
+})();
 """
 
 

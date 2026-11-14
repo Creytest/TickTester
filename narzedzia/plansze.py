@@ -1,13 +1,14 @@
 """
 Plansze wyników do filmu (PNG 1920×1080, kolory kanału).
 
-1_wykres_kapitalu.png — krzywe kapitału wszystkich kombinacji
-    aktywo × interwał na szaro, mediana grubą linią (zielona
-    na plusie, czerwona na minusie).
-2_mediany.png — trzy duże liczby: ile kombinacji na plusie,
+(0_rynki.png — aktywa i interwały, robi ją run_all_assets.py)
+1_mediany.png — trzy duże liczby: ile kombinacji na plusie,
     mediana Win Rate (z obietnicą autora, jeśli ją podał)
     i mediana Profit Factor. Mediana wyniku netto jest tylko
-    na planszy 1.
+    na planszy 2.
+2_wykres_kapitalu.png — krzywe kapitału wszystkich kombinacji
+    aktywo × interwał na szaro, mediana grubą linią (zielona
+    na plusie, czerwona na minusie).
 3_tabela.png — pełna tabela wyników do pobrania z opisu.
 
 Fonty: Anton (nagłówki, liczby) i Inter (reszta). Jeśli nie są
@@ -83,17 +84,22 @@ def save_plansze(
     subtitle = f"{combinations_text(data)}  |  {period}  |  po kosztach"
 
     paths = [
-        folder / "1_wykres_kapitalu.png",
-        folder / "2_mediany.png",
+        folder / "1_mediany.png",
+        folder / "2_wykres_kapitalu.png",
         folder / "3_tabela.png",
     ]
+
+    # Stare nazwy (do 2026-11-14 wykres był pierwszy) — usuwamy,
+    # żeby w folderze nie zostały dwie plansze z tym samym numerem.
+    for old in ("1_wykres_kapitalu.png", "2_mediany.png"):
+        (folder / old).unlink(missing_ok=True)
 
     # mplfinance (wykresy pojedynczych testów) zmienia globalne
     # ustawienia Matplotlib, np. włącza pionową siatkę. Plansze
     # rysujemy więc na ustawieniach domyślnych.
     with plt.style.context("default"):
-        _equity_chart(paths[0], data, equities, title, subtitle)
-        _medians(paths[1], data, title, subtitle, claim_win_rate)
+        _medians(paths[0], data, title, subtitle, claim_win_rate)
+        _equity_chart(paths[1], data, equities, title, subtitle)
         _table(paths[2], data, title, subtitle, costs)
 
     return paths
@@ -192,7 +198,7 @@ def _medians(path, data, title, subtitle, claim_win_rate):
     win_rate = float(data["win_rate_%"].astype(float).median())
     profit_factor = float(data["profit_factor"].astype(float).median())
 
-    # Mediana wyniku netto jest już na planszy 1, więc tu jej
+    # Mediana wyniku netto jest na planszy 2, więc tu jej
     # nie powtarzamy. Win Rate bez obietnicy autora jest szary
     # — sam w sobie nie mówi, czy strategia zarabia.
     if claim_win_rate is not None:

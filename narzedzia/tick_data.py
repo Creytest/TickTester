@@ -33,7 +33,9 @@ def tick_files(file_path: str | Path) -> list[Path]:
     return files
 
 
-def _signature(file_path: str | Path, reverse_bid_ask: bool) -> str:
+def _signature(
+    file_path: str | Path, reverse_bid_ask: bool, volume: bool = False
+) -> str:
     """Nazwa folderu cache — zmienia się razem z plikami danych."""
     files = tick_files(file_path)
     size = sum(file.stat().st_size for file in files)
@@ -41,6 +43,7 @@ def _signature(file_path: str | Path, reverse_bid_ask: bool) -> str:
     return (
         f"{Path(file_path).stem}_{size}_{mtime}"
         f"_{'rev' if reverse_bid_ask else 'norm'}"
+        f"{'_vol' if volume else ''}"
     )
 
 
@@ -86,6 +89,7 @@ def load_ticks(
     reverse_bid_ask: bool = False,
     start_date: str | None = None,
     end_date: str | None = None,
+    volume: bool = False,
 ):
     """
     Wczytuje ticki partiami.
@@ -101,6 +105,13 @@ def load_ticks(
     end_date:
         Opcjonalna data końca, np. "2025-01-01".
         Jest to granica wyłączna.
+
+    volume:
+        True dla plików z prawdziwym wolumenem giełdowym w kolumnach
+        4–5 (wolumen sprzedających i kupujących, np. z
+        narzedzia/binance_ticks.py): dodaje kolumnę volume (float32)
+        z ich sumą. W plikach Tickstory/Dukascopy te kolumny to nie
+        wolumen transakcji, więc dla CFD zostaje False.
 
     Pliki muszą być uporządkowane chronologicznie,
     aby można było przerwać odczyt po end_date.
@@ -137,6 +148,13 @@ def load_ticks(
         chunk = chunk.dropna(
             subset=["timestamp", "bid", "ask"]
         )
+
+        if volume:
+            # float32: 4 bajty na tick zamiast 16 na dwie kolumny.
+            chunk["volume"] = (
+                chunk["extra_1"].fillna(0.0) + chunk["extra_2"].fillna(0.0)
+            ).astype("float32")
+            chunk = chunk.drop(columns=["extra_1", "extra_2"])
 
         if reverse_bid_ask:
             chunk[["bid", "ask"]] = (
@@ -175,11 +193,17 @@ def load_ticks(
                 header=None,
                 skiprows=header,
                 names=COLUMNS,
-                usecols=["timestamp", "bid", "ask"],
+                usecols=["timestamp", "bid", "ask"]
+                + (["extra_1", "extra_2"] if volume else []),
                 dtype={
                     "timestamp": "string",
                     "bid": "float64",
                     "ask": "float64",
+                    **(
+                        {"extra_1": "float64", "extra_2": "float64"}
+                        if volume
+                        else {}
+                    ),
                 },
                 chunksize=chunksize or 1_000_000,
                 skip_blank_lines=True,
@@ -229,7 +253,7 @@ def load_ticks(
                     yield result
 
     if chunksize is None:
-        return _concat_ticks(list(prepared_chunks()))
+        return _concat_ticks(list(prepared_chunks()), volume)
 
     return prepared_chunks()
 
@@ -241,10 +265,14 @@ def load_ticks_cached(
     end_date: str | None = None,
     cache_dir: str | Path | None = None,
     chunksize: int = 1_000_000,
+    volume: bool = False,
 ) -> pd.DataFrame:
     """
     Jak load_ticks, ale zwraca jeden DataFrame i zapisuje
     przetworzone ticki na dysku w podziale na lata.
+
+    volume=True: także kolumna volume (patrz load_ticks), w osobnym
+    folderze cache.
 
     Pierwsze wczytanie danego roku czyta CSV, kolejne ładują
     gotowy plik .pkl w kilka sekund. Pamięć podręczna jest
@@ -263,8 +291,9 @@ def load_ticks_cached(
             reverse_bid_ask=reverse_bid_ask,
             start_date=start_date,
             end_date=end_date,
+            volume=volume,
         )
-        return _concat_ticks(list(chunks))
+        return _concat_ticks(list(chunks), volume)
 
     start = pd.Timestamp(start_date)
     end = pd.Timestamp(end_date)
@@ -275,7 +304,7 @@ def load_ticks_cached(
     if cache_dir is None:
         cache_dir = Path(__file__).resolve().parents[1] / "cache"
 
-    signature = _signature(path, reverse_bid_ask)
+    signature = _signature(path, reverse_bid_ask, volume)
     folder = Path(cache_dir) / signature
     folder.mkdir(parents=True, exist_ok=True)
 
@@ -299,6 +328,7 @@ def load_ticks_cached(
             reverse_bid_ask=reverse_bid_ask,
             start_date=f"{min(missing)}-01-01",
             end_date=f"{max(missing) + 1}-01-01",
+            volume=volume,
         )
 
         # Rok zapisujemy, gdy tylko się skończy, i zwalniamy jego
@@ -309,7 +339,7 @@ def load_ticks_cached(
 
         def flush():
             if buffer_year in missing:
-                part = _concat_ticks(buffer)
+                part = _concat_ticks(buffer, volume)
                 part.to_pickle(folder / f"{buffer_year}.pkl")
 
         for chunk in chunks:
@@ -329,10 +359,10 @@ def load_ticks_cached(
         # puste, żeby nie czytać CSV przy każdym uruchomieniu.
         for year in missing:
             if not (folder / f"{year}.pkl").is_file():
-                _concat_ticks([]).to_pickle(folder / f"{year}.pkl")
+                _concat_ticks([], volume).to_pickle(folder / f"{year}.pkl")
 
     parts = [pd.read_pickle(folder / f"{year}.pkl") for year in years]
-    ticks = _concat_ticks(parts)
+    ticks = _concat_ticks(parts, volume)
 
     mask = (ticks["timestamp"] >= start) & (ticks["timestamp"] < end)
     return ticks.loc[mask].reset_index(drop=True)
@@ -386,16 +416,19 @@ def daily_max_bid(
     return daily
 
 
-def _concat_ticks(chunks: list[pd.DataFrame]) -> pd.DataFrame:
+def _concat_ticks(
+    chunks: list[pd.DataFrame], volume: bool = False
+) -> pd.DataFrame:
     chunks = [chunk for chunk in chunks if not chunk.empty]
 
     if not chunks:
-        return pd.DataFrame(
-            {
-                "timestamp": pd.Series(dtype="datetime64[ns]"),
-                "bid": pd.Series(dtype="float64"),
-                "ask": pd.Series(dtype="float64"),
-            }
-        )
+        empty = {
+            "timestamp": pd.Series(dtype="datetime64[ns]"),
+            "bid": pd.Series(dtype="float64"),
+            "ask": pd.Series(dtype="float64"),
+        }
+        if volume:
+            empty["volume"] = pd.Series(dtype="float32")
+        return pd.DataFrame(empty)
 
     return pd.concat(chunks, ignore_index=True)

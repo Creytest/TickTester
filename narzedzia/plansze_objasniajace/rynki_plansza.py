@@ -30,6 +30,7 @@ TF = "Anton"
 ASSET_CARDS = {
     "XAUUSD": ("XAUUSD", "Złoto", "metal"),
     "Bitcoin": ("BTCUSD", "Bitcoin", "kryptowaluta"),
+    "BTCUSDT": ("BTCUSDT", "Bitcoin", "Binance Futures"),
     "EURUSD": ("EURUSD", "Euro / dolar", "forex"),
     "Brent": ("BRENT", "Ropa Brent", "surowiec"),
     "US500": ("US500", "S&P 500", "indeks akcji"),

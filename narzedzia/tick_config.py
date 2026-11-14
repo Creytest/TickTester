@@ -26,12 +26,18 @@ ASSETS = {
     ),
     # Binance Futures BTCUSDT (perpetual): folder z plikiem na miesiąc,
     # pobierany przez narzedzia/binance_ticks.py (GMT+2 z US-DST, od 2020-09).
-    # Wolumen świec = liczba ticków, a nie wolumen Binance — strategie
-    # z wolumenem na razie licz na "Bitcoin".
+    # Prawdziwy wolumen Binance — patrz REAL_VOLUME.
     "BTCUSDT": Path(
         r"D:\Tickdata\Binance_Futures\BTCUSDT"
     ),
 }
+
+# Aktywa z prawdziwym wolumenem giełdowym w plikach (kolumny 4–5:
+# wolumen sprzedających i kupujących z narzedzia/binance_ticks.py).
+# Wolumen świecy to wtedy suma wolumenu transakcji, a nie liczba
+# ticków — jak na wykresie Binance w TradingView. Pozostałe aktywa
+# (CFD) nie mają wolumenu giełdy, więc liczą ticki.
+REAL_VOLUME = {"BTCUSDT"}
 
 # True oznacza, że plik zapisuje najpierw wyższą cenę,
 # a potem niższą. W loaderze zamienimy je na Bid i Ask.

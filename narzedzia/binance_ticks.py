@@ -24,9 +24,8 @@ narzedzia/tick_data.py czyta go bez zmian):
   w danych CFD, więc pamięci wystarczy.
 - Sell/Buy volume: wolumen BTC z inicjatywy sprzedających
   i kupujących w danej sekundzie, zapisany przy jej ostatnim ticku.
-  TickTester na razie go nie czyta (wolumen świecy = liczba ticków,
-  co po ścięciu do 1 s jest prawie stałe) — strategie z wolumenem
-  liczyć na BTCUSDT dopiero po dodaniu jego obsługi w silniku.
+  TickTester sumuje je w wolumen świec (REAL_VOLUME w tick_config.py),
+  więc wolumen i VWAP są jak na wykresie Binance w TradingView.
 - Czas: GMT+2 z czasem letnim USA (= Nowy Jork + 7 h), tak jak
   pozostałe dane. Strategie z godzinami sesji (np. EMA 9/19 od 16:30)
   zakładają ten czas. W noc końca czasu letniego (listopad) dwie

@@ -175,7 +175,8 @@ def run_backtest(
     wywołaniu.
 
     Strategia otrzymuje świece Bid OHLC z kolumną volume (liczba
-    ticków) i zwraca kolumny: buy, sell oraz opcjonalnie stop_loss
+    ticków albo prawdziwy wolumen, gdy ticki mają kolumnę volume)
+    i zwraca kolumny: buy, sell oraz opcjonalnie stop_loss
     i take_profit.
 
     Opcjonalne kolumny trail_long / trail_short włączają stop

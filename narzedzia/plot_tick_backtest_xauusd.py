@@ -13,6 +13,7 @@ sys.path.insert(0, str(_Path(__file__).resolve().parents[1]))
 
 from narzedzia.tick_config import (
     ASSETS,
+    REAL_VOLUME,
     REVERSE_BID_ASK,
     INITIAL_CAPITAL,
     COMMISSION,
@@ -88,6 +89,8 @@ def load_period_ticks(
         reverse_bid_ask=REVERSE_BID_ASK[asset],
         start_date=start.strftime("%Y-%m-%d"),
         end_date=end.strftime("%Y-%m-%d"),
+        # Prawdziwy wolumen giełdy (BTCUSDT z Binance) zamiast liczby ticków.
+        volume=asset in REAL_VOLUME,
     )
 
 

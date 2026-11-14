@@ -14,13 +14,16 @@ def build_bars(tick_chunks, timeframe: str) -> pd.DataFrame:
     """
     Generuje świece OHLC na podstawie cen Bid oraz kolumnę volume:
     liczbę ticków w świecy (wolumen tickowy, jak w TradingView
-    dla rynków bez wolumenu giełdowego).
+    dla rynków bez wolumenu giełdowego). Gdy ticki mają kolumnę
+    volume (prawdziwy wolumen giełdy, np. BTCUSDT z Binance),
+    volume świecy to jej suma.
 
     Kolumna delta: wolumen świec 1-minutowych wzrostowych minus
     spadkowych w obrębie świecy, jak request.security_lower_tf
     w Volume Delta Candles [LuxAlgo].
 
-    tick_chunks: iterator DataFrame z kolumnami timestamp, bid, ask.
+    tick_chunks: iterator DataFrame z kolumnami timestamp, bid, ask
+    (opcjonalnie volume).
     timeframe: np. '1min', '5min', '15min', '30min', '1h'.
 
     Przetwarza dane partiami i zachowuje ticki ostatniej,
@@ -42,27 +45,35 @@ def build_bars(tick_chunks, timeframe: str) -> pd.DataFrame:
         if not chunk["timestamp"].is_monotonic_increasing:
             chunk = chunk.sort_values("timestamp", kind="stable")
 
-        chunk = pd.Series(
-            chunk["bid"].to_numpy(),
-            index=pd.DatetimeIndex(chunk["timestamp"]),
-            name="bid",
-        ).rename_axis("timestamp")
-        grouped = _ohlc_volume(chunk, timeframe)
+        index = pd.DatetimeIndex(chunk["timestamp"], name="timestamp")
+        volume = (
+            pd.Series(chunk["volume"].to_numpy(), index=index, name="volume")
+            if "volume" in chunk.columns
+            else None
+        )
+        chunk = pd.Series(chunk["bid"].to_numpy(), index=index, name="bid")
+        grouped = _ohlc_volume(chunk, timeframe, volume)
 
         if grouped.empty:
-            pending = chunk.reset_index()
+            pending = _pending(chunk, volume)
             continue
 
         last_bar_start = grouped.index[-1]
-        pending = chunk.loc[chunk.index >= last_bar_start].reset_index()
+        keep = chunk.index >= last_bar_start
+        pending = _pending(
+            chunk[keep], None if volume is None else volume[keep]
+        )
 
         finished_bars = grouped.iloc[:-1]
         if not finished_bars.empty:
             completed.append(finished_bars)
 
     if pending is not None and not pending.empty:
+        pending = pending.set_index("timestamp")
         final = _ohlc_volume(
-            pending.set_index("timestamp")["bid"], timeframe
+            pending["bid"],
+            timeframe,
+            pending["volume"] if "volume" in pending.columns else None,
         )
         if not final.empty:
             completed.append(final)
@@ -77,18 +88,41 @@ def build_bars(tick_chunks, timeframe: str) -> pd.DataFrame:
     return result.sort_index()
 
 
-def _ohlc_volume(bid: pd.Series, timeframe: str) -> pd.DataFrame:
-    """Świece OHLC z cen Bid i liczba ticków; bez pustych świec."""
+def _pending(bid: pd.Series, volume: pd.Series | None) -> pd.DataFrame:
+    """Ticki niedokończonej świecy (timestamp, bid, ewentualnie volume)."""
+    pending = bid.to_frame()
+    if volume is not None:
+        pending["volume"] = volume.to_numpy()
+    return pending.reset_index()
+
+
+def _ohlc_volume(
+    bid: pd.Series, timeframe: str, volume: pd.Series | None = None
+) -> pd.DataFrame:
+    """
+    Świece OHLC z cen Bid i wolumen: liczba ticków albo, gdy podano
+    volume (wolumen każdego ticku), jego suma. Bez pustych świec.
+    """
     resampled = bid.resample(timeframe)
     bars = resampled.ohlc()
-    bars["volume"] = resampled.count().astype(float)
 
     # Delta z niższego interwału: 1 minuta (albo sam interwał,
     # jeśli jest krótszy), świeca wzrostowa +wolumen, spadkowa −.
     ltf = min(pd.Timedelta(timeframe), pd.Timedelta("1min"))
     minutes = bid.resample(ltf).agg(["first", "last", "count"])
+
+    if volume is None:
+        bars["volume"] = resampled.count().astype(float)
+        weight = minutes["count"]
+    else:
+        # Najpierw sumy minutowe (float64), z nich wolumen świecy.
+        weight = volume.resample(ltf).sum().astype(float)
+        bars["volume"] = (
+            weight.resample(timeframe).sum().reindex(bars.index).fillna(0.0)
+        )
+
     direction = np.sign(minutes["last"] - minutes["first"]).fillna(0)
-    signed = (direction * minutes["count"]).resample(timeframe).sum()
+    signed = (direction * weight).resample(timeframe).sum()
     bars["delta"] = signed.reindex(bars.index).fillna(0.0)
 
     return bars.dropna()

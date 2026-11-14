@@ -172,10 +172,16 @@ CHUNK_YEARS = None
 
 # USA 100 pominięte: dane kończą się w 2014 roku.
 # US500: dane od 2020-11-01.
+# BTCUSDT: Binance Futures z prawdziwym wolumenem (pobieranie:
+# narzedzia/binance_ticks.py) zamiast "Bitcoin" z CFD.
 # Wszystkie aktywa z narzedzia/tick_config.py: list(ASSETS).
-# BTCUSDT: Binance Futures (pobieranie: narzedzia/binance_ticks.py) zamiast
-# "Bitcoin" z CFD. Strategie z wolumenem na razie zostają na "Bitcoin".
-ASSETS_TO_TEST = ["XAUUSD", "Bitcoin", "EURUSD", "Brent", "US500"]
+ASSETS_TO_TEST = ["XAUUSD", "BTCUSDT", "EURUSD", "Brent", "US500"]
+
+# Aktywo, które zastępuje inne w podsumowaniu: gdy policzy się
+# kombinacja BTCUSDT, stary wiersz "Bitcoin" (CFD) z tym samym
+# interwałem znika z poprzedniego podsumowania, a BTCUSDT zajmuje
+# jego miejsce. Dzięki temu test samego BTCUSDT nie daje 18 kombinacji.
+ZASTEPUJE = {"BTCUSDT": "Bitcoin"}
 
 # Interaktywny wykres HTML (otwierany w przeglądarce)
 # i/lub statyczny obrazek PNG dla każdej kombinacji.
@@ -365,9 +371,12 @@ def main():
 
     summary.to_csv(table, index=False, sep=";", decimal=",")
 
+    # Koszty wszystkich aktywów w podsumowaniu (także tych
+    # z poprzedniego testu, gdy teraz liczyło się tylko część).
     costs = "spread z danych + prowizja " + ", ".join(
         f"{asset} {COMMISSION[asset] * 100:.4g}%"
-        for asset in assets
+        for asset in dict.fromkeys(summary["asset"])
+        if asset in COMMISSION
     ) + " za stronę + 1 tick poślizgu (przybliżone)"
 
     ok = summary[summary["status"] == "OK"]
@@ -447,6 +456,16 @@ def _merge_previous(summary, table, out_dir, equities):
 
     old = pd.read_csv(table, sep=";", decimal=",")
     done = set(zip(summary.get("asset", []), summary.get("timeframe", [])))
+
+    # Policzone kombinacje aktywa zastępującego (np. BTCUSDT) usuwają
+    # stare wiersze aktywa zastępowanego (Bitcoin z CFD).
+    if "status" in summary.columns:
+        for asset, timeframe, status in zip(
+            summary["asset"], summary["timeframe"], summary["status"]
+        ):
+            if status == "OK" and asset in ZASTEPUJE:
+                done.add((ZASTEPUJE[asset], timeframe))
+
     keep = old[[
         (asset, timeframe) not in done
         for asset, timeframe in zip(old["asset"], old["timeframe"])
@@ -470,8 +489,23 @@ def _merge_previous(summary, table, out_dir, equities):
     merged = pd.concat([summary, keep], ignore_index=True)
     if "trades" in merged.columns:
         merged["trades"] = pd.to_numeric(merged["trades"], errors="coerce").astype("Int64")
-    # Kolejność jak w ustawieniach: aktywa, potem interwały.
-    order_a = {a: i for i, a in enumerate(ASSETS_TO_TEST)}
+    # Kolejność: aktywa, potem interwały. Gdy test objął wszystkie
+    # aktywa podsumowania — jak w ASSETS_TO_TEST. Przy teście części
+    # aktywów — jak w poprzednim podsumowaniu (aktywo zastępujące,
+    # np. BTCUSDT, na miejscu zastępowanego), nowe aktywa na końcu.
+    assets = list(dict.fromkeys(merged["asset"]))
+    if set(assets) <= set(ASSETS_TO_TEST):
+        names = list(ASSETS_TO_TEST)
+    else:
+        replaced_by = {old_asset: new for new, old_asset in ZASTEPUJE.items()}
+        names = [
+            replaced_by[a]
+            if a in replaced_by and a not in assets and replaced_by[a] in assets
+            else a
+            for a in old["asset"]
+        ]
+        names = list(dict.fromkeys(names + list(ASSETS_TO_TEST)))
+    order_a = {a: i for i, a in enumerate(names)}
     order_t = {t: i for i, t in enumerate(TIMEFRAMES_TO_TEST)}
     merged = merged.sort_values(
         by=["asset", "timeframe"],

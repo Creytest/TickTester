@@ -24,6 +24,13 @@ ASSETS = {
     "US500": Path(
         r"D:\Ticksy\USA500IDXUSD"
     ),
+    # Binance Futures BTCUSDT (perpetual): folder z plikiem na miesiąc,
+    # pobierany przez narzedzia/binance_ticks.py (GMT+2 z US-DST, od 2020-09).
+    # Wolumen świec = liczba ticków, a nie wolumen Binance — strategie
+    # z wolumenem na razie licz na "Bitcoin".
+    "BTCUSDT": Path(
+        r"D:\Tickdata\Binance_Futures\BTCUSDT"
+    ),
 }
 
 # True oznacza, że plik zapisuje najpierw wyższą cenę,
@@ -35,6 +42,7 @@ REVERSE_BID_ASK = {
     "EURUSD": True,
     "Brent": True,
     "US500": False,  # kolumny: Bid, Ask
+    "BTCUSDT": False,  # kolumny: Bid, Ask
 }
 
 TIMEFRAMES = {
@@ -63,6 +71,7 @@ COMMISSION = {
     "EURUSD": 0.000035,
     "Brent": 0.000035,
     "US500": 0.000035,
+    "BTCUSDT": 0.0005,  # Binance Futures: taker 0,05% za stronę (spread 1 tick jest w danych)
 }
 
 # Najmniejsza zmiana ceny; poślizg = SLIPPAGE_TICKS * TICK_SIZE.
@@ -73,4 +82,5 @@ TICK_SIZE = {
     "EURUSD": 0.00001,
     "Brent": 0.001,
     "US500": 0.01,
+    "BTCUSDT": 0.1,  # tick BTCUSDT Perpetual
 }

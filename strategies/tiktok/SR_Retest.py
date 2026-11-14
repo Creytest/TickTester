@@ -56,9 +56,11 @@ def support_resistance(bars: pd.DataFrame) -> pd.DataFrame:
     Wsparcie odwrotnie, z low.
 
     Wybicie: zamknięcie nad oporem. Retest: w ciągu 5 kolejnych
-    świec low dotyka poziomu, a świeca zamyka się nad nim — to
-    sygnał long. Bez retestu w 5 świec sygnał przepada. Short
-    lustrzanie przez wsparcie.
+    świec low dochodzi do poziomu (z tą samą tolerancją 0,25 ATR co
+    dotknięcia oporu), a świeca zamyka się nad nim — to sygnał long.
+    Zamknięcie z powrotem pod poziomem kasuje wybicie (nieudane
+    wybicie, a nie retest). Bez retestu w 5 świec sygnał przepada.
+    Short lustrzanie przez wsparcie.
 
     Wyjście: kolumny resistance, support (aktywny poziom, także
     w oknie retestu), break_up, break_down, retest_up,
@@ -97,11 +99,18 @@ def support_resistance(bars: pd.DataFrame) -> pd.DataFrame:
             if n <= state["until"]:
                 level = state["retest"]
                 level_out[n] = level
-                touched = low[n] <= level if sign > 0 else high[n] >= level
+                near = tol[n] if not np.isnan(tol[n]) else 0.0
+                touched = (
+                    low[n] <= level + near if sign > 0 else high[n] >= level - near
+                )
                 held = close[n] > level if sign > 0 else close[n] < level
 
                 if touched and held:
                     retest_out[n] = True
+                    state["until"] = -1
+                elif not held:
+                    # Zamknięcie z powrotem po drugiej stronie poziomu =
+                    # wybicie nieudane, nie czekamy dalej na retest.
                     state["until"] = -1
                 return
 

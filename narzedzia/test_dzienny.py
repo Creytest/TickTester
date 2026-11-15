@@ -1,7 +1,7 @@
 """
 Test strategii na długiej historii świec dziennych (bez ticków).
 
-Dane: narzedzia/swiece_dzienne.py (Stooq, Binance, Dukascopy d1, własny CSV)
+Dane: narzedzia/swiece_dzienne.py (Yahoo, ticki z D:\\Tickdata, Binance, Dukascopy d1, CSV)
 — pobierają się w sekundy, a nie dniami jak ticki. Silnik i statystyki
 te same co w run_all_assets.py (10 000 USD, 1% ryzyka przy SL, bez SL
 EQUITY_FRACTION strategii, kapitalizacja, 1 tick poślizgu, prowizja),

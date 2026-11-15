@@ -26,22 +26,29 @@ _COLUMNS = {
     "low": "low", "najnizszy": "low", "najniższy": "low",
     "close": "close", "zamkniecie": "close", "zamknięcie": "close",
     "adj close": "adj_close",
+    "volume": "volume", "wolumen": "volume",
 }
 
 
 def load_daily_csv(path) -> pd.DataFrame:
-    """CSV z cenami dziennymi → DataFrame (indeks: data; kolumny open/high/low/close)."""
+    """
+    CSV z cenami dziennymi → DataFrame (indeks: data; kolumny
+    open/high/low/close i volume, jeśli są w pliku). Data może być
+    też znacznikiem czasu w ms (kolumna timestamp, np. dukascopy-node).
+    """
     path = Path(path)
     if not path.exists():
         raise FileNotFoundError(f"brak pliku {path}")
     df = pd.read_csv(path, sep=None, engine="python")
     df.columns = [_COLUMNS.get(str(c).strip().lower(), str(c).strip().lower()) for c in df.columns]
-    if "date" not in df or "close" not in df:
+    if ("date" not in df and "timestamp" not in df) or "close" not in df:
         raise ValueError(f"{path.name}: potrzebne kolumny daty i zamknięcia, są {list(df.columns)}")
+    if "date" not in df and "timestamp" in df:
+        df["date"] = pd.to_datetime(df.pop("timestamp"), unit="ms")
     df["date"] = pd.to_datetime(df["date"])
     df = df.set_index("date").sort_index()
     df = df[~df.index.duplicated(keep="last")]
-    cols = [c for c in ("open", "high", "low", "close") if c in df]
+    cols = [c for c in ("open", "high", "low", "close", "volume") if c in df]
     df = df[cols].apply(pd.to_numeric, errors="coerce")
     return df[df["close"] > 0].dropna(subset=["close"])
 

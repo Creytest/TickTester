@@ -35,6 +35,11 @@ ASSET_CARDS = {
     "Brent": ("BRENT", "Ropa Brent", "surowiec"),
     "US500": ("US500", "S&P 500", "indeks akcji"),
     "USA 100": ("US100", "Nasdaq 100", "indeks akcji"),
+    # Świece dzienne z narzedzia/swiece_dzienne.py (test_dzienny.py).
+    "QQQ": ("QQQ", "Nasdaq 100", "ETF"),
+    "SPY": ("SPY", "S&P 500", "ETF"),
+    "BTCUSDT Spot": ("BTCUSDT", "Bitcoin", "Binance Spot"),
+    "BTCUSD": ("BTCUSD", "Bitcoin", "kryptowaluta"),
 }
 MONTHS = ["stycznia", "lutego", "marca", "kwietnia", "maja", "czerwca", "lipca",
           "sierpnia", "września", "października", "listopada", "grudnia"]

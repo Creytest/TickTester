@@ -75,6 +75,9 @@ def ssl_ifvg(bars: pd.DataFrame) -> pd.DataFrame:
     bias = np.zeros(size)
     bear_fvgs = []   # (świeca, góra, dół)
     bull_fvgs = []
+    # FVG zakończone sygnałem: (świeca luki, świeca wejścia, góra,
+    # dół, 1 long / -1 short) — tylko do rysowania stref.
+    signal_zones = []
 
     for n in range(size):
         # ---------------- Płynność i sweep ----------------
@@ -125,6 +128,7 @@ def ssl_ifvg(bars: pd.DataFrame) -> pd.DataFrame:
                 newest = max(inverted, key=lambda f: f[0])
                 long[n] = True
                 stop[n] = newest[2]
+                signal_zones.append((newest[0] - 1, n, newest[1], newest[2], 1))
 
         inverted = [f for f in bull_fvgs if f[0] < n and close[n] < f[2]]
         if inverted:
@@ -133,6 +137,7 @@ def ssl_ifvg(bars: pd.DataFrame) -> pd.DataFrame:
                 newest = max(inverted, key=lambda f: f[0])
                 short[n] = True
                 stop[n] = newest[1]
+                signal_zones.append((newest[0] - 1, n, newest[1], newest[2], -1))
 
         if bear_fvgs:
             bear_top[n], bear_bottom[n] = bear_fvgs[-1][1:]
@@ -146,7 +151,7 @@ def ssl_ifvg(bars: pd.DataFrame) -> pd.DataFrame:
     confirmed = np.flatnonzero(~np.isnan(pl))
     pivot_low_at[confirmed - PIVOT_RIGHT] = pl[confirmed]
 
-    return pd.DataFrame(
+    result = pd.DataFrame(
         {
             "long": long,
             "short": short,
@@ -165,6 +170,8 @@ def ssl_ifvg(bars: pd.DataFrame) -> pd.DataFrame:
         },
         index=bars.index,
     )
+    result.attrs["signal_zones"] = signal_zones
+    return result
 
 
 def generate_signals(bars: pd.DataFrame, rr_ratio: float = 2.0) -> pd.DataFrame:
@@ -201,24 +208,28 @@ def generate_signals(bars: pd.DataFrame, rr_ratio: float = 2.0) -> pd.DataFrame:
 
 def indicators(bars: pd.DataFrame) -> dict:
     """
-    Płynność: SSL żółta, BSL pomarańczowa. FVG, które mogą dać
-    sygnał (spadkowy przy biasie long — fioletowy, wzrostowy przy
-    biasie short — turkusowy), górna i dolna krawędź. Pivoty jako
-    kropki, „S” przy sweepie. Panel: bias (1 long, -1 short).
+    Płynność: SSL żółta, BSL pomarańczowa. FVG, które dały sygnał
+    (IFVG), jako strefa od świecy luki do świecy wejścia: spadkowy
+    odwrócony w long — fioletowy, wzrostowy odwrócony w short —
+    turkusowy. Pivoty jako kropki, „S” przy sweepie. Panel: bias
+    (1 long, -1 short).
     """
     setup = ssl_ifvg(bars)
-    long_bias = setup["bias"] > 0
-    short_bias = setup["bias"] < 0
+    idx = bars.index
+    zones = [
+        (
+            idx[start], idx[end], top, bottom,
+            "rgba(179,136,255,0.45)" if side > 0 else "rgba(29,233,182,0.45)",
+        )
+        for start, end, top, bottom, side in setup.attrs["signal_zones"]
+    ]
 
     return {
         "trend": None,
+        "zones": zones,
         "overlays": [
             ("SSL (płynność pod dołkiem)", _split(setup["ssl"]), "#FFC107"),
             ("BSL (płynność nad szczytem)", _split(setup["bsl"]), "#FF6D00"),
-            ("FVG spadkowy", _split(setup["bear_top"].where(long_bias)), "#B388FF"),
-            ("FVG spadkowy — dół", _split(setup["bear_bottom"].where(long_bias)), "#B388FF"),
-            ("FVG wzrostowy", _split(setup["bull_top"].where(short_bias)), "#1DE9B6"),
-            ("FVG wzrostowy — dół", _split(setup["bull_bottom"].where(short_bias)), "#1DE9B6"),
         ],
         "markers": [
             ("Pivot high", setup["pivot_high"], "#FF6D00", "above"),

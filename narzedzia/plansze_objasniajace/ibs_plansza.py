@@ -93,21 +93,29 @@ def main():
     fig = figure()
     segment_ibs(fig)
 
-    # 2. wejście
-    s = Seg(fig, 1, "2. WEJŚCIE LONG", "Zamknięcie dnia pod progiem (mocny spadek)\ni jednocześnie IBS < 0,3", n, (lo, hi), right=9)
+    # 2. wejście — własna skala (tylko świece do wejścia), żeby spadek był duży i czytelny
+    lo2, hi2 = ylim_of(B, SIG + 1, extra=[band[SIG]], pad=0.16)
+    s = Seg(fig, 1, "2. MOCNY SPADEK = LONG",
+            "Spadek od szczytu z 10 dni o ponad 2,5 typowego dnia\n"
+            "i zamknięcie przy dołku dnia (IBS < 0,3)", n, (lo2, hi2), right=9)
     s.candles(B, SIG + 1, {SIG: GREEN})
     x1 = SIG - 9
     s.level(hh[SIG], x1 - 0.4, SIG + 0.6, BLUE, ls="-", lw=2.6)
-    s.ax.text(x1 - 0.4, hh[SIG] + s.dy * 0.6, "najwyższy high z 10 dni", color=BLUE, fontsize=16,
+    s.ax.text(x1 - 0.4, hh[SIG] + s.dy * 0.6, "szczyt z ostatnich 10 dni", color=BLUE, fontsize=16,
               fontweight="bold", va="bottom", zorder=6)
     s.level(band[SIG], x1 - 0.4, SIG + 0.6, YELLOW, "PRÓG", lw=2.6, above=False, size=18)
-    xa = SIG + 5.2
-    s.ax.add_patch(FancyArrowPatch((xa, hh[SIG]), (xa, band[SIG]), arrowstyle="<->", mutation_scale=18,
-                                   color=YELLOW, lw=2.2, zorder=6))
-    s.ax.text(xa + 0.5, (hh[SIG] + band[SIG]) / 2, "2,5 × średni\nzakres dnia\n(high − low)\nz 25 dni",
-              color=YELLOW, fontsize=15, va="center", linespacing=1.3, zorder=6)
+    # linijka z „typowych dni”: 2 pełne klocki + pół klocka = 2,5 × średni zakres dnia
+    r, xb = rng[SIG], SIG + 4.6
+    for k, frac in enumerate((1, 1, 0.5)):
+        top = hh[SIG] - k * r
+        s.ax.add_patch(Rectangle((xb - 0.45, top - frac * r), 0.9, frac * r, facecolor=YELLOW,
+                                 alpha=0.85 if k % 2 == 0 else 0.45, edgecolor=BG, lw=2, zorder=5))
+    s.ax.text(xb + 0.8, hh[SIG] - r / 2, "1 typowy dzień", color=YELLOW, fontsize=15, fontweight="bold",
+              va="center", zorder=6)
+    s.ax.text(xb + 0.8, hh[SIG] - 1.5 * r, "2", color=YELLOW, fontsize=15, fontweight="bold", va="center", zorder=6)
+    s.ax.text(xb + 0.8, hh[SIG] - 2.25 * r, "2,5 = próg", color=YELLOW, fontsize=15, fontweight="bold", va="center", zorder=6)
+    s.note("typowy dzień = średni ruch high−low z 25 dni\nwejście na otwarciu następnego dnia", y=lo2, size=15)
     s.entry(SIG, B[SIG][3], GREEN, f"long\nIBS = {ibs(B[SIG]):.2f}".replace(".", ","))
-    s.note("wejście na otwarciu następnego dnia", y=lo)
 
     # 3. wyjście
     s = Seg(fig, 2, "3. WYJŚCIE", "Pierwsze zamknięcie nad wczorajszym high.\nBez SL i TP (tak jak u autora)", n, (lo, hi), right=9)

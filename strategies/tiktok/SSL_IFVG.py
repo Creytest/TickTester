@@ -27,6 +27,7 @@ def ssl_ifvg(bars: pd.DataFrame) -> pd.DataFrame:
     Sweep SSL: low świecy schodzi pod ostatni pivot low (3 świece
     w lewo, 3 w prawo — znany 3 świece po dołku), a zamknięcie
     wraca nad niego. Od tej świecy przez 30 świec bias = long.
+    Liczą się tylko FVG domknięte po świecy sweepu (jak na filmie).
     Zamknięcie pod dołkiem to zwykłe przebicie, nie sweep.
     Zamknięcie pod low świecy sweepu kasuje bias (sweep się nie
     udał, cena idzie niżej).
@@ -34,13 +35,19 @@ def ssl_ifvg(bars: pd.DataFrame) -> pd.DataFrame:
     FVG spadkowy: high świecy n jest pod low świecy n-2 (knoty
     1. i 3. świecy się nie stykają). Luka: od high[n] do low[n-2].
 
+    Wypełniona luka (ICT): jeśli świeca dojdzie knotem do górnej
+    krawędzi spadkowego FVG, ale zamknie się nie wyżej, luka jest
+    zużyta i znika — nie da już sygnału. Częściowe wejście w lukę
+    jej nie kasuje.
+
     IFVG: zamknięcie nad górną krawędzią spadkowego FVG z ostatnich
-    30 świec, jeszcze nieodwróconego. Przy biasie long to sygnał
-    long, SL pod dolną krawędzią luki. Odwrócony FVG znika.
+    30 świec, jeszcze nieodwróconego i niewypełnionego. Przy biasie
+    long to sygnał long, SL pod low świecy wejścia (czerwone pole na
+    filmie kończy się tuż pod nią). Odwrócony FVG znika.
 
     Short lustrzanie: sweep BSL (high nad pivot high, zamknięcie
-    pod nim) i zamknięcie pod dolną krawędzią wzrostowego FVG,
-    SL nad jego górną krawędzią.
+    pod nim), zamknięcie pod dolną krawędzią wzrostowego FVG,
+    SL nad high świecy wejścia.
 
     Wyjście: kolumny long, short, stop (SL sygnału), bias (1 long,
     -1 short, 0 brak), ssl, bsl
@@ -71,6 +78,7 @@ def ssl_ifvg(bars: pd.DataFrame) -> pd.DataFrame:
 
     ssl = bsl = np.nan
     long_until = short_until = -1
+    long_sweep_bar = short_sweep_bar = -1
     sweep_low = sweep_high = np.nan
     bias = np.zeros(size)
     bear_fvgs = []   # (świeca, góra, dół)
@@ -93,6 +101,7 @@ def ssl_ifvg(bars: pd.DataFrame) -> pd.DataFrame:
             if close[n] > ssl:
                 sweep_ssl[n] = True
                 long_until, short_until = n + BIAS_BARS, -1
+                long_sweep_bar = n
                 sweep_low = low[n]
             ssl = np.nan
 
@@ -100,6 +109,7 @@ def ssl_ifvg(bars: pd.DataFrame) -> pd.DataFrame:
             if close[n] < bsl:
                 sweep_bsl[n] = True
                 short_until, long_until = n + BIAS_BARS, -1
+                short_sweep_bar = n
                 sweep_high = high[n]
             bsl = np.nan
 
@@ -119,25 +129,36 @@ def ssl_ifvg(bars: pd.DataFrame) -> pd.DataFrame:
         bear_fvgs = [f for f in bear_fvgs if n - f[0] <= FVG_BARS]
         bull_fvgs = [f for f in bull_fvgs if n - f[0] <= FVG_BARS]
 
-        # ---------------- Inwersja ----------------
+        # ---------------- Inwersja i wypełnienie ----------------
         # Luka utworzona na tej świecy nie może się na niej odwrócić.
+        # Knot do drugiej krawędzi bez zamknięcia za nią = luka
+        # wypełniona (zużyta), znika bez sygnału.
         inverted = [f for f in bear_fvgs if f[0] < n and close[n] > f[1]]
-        if inverted:
-            bear_fvgs = [f for f in bear_fvgs if f not in inverted]
-            if n <= long_until:
-                newest = max(inverted, key=lambda f: f[0])
-                long[n] = True
-                stop[n] = newest[2]
-                signal_zones.append((newest[0] - 1, n, newest[1], newest[2], 1))
+        filled = [f for f in bear_fvgs
+                  if f[0] < n and high[n] >= f[1] and close[n] <= f[1]]
+        if inverted or filled:
+            bear_fvgs = [f for f in bear_fvgs
+                         if f not in inverted and f not in filled]
+        valid = [f for f in inverted if f[0] > long_sweep_bar]
+        if valid and n <= long_until and close[n] > low[n]:
+            newest = max(valid, key=lambda f: f[0])
+            long[n] = True
+            stop[n] = low[n]
+            signal_zones.append((newest[0] - 1, n, newest[1], newest[2], 1))
 
         inverted = [f for f in bull_fvgs if f[0] < n and close[n] < f[2]]
-        if inverted:
-            bull_fvgs = [f for f in bull_fvgs if f not in inverted]
-            if n <= short_until and not long[n]:
-                newest = max(inverted, key=lambda f: f[0])
-                short[n] = True
-                stop[n] = newest[1]
-                signal_zones.append((newest[0] - 1, n, newest[1], newest[2], -1))
+        filled = [f for f in bull_fvgs
+                  if f[0] < n and low[n] <= f[2] and close[n] >= f[2]]
+        if inverted or filled:
+            bull_fvgs = [f for f in bull_fvgs
+                         if f not in inverted and f not in filled]
+        valid = [f for f in inverted if f[0] > short_sweep_bar]
+        if (valid and n <= short_until and not long[n]
+                and close[n] < high[n]):
+            newest = max(valid, key=lambda f: f[0])
+            short[n] = True
+            stop[n] = high[n]
+            signal_zones.append((newest[0] - 1, n, newest[1], newest[2], -1))
 
         if bear_fvgs:
             bear_top[n], bear_bottom[n] = bear_fvgs[-1][1:]
@@ -180,8 +201,8 @@ def generate_signals(bars: pd.DataFrame, rr_ratio: float = 2.0) -> pd.DataFrame:
     biasie short po sweepie BSL. Wejście na pierwszym ticku po
     zamknięciu świecy sygnałowej.
 
-    SL pod dolną krawędzią odwróconej luki (dla shorta nad górną),
-    jak czerwone pole na filmie. TP = 2 × ryzyko od zamknięcia.
+    SL pod low świecy wejścia (dla shorta nad jej high), jak
+    czerwone pole na filmie. TP = 2 × ryzyko od zamknięcia.
     Pozycja: 1% kapitału ryzykowany przy SL.
 
     Wyjście:

@@ -675,17 +675,17 @@ def sr_retest():
 
 # ───────────────────────── 09 SSL + IFVG ─────────────────────────
 def ssl_ifvg():
-    n = 38
-    cl = path([(0, 106), (5, 100.6), (8, 106), (10, 106.8), (11, 105.6), (12, 102.4), (13, 101.4), (15, 100.9),
-               (16, 101.5), (18, 102.6), (19, 103), (20, 106.0), (24, 108), (26, 107.4), (33, 113.5), (37, 114)], n, 0.3)
-    PIV, SWP, ENT = 5, 15, 20
-    over = {PIV: (101.6, 101.9, 100.0, 100.7),
-            10: (106.6, 107.3, 105.9, 106.0), 11: (106.0, 106.2, 102.9, 103.2), 12: (103.2, 103.6, 101.6, 102.0),
-            SWP: (100.8, 101.9, 98.6, 101.5), ENT: (103.0, 106.6, 102.8, 106.3)}
+    n = 45
+    cl = path([(0, 105), (5, 100.6), (9, 106), (13, 101.5), (19, 108.0), (20, 107.5), (21, 106.8), (22, 104.4),
+               (23, 104.0), (24, 103.6), (25, 103.9), (26, 106.9), (30, 109), (32, 108.4), (40, 114), (44, 114.5)], n, 0.3)
+    PIV, SWP, ENT = 5, 13, 26
+    over = {PIV: (101.6, 101.9, 100.0, 100.7), SWP: (100.8, 101.9, 98.6, 101.5),
+            21: (107.2, 107.6, 106.6, 106.8), 22: (106.8, 107.0, 104.2, 104.4), 23: (104.4, 105.0, 103.6, 104.0),
+            24: (104.0, 104.6, 103.2, 103.6), 25: (103.6, 104.2, 102.9, 103.9), ENT: (104.0, 107.0, 103.7, 106.9)}
     B = bars_from(cl, wick=0.4, over=over)
     PL = B[PIV][2]
-    g_top, g_bot = B[10][2], B[12][1]  # spadkowy FVG: high[12] < low[10]
-    entry, sl = B[ENT][3], g_bot - 0.2
+    g_top, g_bot = B[21][2], B[23][1]  # spadkowy FVG po sweepie: high[23] < low[21]
+    entry, sl = B[ENT][3], B[ENT][2] - 0.2  # SL pod low świecy wejścia
     tp = entry + 2 * (entry - sl)
     EXIT = next(i for i in range(ENT + 1, n) if B[i][1] >= tp)
     B[EXIT] = (B[EXIT][0], tp + 0.4, B[EXIT][2], max(B[EXIT][3], tp - 0.3))
@@ -693,7 +693,7 @@ def ssl_ifvg():
     lo, hi = ylim_of(B, n, pad=0.12)
 
     def gap(s, x2, col=RED, a=0.22):
-        s.ax.add_patch(Rectangle((10.5, g_bot), x2 - 10.5, g_top - g_bot, facecolor=col, alpha=a, edgecolor=col, lw=1.2, zorder=1))
+        s.ax.add_patch(Rectangle((21.5, g_bot), x2 - 21.5, g_top - g_bot, facecolor=col, alpha=a, edgecolor=col, lw=1.2, zorder=1))
 
     fig = figure()
     s = Seg(fig, 0, "1. SWEEP DOŁKA (SSL)", "Cena wybija dołek i wraca nad niego.\nPrzez 30 świec szukamy tylko longów.", n, (lo, hi))
@@ -701,21 +701,21 @@ def ssl_ifvg():
     s.level(PL, PIV - 0.5, SWP + 1.5, FG, "dołek")
     s.tag(SWP, B[SWP][2], "sweep", GREEN, True, size=16)
 
-    s = Seg(fig, 1, "2. ZAMKNIĘCIE NAD LUKĄ = LONG", "Spadkowy FVG zostaje odwrócony (IFVG).\nShort lustrzanie po sweepie szczytu.", n, (lo, hi))
+    s = Seg(fig, 1, "2. ZAMKNIĘCIE NAD LUKĄ = LONG", "Spadkowy FVG po sweepie zostaje odwrócony.\nLuka wypełniona wcześniej się nie liczy.", n, (lo, hi))
     s.candles(B, ENT + 1, {SWP: GREEN, ENT: GREEN})
     s.level(PL, PIV - 0.5, SWP + 1.5, DIM)
     gap(s, ENT + 0.5)
-    s.ax.text((10.5 + ENT) / 2 + 1.2, (g_top + g_bot) / 2, "spadkowy FVG", color=RED, fontsize=16, fontweight="bold",
-              ha="center", va="center", zorder=8)
+    s.ax.text(ENT + 1.2, (g_top + g_bot) / 2 - 0.4, "spadkowy FVG", color=RED, fontsize=16, fontweight="bold",
+              ha="left", va="center", zorder=8)
     s.entry(ENT, entry, GREEN, "long")
 
-    s = Seg(fig, 2, "3. SL POD LUKĄ, TP 2:1", "SL pod dolną krawędzią luki.\nTP = 2 × ryzyko od zamknięcia.", n, (lo, hi))
+    s = Seg(fig, 2, "3. SL POD ŚWIECĄ, TP 2:1", "SL pod low świecy wejścia.\nTP = 2 × ryzyko od zamknięcia.", n, (lo, hi))
     s.candles(B, n, {SWP: GREEN, ENT: GREEN})
     gap(s, ENT + 0.5, GREY, 0.12)
     s.ax.add_patch(Rectangle((ENT + 0.5, sl), EXIT - ENT, entry - sl, facecolor=RED, alpha=0.14, lw=0, zorder=1))
     s.ax.add_patch(Rectangle((ENT + 0.5, entry), EXIT - ENT, tp - entry, facecolor=GREEN, alpha=0.14, lw=0, zorder=1))
     s.level(tp, ENT - 0.5, EXIT + 0.5, GREEN, "TP", ls="-")
-    s.level(sl, 10.5, EXIT + 0.5, RED, "SL", ls="-")
+    s.level(sl, ENT - 0.5, EXIT + 0.5, RED, "SL", ls="-")
     s.ax.plot([ENT + 0.5], [entry], "o", ms=13, color=GREEN, mec=FG, mew=2, zorder=8)
     s.note("1% kapitału ryzyka do SL", y=lo)
     save(fig, "09_ssl_ifvg")

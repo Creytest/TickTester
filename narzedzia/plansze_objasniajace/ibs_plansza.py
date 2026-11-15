@@ -64,8 +64,10 @@ def data():
     liczone regułami strategii (próg z 10/25 świec, IBS < 0,3, zamknięcie nad wczorajszym high)."""
     H, n = 25, 30
     N = H + n
-    cl = path([(0, 100), (H + 8, 108), (H + 11, 107), (H + 18, 99.5), (H + 20, 98.7),
-               (H + 24, 103), (H + 29, 104)], N, 0.45)
+    cl = path([(0, 100), (H + 8, 108)], H + 9, 0.45)
+    # spadek kilka dni z rzędu, potem odbicie (wartości zamknięć ręcznie, żeby przykład był czytelny)
+    cl += [107.4, 106.5, 105.7, 104.5, 105.0, 106.2, 106.8, 107.1, 106.9, 107.4]
+    cl += [107.6] * (N - len(cl))
     B = bars_from(cl, wick=0.55)
     hi = [b[1] for b in B]
     lo = [b[2] for b in B]
@@ -98,7 +100,7 @@ def main():
     s = Seg(fig, 1, "2. MOCNY SPADEK = LONG",
             "Spadek od szczytu z 10 dni o ponad 2,5 typowego dnia\n"
             "i zamknięcie przy dołku dnia (IBS < 0,3)", n, (lo2, hi2), right=9)
-    s.candles(B, SIG + 1, {SIG: GREEN})
+    s.candles(B, SIG + 1, {SIG: RED})
     x1 = SIG - 9
     s.level(hh[SIG], x1 - 0.4, SIG + 0.6, BLUE, ls="-", lw=2.6)
     s.ax.text(x1 - 0.4, hh[SIG] + s.dy * 0.6, "szczyt z ostatnich 10 dni", color=BLUE, fontsize=16,
@@ -119,11 +121,14 @@ def main():
 
     # 3. wyjście
     s = Seg(fig, 2, "3. WYJŚCIE", "Pierwsze zamknięcie nad wczorajszym high.\nBez SL i TP (tak jak u autora)", n, (lo, hi), right=9)
-    s.candles(B, EX + 1, {SIG: GREEN, EX: GREEN})
+    s.candles(B, EX + 1, {SIG: RED, EX: GREEN})
     s.level(band[SIG], x1 - 0.4, SIG + 0.6, YELLOW, lw=2)
     s.ax.plot([SIG + 0.5], [B[SIG][3]], "o", ms=13, color=GREEN, mec=FG, mew=2, zorder=8)
     yh = B[EX - 1][1]
-    s.level(yh, EX - 3.5, EX + 0.6, FG, ls=(0, (4, 3)), lw=2.4)
+    s.ax.plot([EX - 1.5, EX + 0.6], [yh, yh], color=FG, lw=2.4, ls=(0, (4, 3)), zorder=6)
+    # long: zysk = od zamknięcia dnia wejścia do zamknięcia dnia wyjścia
+    s.ax.add_patch(Rectangle((SIG + 0.5, B[SIG][3]), EX - SIG, B[EX][3] - B[SIG][3], facecolor=GREEN,
+                             alpha=0.16, lw=0, zorder=1))
     s.ax.text(EX + 1.0, yh - s.dy * 0.9, "zamknięcie nad\nwczorajszym high", color=FG, fontsize=15, va="top",
               linespacing=1.25, zorder=6)
     s.exit(EX + 0.5, B[EX][3], GREEN, "wyjście")

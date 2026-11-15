@@ -88,50 +88,67 @@ def data():
 
 def main():
     B, band, hh, rng, SIG, EX = data()
-    n = EX + 2
+    n = EX + 1
     B = B[:n]
-    lo, hi = ylim_of(B, n, extra=[band[SIG]], pad=0.12)
+    # segmenty 2 i 3 mają tę samą skalę, żeby wyglądały jak ten sam wykres
+    lo, hi = ylim_of(B, n, extra=[band[SIG]], pad=0.16)
+    lo -= (hi - lo) * 0.14   # miejsce na znacznik LONG i notkę
+    entry = B[SIG][3]
+    x1 = SIG - 9
 
     fig = figure()
     segment_ibs(fig)
 
-    # 2. wejście — własna skala (tylko świece do wejścia), żeby spadek był duży i czytelny
-    lo2, hi2 = ylim_of(B, SIG + 1, extra=[band[SIG]], pad=0.16)
-    s = Seg(fig, 1, "2. MOCNY SPADEK = LONG",
+    def long_marker(s):
+        """Zielony trójkąt pod świecą sygnału = kupno (long), jak sygnały na TradingView."""
+        s.signal_tri(SIG, B[SIG][2], GREEN, up=True, w_px=46)
+        s.ax.text(SIG + 1.1, B[SIG][2] - s.dy * 1.6, "LONG", color=GREEN, fontsize=18, fontweight="bold",
+                  ha="left", va="center", zorder=8)
+
+    # 2. wejście
+    s = Seg(fig, 1, "2. MOCNY SPADEK = KUPNO",
             "Spadek od szczytu z 10 dni o ponad 2,5 typowego dnia\n"
-            "i zamknięcie przy dołku dnia (IBS < 0,3)", n, (lo2, hi2), right=9)
-    s.candles(B, SIG + 1, {SIG: RED})
-    x1 = SIG - 9
+            "i zamknięcie przy dołku dnia (IBS < 0,3)", n, (lo, hi), right=6)
+    s.candles(B, SIG + 1)
     s.level(hh[SIG], x1 - 0.4, SIG + 0.6, BLUE, ls="-", lw=2.6)
     s.ax.text(x1 - 0.4, hh[SIG] + s.dy * 0.6, "szczyt z ostatnich 10 dni", color=BLUE, fontsize=16,
               fontweight="bold", va="bottom", zorder=6)
     s.level(band[SIG], x1 - 0.4, SIG + 0.6, YELLOW, "PRÓG", lw=2.6, above=False, size=18)
     # linijka z „typowych dni”: 2 pełne klocki + pół klocka = 2,5 × średni zakres dnia
-    r, xb = rng[SIG], SIG + 4.6
+    r, xb = rng[SIG], SIG + 3.2
     for k, frac in enumerate((1, 1, 0.5)):
         top = hh[SIG] - k * r
-        s.ax.add_patch(Rectangle((xb - 0.45, top - frac * r), 0.9, frac * r, facecolor=YELLOW,
+        s.ax.add_patch(Rectangle((xb - 0.4, top - frac * r), 0.8, frac * r, facecolor=YELLOW,
                                  alpha=0.85 if k % 2 == 0 else 0.45, edgecolor=BG, lw=2, zorder=5))
-    s.ax.text(xb + 0.8, hh[SIG] - r / 2, "1 typowy dzień", color=YELLOW, fontsize=15, fontweight="bold",
+    s.ax.text(xb + 0.7, hh[SIG] - r / 2, "1 typowy dzień", color=YELLOW, fontsize=15, fontweight="bold",
               va="center", zorder=6)
-    s.ax.text(xb + 0.8, hh[SIG] - 1.5 * r, "2", color=YELLOW, fontsize=15, fontweight="bold", va="center", zorder=6)
-    s.ax.text(xb + 0.8, hh[SIG] - 2.25 * r, "2,5 = próg", color=YELLOW, fontsize=15, fontweight="bold", va="center", zorder=6)
-    s.note("typowy dzień = średni ruch high−low z 25 dni\nwejście na otwarciu następnego dnia", y=lo2, size=15)
-    s.entry(SIG, B[SIG][3], GREEN, f"long\nIBS = {ibs(B[SIG]):.2f}".replace(".", ","))
+    s.ax.text(xb + 0.7, hh[SIG] - 1.5 * r, "2", color=YELLOW, fontsize=15, fontweight="bold", va="center", zorder=6)
+    s.ax.text(xb + 0.7, hh[SIG] - 2.25 * r, "2,5 = próg", color=YELLOW, fontsize=15, fontweight="bold",
+              va="center", zorder=6)
+    s.ax.text(SIG + 0.7, entry, f"IBS = {ibs(B[SIG]):.2f}".replace(".", ","), color=FG, fontsize=16,
+              fontweight="bold", va="center", zorder=8)
+    long_marker(s)
+    s.note("typowy dzień = średni ruch high−low z 25 dni\nkupno po zamknięciu dnia sygnału", y=lo, size=15)
 
     # 3. wyjście
-    s = Seg(fig, 2, "3. WYJŚCIE", "Pierwsze zamknięcie nad wczorajszym high.\nBez SL i TP (tak jak u autora)", n, (lo, hi), right=9)
-    s.candles(B, EX + 1, {SIG: RED, EX: GREEN})
+    s = Seg(fig, 2, "3. WYJŚCIE", "Sprzedaż, gdy dzień zamknie się nad wczorajszym high.\nBez SL i TP (tak jak u autora)",
+            n, (lo, hi), right=6)
+    s.candles(B, n)
     s.level(band[SIG], x1 - 0.4, SIG + 0.6, YELLOW, lw=2)
-    s.ax.plot([SIG + 0.5], [B[SIG][3]], "o", ms=13, color=GREEN, mec=FG, mew=2, zorder=8)
+    long_marker(s)
+    # cena kupna → cena sprzedaży
+    s.ax.plot([SIG + 0.5, EX + 0.9], [entry, entry], color=GREEN, lw=2.2, ls=(0, (4, 3)), zorder=6)
+    s.ax.plot([SIG + 0.5], [entry], "o", ms=12, color=GREEN, mec=FG, mew=2, zorder=8)
     yh = B[EX - 1][1]
-    s.ax.plot([EX - 1.5, EX + 0.6], [yh, yh], color=FG, lw=2.4, ls=(0, (4, 3)), zorder=6)
-    # long: zysk = od zamknięcia dnia wejścia do zamknięcia dnia wyjścia
-    s.ax.add_patch(Rectangle((SIG + 0.5, B[SIG][3]), EX - SIG, B[EX][3] - B[SIG][3], facecolor=GREEN,
-                             alpha=0.16, lw=0, zorder=1))
-    s.ax.text(EX + 1.0, yh - s.dy * 0.9, "zamknięcie nad\nwczorajszym high", color=FG, fontsize=15, va="top",
-              linespacing=1.25, zorder=6)
-    s.exit(EX + 0.5, B[EX][3], GREEN, "wyjście")
+    s.ax.plot([EX - 1.45, EX + 1.4], [yh, yh], color=FG, lw=2.4, ls=(0, (3, 2)), zorder=6)
+    s.ax.text(EX + 1.6, yh, "wczorajszy high", color=FG, fontsize=15, va="center", zorder=6)
+    s.ax.add_patch(FancyArrowPatch((EX + 0.9, entry), (EX + 0.9, B[EX][3]), arrowstyle="-|>", mutation_scale=20,
+                                   color=GREEN, lw=2.4, zorder=7))
+    s.ax.text(EX + 1.4, entry + 0.25 * (B[EX][3] - entry), "zysk", color=GREEN, fontsize=17, fontweight="bold",
+              va="center", zorder=7)
+    s.ax.plot([EX + 0.5], [B[EX][3]], marker="X", ms=17, color=GREEN, mec=FG, mew=1.6, zorder=8)
+    s.ax.text(EX + 1.0, B[EX][3] + s.dy * 0.8, "SPRZEDAŻ", color=GREEN, fontsize=17, fontweight="bold",
+              va="bottom", zorder=8)
     s.note("nasze założenie: pozycja = 100% kapitału", col=YELLOW, y=lo)
 
     OUT.parent.mkdir(parents=True, exist_ok=True)

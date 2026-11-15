@@ -10,4 +10,4 @@ Na TikToku nie ma tekstu posta, więc zapisuję tylko to, co mamy w rozmowie. Br
 | RSI 6 (80/20) RR 2:1 | `RSI6_80_20.py` | do uzupełnienia | — |
 | BigBeluga Two-Pole + Stochastic 7,3,3 | `BigBeluga_Stoch_80percent.py` | do uzupełnienia | Claim 80%. |
 | SR Retest | `SR_Retest.py` | TikTok, Antonio (link do uzupełnienia) | Claim: „This simple price action trading strategy on a 5 minute time frame has 90% win rate along with tight support and resistance.” Kadr: kilka knotów na jednym poziomie = opór, „Break and close above resistance”, „Retest resistance (Take Long)”. Autor nie podał wyjścia. Nasze założenia (Kamil, 2026-11-13): opór = najwyższe high z 20 świec, min. 2 knoty w 0,25 ATR z odbiciem pomiędzy (nie double top), retest w 5 świec, SL za świecą retestu, TP 2:1, short lustrzanie. |
-| SSL + IFVG | `SSL_IFVG.py` | do uzupełnienia | 1 min, NQ. |
+| SSL + IFVG | `SSL_IFVG.py` | TradingLouisYT, „The 90% winrate trading strategy - ICT” (2023-10-24) | 1 min, NQ. |

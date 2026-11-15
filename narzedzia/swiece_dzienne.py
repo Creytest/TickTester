@@ -5,10 +5,13 @@ Dane tickowe z Dukascopy pobierają się dniami. Strategie na świecach
 dziennych (np. IBS Mean Reversion) potrzebują tylko OHLC z każdego
 dnia, a te pobierają się w sekundy:
 
-    Stooq (CSV)       — QQQ, SPY od 1999/1993, XAUUSD od dawna,
+    Yahoo Finance     — QQQ od 1999, SPY od 1993, BTC-USD od 2014-09
+                        (biblioteka yfinance: pip install yfinance),
+    ticki z D:\\Tickdata — np. XAUUSD od 2003 (świece 1D z ticków, które już masz),
     Binance (klines)  — BTCUSDT Spot od 2017-08-17,
     Dukascopy (d1)    — przez `npx dukascopy-node` (wymaga Node.js),
-    własny plik CSV   — dowolne aktywo (np. pobrane ręcznie ze Stooq).
+    Stooq (CSV)       — od 2026-11 blokuje pobieranie spoza przeglądarki,
+    własny plik CSV   — dowolne aktywo.
 
 Pliki trafiają do FOLDER (jeden CSV na aktywo: date, open, high, low,
 close, volume). Ponowne uruchomienie korzysta z pliku, chyba że
@@ -50,19 +53,19 @@ from narzedzia.dane_dzienne import load_daily_csv
 FOLDER = Path(r"D:\Tickdata\Dzienne")
 
 # Aktywa do testów na świecach dziennych.
-#   zrodlo: "stooq" | "binance" | "dukascopy" | "csv"
-#   symbol: symbol w źródle (dla "csv": nazwa pliku w FOLDER)
+#   zrodlo: "yahoo" | "ticki" | "binance" | "dukascopy" | "stooq" | "csv"
+#   symbol: symbol w źródle (dla "ticki": nazwa aktywa z tick_config,
+#           dla "csv": nazwa pliku w FOLDER)
 #   commission: prowizja jako ułamek wartości, za stronę
 #   spread_pct: przybliżony spread jako ułamek ceny (Ask = Bid × (1 + spread_pct))
 #   tick: najmniejsza zmiana ceny — poślizg = 1 tick
 #   opis: do tabel i plansz
 # Koszty są PRZYBLIŻONE — na świecach dziennych nie ma spreadu z danych.
 AKTYWA_DZIENNE = {
-    # ETF na Nasdaq 100. Stooq: ceny skorygowane o splity; czy także
-    # o dywidendy — sprawdzić przed filmem (wpływa na wynik buy & hold,
-    # nie na sygnały IBS).
+    # ETF na Nasdaq 100. Yahoo: ceny skorygowane o splity, bez dywidend
+    # (buy & hold nie liczy dywidend — mówić w filmie, jeśli ważne).
     "QQQ": {
-        "zrodlo": "stooq", "symbol": "qqq.us",
+        "zrodlo": "yahoo", "symbol": "QQQ",
         "commission": 0.0005,      # standard kanału 0,05%/stronę
         "spread_pct": 0.0001,      # ~1 cent przy cenie ~100 USD
         "tick": 0.01,
@@ -70,16 +73,18 @@ AKTYWA_DZIENNE = {
     },
     # ETF na S&P 500 — na nim autor IBS Mean Reversion pokazywał wyniki.
     "SPY": {
-        "zrodlo": "stooq", "symbol": "spy.us",
+        "zrodlo": "yahoo", "symbol": "SPY",
         "commission": 0.0005,
         "spread_pct": 0.0001,
         "tick": 0.01,
         "opis": "S&P 500 ETF",
     },
-    # Złoto spot. Prowizja jak w TickTesterze (CFD), spread ~0,3 USD przy 3000 USD.
-    # Alternatywa: {"zrodlo": "dukascopy", "symbol": "xauusd", ...} (świece d1 z Dukascopy).
+    # Złoto spot: świece 1D z Twoich ticków XAUUSD (Tickstory, od 2003-08,
+    # GMT+2 US-DST = dzień kończy się o 17:00 NY). Pierwsze wczytanie trwa
+    # kilka minut (ticki rok po roku), potem plik CSV w FOLDER.
+    # Prowizja jak w TickTesterze (CFD), spread ~0,3 USD przy 3000 USD.
     "XAUUSD": {
-        "zrodlo": "stooq", "symbol": "xauusd",
+        "zrodlo": "ticki", "symbol": "XAUUSD",
         "commission": 0.000035,
         "spread_pct": 0.0001,
         "tick": 0.01,
@@ -94,14 +99,14 @@ AKTYWA_DZIENNE = {
         "tick": 0.01,
         "opis": "Bitcoin (Binance Spot)",
     },
-    # Bitcoin ze Stooq — może sięgać przed 2017 (dane z giełd sprzed Binance,
-    # zakres sprawdzić po pobraniu; inne źródło niż Binance).
+    # Bitcoin z Yahoo (indeks CoinMarketCap) od 2014-09 — dłużej niż Binance,
+    # ale to nie są ceny jednej giełdy.
     "BTCUSD": {
-        "zrodlo": "stooq", "symbol": "btcusd",
+        "zrodlo": "yahoo", "symbol": "BTC-USD",
         "commission": 0.0005,
         "spread_pct": 0.0,
         "tick": 0.01,
-        "opis": "Bitcoin (Stooq)",
+        "opis": "Bitcoin (Yahoo)",
     },
 }
 
@@ -122,7 +127,11 @@ def pobierz(asset: str) -> Path:
     zrodlo = spec["zrodlo"]
     print(f"Pobieranie {asset} ({zrodlo}: {spec['symbol']})...")
 
-    if zrodlo == "stooq":
+    if zrodlo == "yahoo":
+        bars = _yahoo(spec["symbol"])
+    elif zrodlo == "ticki":
+        bars = _ticki(spec["symbol"])
+    elif zrodlo == "stooq":
         bars = _stooq(spec["symbol"], asset)
     elif zrodlo == "binance":
         bars = _binance(spec["symbol"])
@@ -214,6 +223,62 @@ def _stooq(symbol: str, asset: str) -> pd.DataFrame:
         return load_daily_csv(tmp)
     finally:
         tmp.unlink(missing_ok=True)
+
+
+def _yahoo(symbol: str) -> pd.DataFrame:
+    """
+    Świece dzienne z Yahoo Finance (yfinance). Ceny skorygowane o splity,
+    bez korekty o dywidendy (auto_adjust=False, kolumny Open/High/Low/Close).
+    """
+    try:
+        import yfinance as yf
+    except ImportError:
+        raise RuntimeError("Brak biblioteki yfinance — zainstaluj: pip install yfinance") from None
+    df = yf.download(
+        symbol, start="1990-01-01", interval="1d", auto_adjust=False,
+        progress=False, multi_level_index=False,
+    )
+    if df is None or df.empty:
+        raise RuntimeError(f"Yahoo nie zwrócił danych dla {symbol!r}")
+    df = df.rename(columns=str.lower)[["open", "high", "low", "close", "volume"]]
+    df.index = pd.DatetimeIndex(df.index).tz_localize(None).normalize()
+    df = df.astype(float)
+    # Ostatnia świeca może być niedokończona (dzisiejsza sesja).
+    today = pd.Timestamp.now().normalize()
+    return df[(df.index < today) & (df["close"] > 0)].dropna(subset=["close"])
+
+
+def _ticki(asset: str) -> pd.DataFrame:
+    """
+    Świece 1D (Bid) z ticków aktywa z tick_config. Jeden przebieg przez
+    cały plik CSV partiami — w pamięci jest tylko bieżąca partia.
+    Jednorazowo trwa długo (cały plik ticków), potem jest plik CSV w FOLDER.
+    """
+    from narzedzia.tick_config import ASSETS, REVERSE_BID_ASK
+    from narzedzia.tick_data import load_ticks
+    from narzedzia.tick_engine import build_bars
+
+    if asset not in ASSETS:
+        raise KeyError(f"brak aktywa {asset!r} w narzedzia/tick_config.py")
+
+    def chunks():
+        last_year = None
+        for chunk in load_ticks(
+            ASSETS[asset], chunksize=2_000_000,
+            reverse_bid_ask=REVERSE_BID_ASK[asset],
+        ):
+            if chunk.empty:
+                continue
+            year = chunk["timestamp"].iloc[-1].year
+            if year != last_year:
+                print(f"  ticki {asset} {year}...")
+                last_year = year
+            yield chunk[["timestamp", "bid", "ask"]]
+
+    bars = build_bars(chunks(), "1D")
+    if bars.empty:
+        raise RuntimeError(f"brak ticków {asset}")
+    return bars[["open", "high", "low", "close"]].dropna(subset=["close"])
 
 
 def _binance(symbol: str) -> pd.DataFrame:

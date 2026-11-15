@@ -701,13 +701,20 @@ def ssl_ifvg():
     s.level(PL, PIV - 0.5, SWP + 1.5, FG, "dołek")
     s.tag(SWP, B[SWP][2], "sweep", GREEN, True, size=16)
 
-    s = Seg(fig, 1, "2. ZAMKNIĘCIE NAD LUKĄ = LONG", "Spadkowy FVG po sweepie zostaje odwrócony.\nLuka wypełniona wcześniej się nie liczy.", n, (lo, hi))
-    s.candles(B, ENT + 1, {SWP: GREEN, ENT: GREEN})
-    s.level(PL, PIV - 0.5, SWP + 1.5, DIM)
-    gap(s, ENT + 0.5)
-    s.ax.text(ENT + 1.2, (g_top + g_bot) / 2 - 0.4, "spadkowy FVG", color=RED, fontsize=16, fontweight="bold",
-              ha="left", va="center", zorder=8)
-    s.entry(ENT, entry, GREEN, "long")
+    # Panel 2: powiększony rysunek FVG — 3 świece, luka między knotami 1. i 3., potem zamknięcie nad luką.
+    F = [(109.0, 109.6, 107.6, 108.0), (108.0, 108.3, 103.8, 104.2), (104.2, 105.0, 103.2, 103.6),
+         (103.6, 104.3, 102.9, 104.0), (104.0, 108.4, 103.7, 108.2)]
+    f_top, f_bot = F[0][2], F[2][1]
+    s = Seg(fig, 1, "2. ZAMKNIĘCIE NAD LUKĄ = LONG",
+            "FVG: luka między knotem 1. i 3. świecy.\nLuka wypełniona wcześniej się nie liczy.", 5, (100.5, 112), right=3)
+    s.ax.add_patch(Rectangle((-0.45, f_bot), 4.9, f_top - f_bot, facecolor=RED, alpha=0.22, edgecolor=RED, lw=1.4, zorder=1))
+    s.candles(F, 5, {1: RED, 4: GREEN})
+    s.level(f_top, 0, 4.45, FG, ls=(0, (5, 4)), lw=1.8)
+    s.level(f_bot, 2, 4.45, FG, ls=(0, (5, 4)), lw=1.8)
+    for i in range(3):
+        s.ax.text(i, 101.9, str(i + 1), color=FG, fontsize=20, fontweight="bold", ha="center", va="top", zorder=8)
+    s.ax.text(3.0, (f_top + f_bot) / 2, "FVG", color=RED, fontsize=22, fontweight="bold", ha="center", va="center", zorder=8)
+    s.entry(4, F[4][3], GREEN, "long")
 
     s = Seg(fig, 2, "3. SL POD ŚWIECĄ, TP 2:1", "SL pod low świecy wejścia.\nTP = 2 × ryzyko od zamknięcia.", n, (lo, hi))
     s.candles(B, n, {SWP: GREEN, ENT: GREEN})

@@ -92,6 +92,7 @@ def generate_signals(bars: pd.DataFrame, length: int = 9) -> pd.DataFrame:
     Short: EMA 9 przecina VWAP od góry (VWAP wg VWAP_ANCHOR,
     domyślnie sesyjny).
     Wyjście: EMA 9 przecina VWAP od dołu. Brak SL i TP, brak longów.
+    Przeskok VWAP na resecie kotwicy nie jest przecięciem.
 
     Wyjście:
         buy (zawsze False), sell, exit_short.
@@ -108,6 +109,18 @@ def generate_signals(bars: pd.DataFrame, length: int = 9) -> pd.DataFrame:
     # Odpowiedniki ta.crossover() i ta.crossunder().
     cross_up = (fast > line) & (fast.shift(1) <= line.shift(1))
     sell = (fast < line) & (fast.shift(1) >= line.shift(1))
+
+    # Na pierwszej świecy nowego okresu kotwicy VWAP startuje od nowa
+    # (= hlc3 tej świecy, czyli praktycznie cena), a poprzednia wartość
+    # pochodzi ze starej sesji. Porównanie przez reset daje sztuczne
+    # "przecięcie": EMA 9 nie przecięła VWAP, to VWAP przeskoczył.
+    # W TV ta.crossunder() też by to złapał, ale to artefakt resetu,
+    # nie sygnał autora — przecięcie liczymy tylko w obrębie jednej
+    # sesji (tygodnia/miesiąca). Przy ciągłym VWAP bez zmian.
+    groups = _anchor_groups(bars.index, VWAP_ANCHOR)
+    reset = groups != groups.shift(1)
+    cross_up &= ~reset
+    sell &= ~reset
 
     result = pd.DataFrame(index=bars.index)
     result["buy"] = False

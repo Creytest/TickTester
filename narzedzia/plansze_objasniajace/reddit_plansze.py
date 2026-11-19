@@ -125,9 +125,19 @@ def rsi_90():
 # ───────────────────────── Second Entry ─────────────────────────
 def second_entry():
     H, n = 30, 40
-    cl = path([(0, 92), (H, 100), (H + 8, 108), (H + 11, 105.2), (H + 13, 107.3), (H + 16, 104.6), (H + 17, 105.4),
-               (H + 18, 106.6), (H + 26, 113), (H + 39, 116)], H + n, 0.15)
-    over = {}
+    # pierwsza noga cofnięcia głębsza, druga płytsza: dołek 2 wyraźnie wyżej niż dołek 1
+    cl = path([(0, 92), (H, 100), (H + 8, 108), (H + 11, 103.6), (H + 13, 106.8), (H + 16, 105.6), (H + 17, 106.1),
+               (H + 18, 107.2), (H + 26, 113), (H + 39, 116)], H + n, 0.15)
+    # cofnięcie rysowane świeca po świecy, żeby obie nogi były czytelne
+    P = {8: (107.0, 108.5, 106.6, 108.0), 9: (108.0, 108.3, 106.4, 106.7), 10: (106.7, 107.0, 105.0, 105.3),
+         11: (105.3, 105.6, 103.4, 103.8),   # dołek nogi 1
+         12: (103.8, 105.8, 103.6, 105.5),   # H1: pierwsze wyższe high (nie gramy)
+         13: (105.5, 107.0, 105.2, 106.8), 14: (106.8, 106.9, 106.0, 106.3), 15: (106.3, 106.6, 105.3, 105.6),
+         16: (105.6, 106.0, 104.9, 105.8),   # świeca sygnałowa, dołek nogi 2 wyżej niż nogi 1
+         17: (105.8, 107.0, 105.6, 106.9), 18: (106.9, 107.6, 106.6, 107.4)}
+    over = {H + k: v for k, v in P.items()}
+    for k, v in P.items():
+        cl[H + k] = v[3]
     Ball = bars_from(cl, wick=0.45, over=over)
     e = ema(cl, 21)
     B, e = Ball[H:], e[H:]
@@ -146,20 +156,23 @@ def second_entry():
     EXIT = next(i for i in range(ENT, n) if B[i][1] >= tp)
     n = EXIT + 3
     leg1 = min(range(top, H1 + 1), key=lambda i: B[i][2])
-    leg2 = min(range(H1, SIG + 1), key=lambda i: B[i][2])
+    top2 = max(range(H1, SIG + 1), key=lambda i: B[i][1])  # szczyt odbicia 1 — od niego zaczyna się druga noga
+    leg2 = min(range(top2, SIG + 1), key=lambda i: B[i][2])
+    assert B[leg2][2] > B[leg1][2] + 0.5, "dołek drugiej nogi musi być wyżej niż pierwszej"
     lo, hi = ylim_of(B, n, extra=[e[0]], pad=0.1)
 
     fig = figure()
     s = Seg(fig, 0, "1. TREND: EMA 21 ROŚNIE", "Cena cofa się po szczycie.\nPierwsze odbicie (1) pomijamy.", n, (lo, hi))
     s.candles(B, H1 + 1, {H1: DIM})
     s.line(e, H1 + 1, BLUE, label="EMA 21")
-    s.tag(leg1, B[leg1][2], "1", FG, True, size=22)
+    s.tag(leg1, B[leg1][2], "1", FG, True, size=22, off=0.5)
 
     s = Seg(fig, 1, "2. DRUGIE ODBICIE = BUY STOP", "Dołek drugiej nogi (2) wyżej niż pierwszej.\nZlecenie nad high świecy sygnałowej.", n, (lo, hi))
     s.candles(B, SIG + 1, {H1: DIM, SIG: GREEN})
     s.line(e, SIG + 1, BLUE)
-    s.tag(leg1, B[leg1][2], "1", FG, True, size=22)
-    s.tag(leg2, B[leg2][2], "2", GREEN, True, size=22)
+    s.tag(leg1, B[leg1][2], "1", FG, True, size=22, off=0.5)
+    s.tag(leg2, B[leg2][2], "2", GREEN, True, size=22, off=0.5)
+    s.level(B[leg1][2], leg1, SIG + 0.5, GREY, lw=1.6)  # poziom dołka 1: dołek 2 jest nad nim
     s.level(entry, SIG - 0.5, SIG + 3, GREEN, "buy stop", lw=2)
 
     s = Seg(fig, 2, "3. SL POD ŚWIECĄ, TP 1:1", "SL pod low świecy sygnałowej.\nTP = tyle samo co ryzyko.", n, (lo, hi))

@@ -78,9 +78,10 @@ def risk_boxes(s, x1, x2, entry, sl, tp, long=True):
 
 # ───────────────────────── RSI 90% ─────────────────────────
 def rsi_90():
-    H, n = 30, 46
-    cl = path([(0, 110), (H, 108), (H + 5, 98), (H + 8, 101), (H + 13, 95), (H + 17, 97), (H + 22, 103),
-               (H + 30, 112), (H + 36, 118), (H + 39, 117.4), (H + 45, 113)], H + n, 0.35)
+    H, n = 30, 50
+    # RSI: wyjście nad 30, wyraźnie wyżej (~50), powrót pod 30 i drugie przecięcie w górę
+    cl = path([(0, 110), (H, 108), (H + 5, 98), (H + 11, 105), (H + 18, 93), (H + 21, 97), (H + 26, 103),
+               (H + 33, 112), (H + 39, 118), (H + 42, 117.4), (H + 48, 113)], H + n, 0.35)
     Ball = bars_from(cl, wick=0.55)
     r = rsi(cl, 14)
     B, r = Ball[H:], r[H:]

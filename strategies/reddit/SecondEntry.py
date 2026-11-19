@@ -21,6 +21,10 @@ RR_RATIO = 1.0
 
 
 def generate_signals(bars: pd.DataFrame) -> pd.DataFrame:
+    return _compute(bars).drop(columns=["first_long", "first_short"])
+
+
+def _compute(bars: pd.DataFrame) -> pd.DataFrame:
     """
     Reddit r/Daytrading (thefakeab), „From 45% to 75% Win Rate”:
     „Entry: pullback + second entry setup (higher low in uptrend /
@@ -65,6 +69,9 @@ def generate_signals(bars: pd.DataFrame) -> pd.DataFrame:
     entry = np.full(n, np.nan)
     stop_loss = np.full(n, np.nan)
     take_profit = np.full(n, np.nan)
+    # Pierwsze odbicie (H1 / L1) setupów, które dały sygnał — tylko do
+    # wykresu, nie gramy go.
+    first = {1: np.zeros(n, dtype=bool), -1: np.zeros(n, dtype=bool)}
 
     for side in (1, -1):
         # Shorty: ceny odwrócone (−low jako high), jedna logika.
@@ -100,6 +107,7 @@ def generate_signals(bars: pd.DataFrame) -> pd.DataFrame:
                         state = "idle"
                     else:
                         state, leg2_low = "h1", np.inf
+                        h1_bar = i
                 else:
                     leg1_low = min(leg1_low, l[i])
                 continue
@@ -136,6 +144,7 @@ def generate_signals(bars: pd.DataFrame) -> pd.DataFrame:
                 else:
                     sell[i] = True
                 entry[i] = h[i] * side
+                first[side][h1_bar] = True
                 stop_loss[i] = l[i] * side
                 take_profit[i] = (h[i] + RR_RATIO * risk) * side
 
@@ -150,15 +159,19 @@ def generate_signals(bars: pd.DataFrame) -> pd.DataFrame:
     result["entry_stop"] = entry
     result["stop_loss"] = stop_loss
     result["take_profit"] = take_profit
+    result["first_long"] = first[1]
+    result["first_short"] = first[-1]
     return result
 
 
 def indicators(bars: pd.DataFrame) -> dict:
     """
     EMA 21 na cenie, zlecenia stop (H2 / L2) jako kropki.
+    Etykieta „1” = pierwsze odbicie (H1 / L1, pomijane),
+    „2” = świeca sygnałowa drugiego odbicia (H2 / L2).
     Panel: zmiana EMA 21 na świecę (> 0 = trend wzrostowy, < 0 = spadkowy).
     """
-    signals = generate_signals(bars)
+    signals = _compute(bars)
     average = ema(bars["close"], EMA_LENGTH)
     slope = average.diff()
     top = float(np.nanmax(np.abs(slope.to_numpy()))) if slope.notna().any() else 1.0
@@ -170,6 +183,12 @@ def indicators(bars: pd.DataFrame) -> dict:
         "markers": [
             ("Buy stop (H2)", signals["entry_stop"].where(signals["buy"]), "#00D084", "above"),
             ("Sell stop (L2)", signals["entry_stop"].where(signals["sell"]), "#FF3B30", "below"),
+        ],
+        "labels": [
+            ("Pierwsze odbicie (H1, pomijamy)", signals["first_long"], "1", "#9E9E9E", "above"),
+            ("Pierwsze odbicie (L1, pomijamy)", signals["first_short"], "1", "#9E9E9E", "below"),
+            ("Drugie odbicie (H2)", signals["buy"], "2", "#00D084", "above"),
+            ("Drugie odbicie (L2)", signals["sell"], "2", "#FF3B30", "below"),
         ],
         "panel": {
             "title": f"Nachylenie EMA {EMA_LENGTH}",

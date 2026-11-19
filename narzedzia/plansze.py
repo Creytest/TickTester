@@ -404,12 +404,13 @@ def _sign_color(value) -> str:
 
 
 def profitable_color(profitable: int, total: int) -> str:
-    """X/N kombinacji na plusie: wszystkie = zielony, żadna = czerwony, część = żółty."""
+    """X/N kombinacji na plusie: mniej niż połowa = czerwony, od połowy = żółty, od 80% = zielony."""
     if total == 0:
         return WHITE
-    if profitable == total:
-        return GREEN
-    return RED if profitable == 0 else YELLOW
+    share = profitable / total
+    if share < 0.5:
+        return RED
+    return YELLOW if share < 0.8 else GREEN
 
 
 def profit_factor_color(value) -> str:

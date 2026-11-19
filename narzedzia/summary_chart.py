@@ -186,9 +186,10 @@ def _sign_color(value) -> str:
 
 
 def profitable_color(profitable: int, total: int) -> str:
-    """Jak w narzedzia/plansze.py: wszystkie na plusie = zielony, żadna = czerwony, część = żółty."""
+    """Jak w narzedzia/plansze.py: poniżej połowy czerwony, od połowy żółty, od 80% zielony."""
     if total == 0:
         return "#F2F2F2"
-    if profitable == total:
-        return GREEN
-    return RED if profitable == 0 else YELLOW
+    share = profitable / total
+    if share < 0.5:
+        return RED
+    return YELLOW if share < 0.8 else GREEN

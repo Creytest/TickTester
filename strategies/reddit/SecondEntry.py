@@ -21,7 +21,9 @@ RR_RATIO = 1.0
 
 
 def generate_signals(bars: pd.DataFrame) -> pd.DataFrame:
-    return _compute(bars).drop(columns=["first_long", "first_short"])
+    return _compute(bars)[
+        ["buy", "sell", "entry_stop", "stop_loss", "take_profit"]
+    ]
 
 
 def _compute(bars: pd.DataFrame) -> pd.DataFrame:
@@ -72,6 +74,13 @@ def _compute(bars: pd.DataFrame) -> pd.DataFrame:
     # Pierwsze odbicie (H1 / L1) setupów, które dały sygnał — tylko do
     # wykresu, nie gramy go.
     first = {1: np.zeros(n, dtype=bool), -1: np.zeros(n, dtype=bool)}
+    # Linie korekt (zygzak po skrajnych cenach) — też tylko do wykresu:
+    # pierwsza = szczyt przed cofnięciem → dołek 1. nogi → high H1,
+    # druga = high H1 → dołek 2. nogi → high świecy sygnałowej.
+    leg_lines = {
+        key: np.full(n, np.nan)
+        for key in ("first_leg", "second_leg_long", "second_leg_short")
+    }
 
     for side in (1, -1):
         # Shorty: ceny odwrócone (−low jako high), jedna logika.
@@ -98,6 +107,7 @@ def _compute(bars: pd.DataFrame) -> pd.DataFrame:
             if state == "idle":
                 if lower:
                     state, top, leg1_low = "leg1", h[i - 1], l[i]
+                    top_bar, leg1_bar = i - 1, i
                 continue
 
             if state == "leg1":
@@ -108,8 +118,8 @@ def _compute(bars: pd.DataFrame) -> pd.DataFrame:
                     else:
                         state, leg2_low = "h1", np.inf
                         h1_bar = i
-                else:
-                    leg1_low = min(leg1_low, l[i])
+                elif l[i] < leg1_low:
+                    leg1_low, leg1_bar = l[i], i
                 continue
 
             if state == "h1":
@@ -119,7 +129,7 @@ def _compute(bars: pd.DataFrame) -> pd.DataFrame:
                     continue
                 if lower:
                     state = "leg2"
-                    leg2_low = l[i]
+                    leg2_low, leg2_bar = l[i], i
                 else:
                     continue
 
@@ -129,7 +139,8 @@ def _compute(bars: pd.DataFrame) -> pd.DataFrame:
                     # setup przepadł; zaczynamy od nowa.
                     state = "idle"
                     continue
-                leg2_low = min(leg2_low, l[i])
+                if l[i] < leg2_low:
+                    leg2_low, leg2_bar = l[i], i
 
             if leg2_low <= leg1_low:
                 # Brak "higher low".
@@ -145,6 +156,16 @@ def _compute(bars: pd.DataFrame) -> pd.DataFrame:
                     sell[i] = True
                 entry[i] = h[i] * side
                 first[side][h1_bar] = True
+                _zigzag(
+                    leg_lines["first_leg"],
+                    [(top_bar, top), (leg1_bar, leg1_low), (h1_bar, h[h1_bar])],
+                    side,
+                )
+                _zigzag(
+                    leg_lines["second_leg_long" if side == 1 else "second_leg_short"],
+                    [(h1_bar, h[h1_bar]), (leg2_bar, leg2_low), (i, h[i])],
+                    side,
+                )
                 stop_loss[i] = l[i] * side
                 take_profit[i] = (h[i] + RR_RATIO * risk) * side
 
@@ -161,7 +182,18 @@ def _compute(bars: pd.DataFrame) -> pd.DataFrame:
     result["take_profit"] = take_profit
     result["first_long"] = first[1]
     result["first_short"] = first[-1]
+    for key, line in leg_lines.items():
+        result[key] = line
     return result
+
+
+def _zigzag(line: np.ndarray, points: list, side: int) -> None:
+    """Wpisuje do line odcinki między punktami (świeca, cena)."""
+    for (b0, p0), (b1, p1) in zip(points, points[1:]):
+        if b1 > b0:
+            line[b0:b1 + 1] = np.linspace(p0, p1, b1 - b0 + 1) * side
+        else:
+            line[b0] = p0 * side
 
 
 def indicators(bars: pd.DataFrame) -> dict:
@@ -169,6 +201,9 @@ def indicators(bars: pd.DataFrame) -> dict:
     EMA 21 na cenie, zlecenia stop (H2 / L2) jako kropki.
     Etykieta „1” = pierwsze odbicie (H1 / L1, pomijane),
     „2” = świeca sygnałowa drugiego odbicia (H2 / L2).
+    Szara linia = pierwsza korekta (szczyt → dołek 1. nogi → H1),
+    zielona / czerwona = druga korekta (H1 → dołek 2. nogi → świeca
+    sygnałowa). Tylko setupy, które dały sygnał.
     Panel: zmiana EMA 21 na świecę (> 0 = trend wzrostowy, < 0 = spadkowy).
     """
     signals = _compute(bars)
@@ -179,6 +214,9 @@ def indicators(bars: pd.DataFrame) -> dict:
         "trend": None,
         "overlays": [
             (f"EMA {EMA_LENGTH}", average, "#FF9800"),
+            ("Pierwsza korekta", signals["first_leg"], "#9E9E9E"),
+            ("Druga korekta (long)", signals["second_leg_long"], "#00D084"),
+            ("Druga korekta (short)", signals["second_leg_short"], "#FF3B30"),
         ],
         "markers": [
             ("Buy stop (H2)", signals["entry_stop"].where(signals["buy"]), "#00D084", "above"),

@@ -29,9 +29,9 @@ sys.path.insert(0, str(_Path(__file__).resolve().parents[1]))
 
 from narzedzia.odcinki import folder_wynikow
 from narzedzia.plansze import (
-    BLACK, DPI, GRAY, GREEN, RED, SIZE, WHITE,
+    BLACK, DPI, GRAY, SIZE, WHITE,
     _body_font, _fit_width, _header, _heading_font, _heading_weight,
-    _pct, _save, _sign_color, _timeframe, combinations_text,
+    _pct, _save, _sign_color, _timeframe, combinations_text, profitable_color,
 )
 
 
@@ -135,7 +135,7 @@ def _column(fig, x, label, data, color):
     profitable = int((returns > 0).sum())
     items = [
         (f"{profitable}/{len(data)}", "kombinacji na plusie",
-         GREEN if profitable > len(data) / 2 else RED),
+         profitable_color(profitable, len(data))),
         (_pct(returns.median()), "mediana wyniku netto",
          _sign_color(returns.median())),
         (_pct(data["win_rate_%"].astype(float).median(), 1, sign=False),

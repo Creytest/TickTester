@@ -28,6 +28,8 @@ BLACK = "#0B0D10"
 WHITE = "#F2F2F2"
 GREEN = "#00D084"
 RED = "#FF3B30"
+# Wynik „na granicy”: Profit Factor 1–1,2 albo tylko część kombinacji na plusie.
+YELLOW = "#F5C542"
 GRAY = "#8A8F98"
 
 # 1920×1080 przy dpi=100.
@@ -214,7 +216,7 @@ def _medians(path, data, title, subtitle, claim_win_rate):
         (
             f"{profitable}/{len(data)}",
             "kombinacji na plusie\npo kosztach",
-            GREEN if profitable > len(data) / 2 else RED,
+            profitable_color(profitable, len(data)),
         ),
         (
             _pct(win_rate, 0, sign=False),
@@ -224,7 +226,7 @@ def _medians(path, data, title, subtitle, claim_win_rate):
         (
             _num(profit_factor, 2),
             "mediana\nProfit Factor",
-            GREEN if profit_factor >= 1 else RED,
+            profit_factor_color(profit_factor),
         ),
     ]
 
@@ -295,7 +297,7 @@ def _table(path, data, title, subtitle, costs):
             (_timeframe(row["timeframe"]), WHITE),
             (_pct(result), _sign_color(result)),
             (_pct(row["cagr_%"]), _sign_color(row["cagr_%"])),
-            (_num(row["profit_factor"], 2), WHITE),
+            (_num(row["profit_factor"], 2), profit_factor_color(row["profit_factor"])),
             (_pct(row["win_rate_%"], 1, sign=False), WHITE),
             (_pct(row["max_drawdown_%"], 1, sign=False), WHITE),
             (str(row["trades"]), WHITE),
@@ -399,3 +401,23 @@ def _sign_color(value) -> str:
     if value is None or pd.isna(value) or value == 0:
         return WHITE
     return GREEN if value > 0 else RED
+
+
+def profitable_color(profitable: int, total: int) -> str:
+    """X/N kombinacji na plusie: mniej niż połowa = czerwony, od połowy = żółty, od 80% = zielony."""
+    if total == 0:
+        return WHITE
+    share = profitable / total
+    if share < 0.5:
+        return RED
+    return YELLOW if share < 0.8 else GREEN
+
+
+def profit_factor_color(value) -> str:
+    """Profit Factor: poniżej 1 czerwony, 1–1,2 żółty (na granicy), od 1,2 zielony."""
+    if value is None or pd.isna(value):
+        return WHITE
+    value = float(value)
+    if value < 1:
+        return RED
+    return YELLOW if value < 1.2 else GREEN

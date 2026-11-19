@@ -12,6 +12,7 @@ import pandas as pd
 
 GREEN = "#00D084"
 RED = "#FF3B30"
+YELLOW = "#F5C542"
 
 
 def save_summary_chart(path, summary: pd.DataFrame, title: str, costs: str):
@@ -119,7 +120,7 @@ def save_summary_chart(path, summary: pd.DataFrame, title: str, costs: str):
         (
             "NA PLUSIE PO KOSZTACH",
             f"{profitable} z {len(data)}",
-            GREEN if profitable > len(data) / 2 else RED,
+            profitable_color(profitable, len(data)),
         ),
         ("MEDIANA WYNIKU", f"{median:+.2f}%", _sign_color(median)),
         (
@@ -182,3 +183,13 @@ def _sign_color(value) -> str:
     if value == 0:
         return "black"
     return GREEN if value > 0 else RED
+
+
+def profitable_color(profitable: int, total: int) -> str:
+    """Jak w narzedzia/plansze.py: poniżej połowy czerwony, od połowy żółty, od 80% zielony."""
+    if total == 0:
+        return "#F2F2F2"
+    share = profitable / total
+    if share < 0.5:
+        return RED
+    return YELLOW if share < 0.8 else GREEN

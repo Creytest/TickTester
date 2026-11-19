@@ -1,0 +1,16 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+//@version=6
+indicator("Internal Bar Strength (IBS)", shorttitle = "IBS", overlay = false, precision = 2)
+
+// IBS = (close - low) / (high - low): 0 = close at the low, 1 = close at the high.
+ibsMax = input.float(0.3, "Low IBS threshold", minval = 0.0, maxval = 1.0, step = 0.05)
+
+float rng = high - low
+float ibs = rng > 0 ? (close - low) / rng : na
+
+color col = ibs < ibsMax ? #FFC107 : color.new(#7E57C2, 0)
+plot(ibs, "IBS", color = col, style = plot.style_columns)
+hline(ibsMax, "Threshold", color = color.new(#FFC107, 0), linestyle = hline.style_dashed)
+hline(0.5, "Middle", color = color.new(color.gray, 60), linestyle = hline.style_dotted)
+hline(0, "0", color = color.new(color.gray, 80))
+hline(1, "1", color = color.new(color.gray, 80))

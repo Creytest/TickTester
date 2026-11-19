@@ -1,0 +1,45 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+//@version=6
+strategy("IBS Mean Reversion [Strategy]", shorttitle = "IBS MR S", overlay = true,
+     initial_capital     = 10000,
+     default_qty_type    = strategy.percent_of_equity,
+     default_qty_value   = 100,
+     commission_type     = strategy.commission.percent,
+     commission_value    = 0.05,
+     slippage            = 1,
+     pyramiding          = 0,
+     margin_long         = 100)
+
+// Rule: u/vaanam-dev (r/Daytrading), based on Quantified Strategies.
+// Long only, no SL/TP (as in the original). 100% of equity, compounding.
+// Orders fill at the next bar's open after the signal bar closes.
+
+// ── Inputs ─────────────────────────────────────────────
+lenHigh  = input.int(10, "Highest high length", minval = 1)
+lenAvg   = input.int(25, "Average range length", minval = 1)
+mult     = input.float(2.5, "Range multiplier", step = 0.1)
+ibsMax   = input.float(0.3, "IBS below", minval = 0.0, maxval = 1.0, step = 0.05)
+exitMode = input.string("Close > yesterday's high", "Exit",
+     options = ["Close > yesterday's high", "Close > yesterday's close"])
+
+// ── Calculations ───────────────────────────────────────
+float rng      = high - low
+float ibs      = rng > 0 ? (close - low) / rng : na
+float hh       = ta.highest(high, lenHigh)
+float avgRange = ta.sma(high, lenAvg) - ta.sma(low, lenAvg)
+float band     = hh - mult * avgRange
+
+bool setup   = close < band and ibs < ibsMax
+bool exitRaw = exitMode == "Close > yesterday's high" ? close > high[1] : close > close[1]
+
+// ── Orders ─────────────────────────────────────────────
+if strategy.position_size > 0 and exitRaw
+    strategy.close("Long", comment = "Exit")
+
+if setup
+    strategy.entry("Long", strategy.long, comment = "Buy")
+
+// ── Plots ──────────────────────────────────────────────
+plot(hh,   "Highest high", color = color.new(#4C8DFF, 0))
+plot(band, "Entry band",   color = color.new(#FFC107, 0), linewidth = 2)
+plot(ibs,  "IBS", display = display.data_window)

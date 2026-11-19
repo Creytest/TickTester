@@ -1,0 +1,71 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+//@version=6
+indicator("IBS Mean Reversion", shorttitle = "IBS MR", overlay = true, max_labels_count = 500)
+
+// Rule: u/vaanam-dev (r/Daytrading), based on Quantified Strategies.
+// Long:  close < highest high(10) - 2.5 * (SMA25(high) - SMA25(low))  AND  IBS < 0.3
+// Exit:  close > yesterday's high
+// Signals are evaluated on bar close (no repaint). Designed for the daily timeframe.
+
+// ── Inputs ─────────────────────────────────────────────
+lenHigh  = input.int(10, "Highest high length", minval = 1)
+lenAvg   = input.int(25, "Average range length", minval = 1)
+mult     = input.float(2.5, "Range multiplier", step = 0.1)
+ibsMax   = input.float(0.3, "IBS below", minval = 0.0, maxval = 1.0, step = 0.05)
+exitMode = input.string("Close > yesterday's high", "Exit",
+     options = ["Close > yesterday's high", "Close > yesterday's close"])
+showBand = input.bool(true, "Show bands")
+showBg   = input.bool(true, "Shade open position")
+showIbsDot   = input.bool(true, "Mark bars with IBS below threshold")
+showIbsLabel = input.bool(true, "Show IBS value on BUY bars")
+showIbsTable = input.bool(true, "Show current IBS (table)")
+
+// ── Calculations ───────────────────────────────────────
+float rng      = high - low
+float ibs      = rng > 0 ? (close - low) / rng : na
+float hh       = ta.highest(high, lenHigh)
+float avgRange = ta.sma(high, lenAvg) - ta.sma(low, lenAvg)
+float band     = hh - mult * avgRange
+
+bool setup   = close < band and ibs < ibsMax
+bool exitRaw = exitMode == "Close > yesterday's high" ? close > high[1] : close > close[1]
+
+// ── Position state (one long at a time, like the strategy) ──
+var bool inPos = false
+bool entrySig  = false
+bool exitSig   = false
+
+if barstate.isconfirmed
+    if inPos and exitRaw
+        exitSig := true
+        inPos   := false
+    if not inPos and setup
+        entrySig := true
+        inPos    := true
+
+// ── Plots ──────────────────────────────────────────────
+plot(showBand ? hh : na,   "Highest high", color = color.new(#4C8DFF, 0))
+plot(showBand ? band : na, "Entry band",   color = color.new(#FFC107, 0), linewidth = 2)
+plot(ibs, "IBS", display = display.data_window)
+
+plotshape(showIbsDot and ibs < ibsMax and not entrySig, "Low IBS", shape.circle, location.belowbar, color.new(#FFC107, 30), size = size.tiny)
+plotshape(entrySig, "Buy",  shape.triangleup,   location.belowbar, color.new(#00D084, 0), size = size.small, text = "BUY",  textcolor = color.new(#00D084, 0))
+
+if entrySig and showIbsLabel
+    label.new(bar_index, low, "IBS " + str.tostring(ibs, "0.00"), yloc = yloc.belowbar,
+         style = label.style_none, textcolor = color.new(#00D084, 0), size = size.small)
+plotshape(exitSig,  "Exit", shape.triangledown, location.abovebar, color.new(#FF3B30, 0), size = size.small, text = "EXIT", textcolor = color.new(#FF3B30, 0))
+
+bgcolor(showBg and (inPos or exitSig) ? color.new(#00D084, 92) : na, title = "Open position")
+
+var table info = table.new(position.top_right, 1, 2)
+if barstate.islast
+    if showIbsTable
+        color ibsCol = na(ibs) ? color.gray : ibs < ibsMax ? #FFC107 : #F2F2F2
+        table.cell(info, 0, 0, "IBS " + (na(ibs) ? "n/a" : str.tostring(ibs, "0.00")), text_color = ibsCol, bgcolor = color.new(#0B0D10, 10))
+    if timeframe.isintraday
+        table.cell(info, 0, 1, "IBS MR was designed for the daily (1D) timeframe", text_color = color.white, bgcolor = color.new(#FF3B30, 20))
+
+// ── Alerts (set "Once per bar close") ──────────────────
+alertcondition(entrySig, "IBS MR Buy",  "IBS Mean Reversion: BUY {{ticker}} at {{close}}")
+alertcondition(exitSig,  "IBS MR Exit", "IBS Mean Reversion: EXIT {{ticker}} at {{close}}")

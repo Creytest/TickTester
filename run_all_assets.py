@@ -11,7 +11,7 @@ import pandas as pd
 from narzedzia.tick_config import COMMISSION
 from narzedzia import plot_tick_backtest_xauusd as single
 from narzedzia.summary_chart import save_summary_chart
-from narzedzia.plansze import save_plansze
+from narzedzia.plansze import save_plansze, split_by_trades
 from narzedzia.interactive_chart import save_interactive_chart
 from narzedzia.odcinki import folder_wynikow
 from narzedzia.plansze_objasniajace.rynki_plansza import period_text, plansza as rynki_plansza
@@ -190,6 +190,12 @@ SAVE_PNG = False
 
 # Plansze PNG do filmu (0 rynki, 1 mediany, 2 wykres kapitału, 3 tabela).
 SAVE_PLANSZE = True
+
+# Kombinacje z mniejszą liczbą transakcji: poza X/N na plusie i medianą,
+# na końcu tabeli z dopiskiem („brak transakcji” / „za mało transakcji”).
+# None: wszystkie liczone (jak dotąd). Strategia może nadpisać atrybutem
+# MIN_TRADES (i NO_TRADES_TEXT, np. "brak nowych ATH").
+MIN_TRADES = None
 
 # Win Rate obiecany przez autora w procentach, np. 90.
 # None: na planszy 1 zamiast Win Rate jest Profit Factor.
@@ -380,6 +386,8 @@ def main():
     ) + " za stronę + 1 tick poślizgu (przybliżone)"
 
     ok = summary[summary["status"] == "OK"]
+    min_trades = getattr(strategy_module, "MIN_TRADES", MIN_TRADES)
+    zero_text = getattr(strategy_module, "NO_TRADES_TEXT", "brak transakcji")
 
     if not ok.empty:
         save_summary_chart(
@@ -387,6 +395,8 @@ def main():
             ok,
             title=f"{strategy_name} | {START_DATE} – {END_DATE}",
             costs=costs,
+            min_trades=min_trades,
+            zero_text=zero_text,
         )
 
     if SAVE_PLANSZE and not ok.empty:
@@ -406,6 +416,8 @@ def main():
             period=f"{START_DATE[:4]}–{END_DATE[:4]}",
             costs=costs,
             claim_win_rate=CLAIM_WIN_RATE,
+            min_trades=min_trades,
+            zero_text=zero_text,
         )
 
     print("\n" + "=" * 60)
@@ -419,12 +431,19 @@ def main():
     )
 
     if not ok.empty:
-        profitable = int((ok["return_%"] > 0).sum())
-        median = ok["return_%"].median()
+        counted, skipped = split_by_trades(ok, min_trades)
+        profitable = int((counted["return_%"] > 0).sum())
+        median = counted["return_%"].median()
         print(
-            f"\nNa plusie po kosztach: {profitable} z {len(ok)} "
+            f"\nNa plusie po kosztach: {profitable} z {len(counted)} "
             f"kombinacji. Mediana wyniku netto: {median:.2f}%."
         )
+        if not skipped.empty:
+            print(
+                f"Poza statystyką (< {min_trades} transakcji): "
+                + ", ".join(f"{r.asset} {r.timeframe} ({r.trades})"
+                            for r in skipped.itertuples())
+            )
 
     print(f"\nWykresy i tabela zapisane w: {out_dir}")
 

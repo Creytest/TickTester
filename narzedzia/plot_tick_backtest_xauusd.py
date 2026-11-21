@@ -407,7 +407,17 @@ def main(
         strategy_module.HISTORY_HIGH = history_high(
             asset, all_ticks, warmup_start
         )
-        print(f"Szczyt sprzed rozgrzewki: {strategy_module.HISTORY_HIGH}")
+        print(f"Szczyt sprzed rozgrzewki (z pliku): {strategy_module.HISTORY_HIGH}")
+
+        # Szczyt sprzed początku pliku (atrybut KNOWN_ATH strategii:
+        # {aktywo: (wartość, dzień, źródło)}) — bierzemy wyższy.
+        known = getattr(strategy_module, "KNOWN_ATH", {}).get(asset)
+        if known is not None and pd.Timestamp(known[1]) < warmup_start:
+            value, day, source = known
+            current = strategy_module.HISTORY_HIGH
+            if current is None or value > current:
+                strategy_module.HISTORY_HIGH = float(value)
+                print(f"Szczyt z KNOWN_ATH: {value} ({day}, {source}) — wyższy niż w pliku")
 
     # Strategie z ceną "1 tick za świecą" (atrybut TICK) dostają
     # najmniejszą zmianę ceny aktywa (syminfo.mintick).

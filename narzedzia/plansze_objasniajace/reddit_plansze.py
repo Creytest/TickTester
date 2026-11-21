@@ -363,11 +363,11 @@ def gold_thu_fri():
             s.ax.text(i, lo + s.dy * 0.6, days[i % 5], color=FG if i in hl else GREY, fontsize=17, ha="center", zorder=6)
 
     fig = figure()
-    s = Seg(fig, 0, "1. CZWARTEK: KUPNO", "Kupno złota na zamknięciu czwartku.", n, (lo, hi), right=1)
+    s = Seg(fig, 0, "1. CZWARTEK: KUPNO", "Kupujemy złoto w czwartek\nna koniec dnia.", n, (lo, hi), right=1)
     draw(s, THU + 1, {THU: GREEN})
     s.entry(THU, B[THU][3], GREEN, "")
 
-    s = Seg(fig, 1, "2. PIĄTEK: SPRZEDAŻ", "Sprzedaż na zamknięciu piątku.\nPozycja trwa jeden dzień.", n, (lo, hi), right=1)
+    s = Seg(fig, 1, "2. PIĄTEK: SPRZEDAŻ", "Sprzedajemy w piątek na koniec dnia.\nPozycję trzymamy jeden dzień.", n, (lo, hi), right=1)
     draw(s, FRI + 1, {THU: GREEN, FRI: FG})
     dot(s, THU + 0.5, B[THU][3], GREEN)
     s.exit(FRI + 0.5, B[FRI][3], GREEN, "")

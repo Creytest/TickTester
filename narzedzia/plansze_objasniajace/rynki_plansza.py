@@ -158,3 +158,7 @@ if __name__ == "__main__":
     # (test_dzienny.py --strategia MOC_MOO --aktywa BRK.A --od 2006-01-01).
     plansza(["BRK.A"], ["1D"], ROOT / "nagrania" / "Reddit" / "MOC_MOO" / "plansza_rynki.png",
             period_text("2006-01-01", "2025-12-31"))
+    # Gold Thursday-Friday: autor pisze o 20 latach — ticki XAUUSD od 2006
+    # (run_all_assets: START_DATE = "2006-01-01", CHUNK_YEARS = 5).
+    plansza(["XAUUSD"], ["5min"], ROOT / "nagrania" / "Reddit" / "Gold_ThuFri" / "plansza_rynki.png",
+            period_text("2006-01-01", "2025-12-31"))

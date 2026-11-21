@@ -282,7 +282,7 @@ def ema9_19():
     s.line(e19, T + 1, BLUE)
     s.entry(T - 0.5, entry, GREEN, "long")
 
-    s = Seg(fig, 2, "3. SL ZA EMA 19, TP 2:1", "Po zysku równym ryzyku SL na wejście.\nTylko 9:30–10:00 czasu NY.", n, (lo, hi))
+    s = Seg(fig, 2, "3. SL POD EMA 19, TP 2:1", "TP dwa razy dalej od wejścia niż SL.\nGdy zysk dojdzie do ryzyka, SL idzie na wejście.\nHandel tylko 9:30–10:00 czasu NY.", n, (lo, hi))
     s.candles(B, n, {T: GREEN})
     s.line(e9, n, YELLOW)
     s.line(e19, n, BLUE)

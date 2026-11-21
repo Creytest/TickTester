@@ -130,6 +130,41 @@ def _plansza(assets, timeframes, path, period):
     print("ok", path.relative_to(ROOT) if path.is_relative_to(ROOT) else path)
 
 
+def plansza_zrodla(tests, path):
+    """
+    Plansza 'na czym testuję', gdy rynki mają różne dane i okresy
+    (np. US500 na tickach 5 lat + BRK.A na świecach dziennych 20 lat).
+    tests: lista (aktywo, dane, interwał, okres), np.
+        ("US500", "dane tickowe", "15min", "5 lat: 2021–2025").
+    """
+    with plt.rc_context({"font.family": ["Inter", "DejaVu Sans"]}):
+        path = Path(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        fig = plt.figure(figsize=(19.2, 10.8), dpi=100, facecolor=BG)
+        ax = fig.add_axes([0, 0, 1, 1]); ax.set_xlim(0, 1920); ax.set_ylim(1080, 0); ax.axis("off")
+        ax.text(960, 45, "NA CZYM TESTUJĘ", color=FG, fontsize=58, family=TF, ha="center", va="top")
+
+        CW, GAP, CH, Y = 620, 60, 560, 230
+        n = len(tests)
+        L = (1920 - (n * CW + (n - 1) * GAP)) / 2
+        for j, (asset, dane, tf, okres) in enumerate(tests):
+            sym, nm, cat = ASSET_CARDS.get(asset, (asset, asset, ""))
+            x = L + j * (CW + GAP)
+            ax.add_patch(FancyBboxPatch((x, Y), CW, CH, boxstyle="round,pad=0,rounding_size=18",
+                                        fc=CARD, ec=LINE, lw=1.6))
+            ax.plot([x + 40, x + 90], [Y + 40, Y + 40], color=GREEN, lw=4, solid_capstyle="round")
+            ax.text(x + 40, Y + 65, sym, color=FG, fontsize=64, family=TF, va="top")
+            ax.text(x + 40, Y + 175, f"{nm} · {cat}", color=GREY, fontsize=22, va="top")
+            ax.plot([x + 40, x + CW - 40], [Y + 240, Y + 240], color=LINE, lw=1.6)
+            for i, (label, value) in enumerate((("DANE", dane), ("INTERWAŁ", tf_label(tf)), ("OKRES", okres))):
+                y = Y + 280 + i * 92
+                ax.text(x + 40, y, label, color=GREY, fontsize=16, fontweight="bold", va="top")
+                ax.text(x + 40, y + 28, value, color=FG, fontsize=30, family=TF, va="top")
+        fig.savefig(path, facecolor=BG)
+        plt.close(fig)
+    print("ok", path.relative_to(ROOT) if path.is_relative_to(ROOT) else path)
+
+
 def wszystkie_strategie():
     """Plansza rynków w folderze każdej strategii (bez wariantów _Control/_Standard)."""
     sys.path.insert(0, str(ROOT))
@@ -154,7 +189,10 @@ if __name__ == "__main__":
     plansza(["XAUUSD", "Bitcoin", "EURUSD", "Brent", "US500"], ["5min", "15min", "30min"],
             ROOT / "nagrania" / "TikTok" / "plansza_rynki.png",
             "5 pełnych lat: od początku 2021 do końca 2025 roku")
-    # MOC to MOO: akcje autora (BRK.A) na świecach dziennych, 20 lat
+    # MOC to MOO: S&P 500 na tickach (run_all_assets, 5 lat) + akcje autora
+    # (BRK.A) na świecach dziennych, 20 lat
     # (test_dzienny.py --strategia MOC_MOO --aktywa BRK.A --od 2006-01-01).
-    plansza(["BRK.A"], ["1D"], ROOT / "nagrania" / "Reddit" / "MOC_MOO" / "plansza_rynki.png",
-            period_text("2006-01-01", "2025-12-31"))
+    plansza_zrodla([
+        ("US500", "dane tickowe", "15min", "5 lat: 2021–2025"),
+        ("BRK.A", "świece dzienne", "1D", "20 lat: 2006–2025"),
+    ], ROOT / "nagrania" / "Reddit" / "MOC_MOO" / "plansza_rynki.png")

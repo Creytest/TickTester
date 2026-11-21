@@ -19,6 +19,13 @@ podsumowanie CSV + HTML, wykres HTML i transakcje każdego aktywa,
 plansze PNG jak z run_all_assets.py. Ponowny test części aktywów
 podmienia ich wiersze, resztę bierze z poprzedniego podsumowania.
 
+Strategie handlujące tylko na otwarciu i zamknięciu sesji USA (MOC to MOO)
+mają atrybut SWIECE_DZIENNE = "sesja": świeca dzienna zamienia się w ticki
+o 9:30 i 16:00 NY (swiece_dzienne.na_ticki_sesja), a test idzie na ich
+interwale (TIMEFRAMES[0]), np.:
+
+    python narzedzia/test_dzienny.py --strategia MOC_MOO --aktywa BRK.A --od 2000-01-01 --do 2025-12-31
+
 Pasuje do strategii na świecach dziennych (TIMEFRAMES z "1D"). Strategie
 intraday (godziny sesji, interwały minutowe) i własne świece (Renko)
 na świecach dziennych nie mają sensu — program ostrzega albo je pomija.
@@ -54,7 +61,7 @@ from narzedzia.plansze_objasniajace.rynki_plansza import period_text, plansza as
 STRATEGY = "IBS_MeanReversion"
 
 # Nazwy z AKTYWA_DZIENNE w narzedzia/swiece_dzienne.py:
-# "QQQ", "SPY", "XAUUSD", "BTCUSDT Spot", "BTCUSD" (+ własne).
+# "QQQ", "SPY", "XAUUSD", "BTCUSDT Spot", "BTCUSD", "BRK.A" (+ własne).
 ASSETS_TO_TEST = ["QQQ", "XAUUSD", "BTCUSDT Spot"]
 
 # Okres handlu. Gdy dane aktywa zaczynają się później (BTC), handel
@@ -62,6 +69,8 @@ ASSETS_TO_TEST = ["QQQ", "XAUUSD", "BTCUSDT Spot"]
 START_DATE = "2000-01-01"
 END_DATE = "2025-12-31"
 
+# Interwał testu: "1D", a dla strategii z SWIECE_DZIENNE = "sesja"
+# jej TIMEFRAMES[0] (ustawiane w main).
 TIMEFRAME = "1D"
 
 SAVE_HTML = True
@@ -77,13 +86,21 @@ CLAIM_WIN_RATE = None
 
 def main(strategy=STRATEGY, assets=ASSETS_TO_TEST, start_date=START_DATE,
          end_date=END_DATE, pobierz=False, claim_win_rate=CLAIM_WIN_RATE):
+    global TIMEFRAME
     module = single.load_strategy(strategy)
     name = module.NAME
-    _check_strategy(strategy, module)
+    sesja = getattr(module, "SWIECE_DZIENNE", None) == "sesja"
+    # Strategia sesyjna liczona na swoim interwale, reszta na 1D.
+    TIMEFRAME = module.TIMEFRAMES[0] if sesja else "1D"
+    na_ticki = sd.na_ticki_sesja if sesja else sd.na_ticki
+    if not sesja:
+        _check_strategy(strategy, module)
 
     out_dir = folder_strategii(strategy) / "wyniki_dzienne"
     out_dir.mkdir(parents=True, exist_ok=True)
-    print(f"Strategia: {name} | świece dzienne | {start_date} – {end_date}")
+    print(f"Strategia: {name} | świece dzienne"
+          + (f" → ticki 9:30/16:00 NY, interwał {TIMEFRAME}" if sesja else "")
+          + f" | {start_date} – {end_date}")
 
     warmup = single.warmup_span(TIMEFRAME, module)
     rows, equities = [], {}
@@ -111,7 +128,7 @@ def main(strategy=STRATEGY, assets=ASSETS_TO_TEST, start_date=START_DATE,
             print(f"Dane od {history.index[0]:%Y-%m-%d} → handel od {s} (po rozgrzewce {warmup.days} dni)")
 
         bars = history[(history.index >= start - warmup) & (history.index <= end)]
-        ticks = sd.na_ticki(bars, spec["spread_pct"])
+        ticks = na_ticki(bars, spec["spread_pct"])
         file_name = f"{strategy}_{asset.replace(' ', '_')}_{TIMEFRAME}_{start_date}_{end_date}"
 
         try:
@@ -191,7 +208,8 @@ def main(strategy=STRATEGY, assets=ASSETS_TO_TEST, start_date=START_DATE,
                            title=f"{name} | świece dzienne | {period}", costs=costs)
         if SAVE_PLANSZE:
             plansze_dir = out_dir / f"plansze_{strategy}_{start_date}_{end_date}"
-            rynki_plansza(list(dict.fromkeys(ok["asset"])), [TIMEFRAME],
+            # Strategia sesyjna i tak liczy na danych dziennych — na planszy 1D.
+            rynki_plansza(list(dict.fromkeys(ok["asset"])), ["1D" if sesja else TIMEFRAME],
                           plansze_dir / "0_rynki.png", period_text(start_date, end_date))
             save_plansze(plansze_dir, ok, equities, title=name, period=period,
                          costs=costs, claim_win_rate=claim_win_rate)
@@ -269,9 +287,10 @@ _MISSING = object()
 
 def _costs_text(asset):
     spec = sd.AKTYWA_DZIENNE[asset]
-    text = (f"{asset}: prowizja {spec['commission'] * 100:.4g}%/stronę"
+    text = (f"prowizja {spec['commission'] * 100:.4g}%/stronę"
             + (f", spread ~{spec['spread_pct'] * 100:.3g}% ceny" if spec["spread_pct"] else ""))
-    return text.replace(".", ",")
+    # Przecinek dziesiętny tylko w liczbach (nazwa aktywa może mieć kropkę, np. BRK.A).
+    return f"{asset}: " + text.replace(".", ",")
 
 
 def _merge_previous(summary, table, out_dir, equities, strategy, start_date, end_date, assets):

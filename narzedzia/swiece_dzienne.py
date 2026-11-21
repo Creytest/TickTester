@@ -31,7 +31,10 @@ OGRANICZENIA (mówić w filmie, gdy wyniki z tego źródła):
   COMMISSION w AKTYWA_DZIENNE).
 - Strategie z SL/TP: gdy w jednym dniu cena dotknie i SL, i TP,
   kolejność wynika z założonej drogi ceny (wyżej), a nie z ticków.
-- Strategie intraday (godziny sesji, interwały < 1D) tu nie pasują.
+- Strategie intraday (godziny sesji, interwały < 1D) tu nie pasują,
+  z wyjątkiem handlujących tylko na otwarciu i zamknięciu sesji USA
+  (MOC to MOO) — dla nich na_ticki_sesja() i atrybut strategii
+  SWIECE_DZIENNE = "sesja".
 """
 
 from __future__ import annotations
@@ -107,6 +110,18 @@ AKTYWA_DZIENNE = {
         "spread_pct": 0.0,
         "tick": 0.01,
         "opis": "Bitcoin (Yahoo)",
+    },
+    # Berkshire Hathaway A — na niej autor MOC to MOO (Reddit) grał.
+    # Jedna akcja kosztuje setki tysięcy USD: przy 10 000 USD silnik
+    # liczy ułamek akcji (w realu na BRK.A niemożliwe; BRK.B ma ten sam
+    # ruch ceny). Spread BRK.A jest szeroki — przyjmujemy ~0,03% ceny
+    # (przybliżenie, nie z danych).
+    "BRK.A": {
+        "zrodlo": "yahoo", "symbol": "BRK-A",
+        "commission": 0.0005,
+        "spread_pct": 0.0003,
+        "tick": 0.01,
+        "opis": "Berkshire Hathaway A",
     },
 }
 
@@ -376,5 +391,63 @@ def na_ticki(bars: pd.DataFrame, spread_pct: float = 0.0) -> pd.DataFrame:
     if "volume" in bars:
         vol = np.zeros((len(bars), 4))
         vol[:, 3] = bars["volume"].fillna(0).to_numpy(float)
+        ticks["volume"] = vol.ravel()
+    return ticks
+
+
+# Sesja akcji USA w czasie danych TickTestera (Nowy Jork + 7 h, cały rok).
+# Daty świec dziennych z Yahoo to daty sesji w Nowym Jorku.
+SESJA_OTWARCIE = pd.Timedelta(hours=16, minutes=30)   # 9:30 NY
+SESJA_ZAMKNIECIE = pd.Timedelta(hours=23)             # 16:00 NY
+
+
+def na_ticki_sesja(bars: pd.DataFrame, spread_pct: float = 0.0) -> pd.DataFrame:
+    """
+    Świece dzienne → ticki o godzinach sesji USA, dla strategii, które
+    handlują tylko na otwarciu i zamknięciu sesji (MOC to MOO). Pozwala
+    liczyć je na interwale minutowym (np. 15min) bez danych intraday.
+
+    Ticki dnia (czas danych = NY + 7 h):
+        16:29:59  otwarcie  — żeby istniała świeca kończąca się o 9:30 NY
+                              (sygnał wyjścia na otwarciu),
+        16:30:00  otwarcie  — 9:30 NY, tu wykonuje się zlecenie MOO,
+        18:00     pierwsze ekstremum (O→L→H→C / O→H→L→C jak na_ticki),
+        21:00     drugie ekstremum,
+        22:59:59  zamknięcie,
+        23:00:00  zamknięcie — 16:00 NY, tu wykonuje się zlecenie MOC.
+
+    Zlecenie wykonuje się na pierwszym ticku po zamknięciu świecy
+    sygnałowej, więc kupno = cena zamknięcia sesji, sprzedaż = cena
+    otwarcia następnej. Ceny w środku dnia są umowne (jak w na_ticki).
+    """
+    if bars.empty:
+        return pd.DataFrame(columns=["timestamp", "bid", "ask"])
+
+    o = bars["open"].to_numpy(float)
+    h = bars["high"].to_numpy(float)
+    l = bars["low"].to_numpy(float)
+    c = bars["close"].to_numpy(float)
+    up = c >= o
+    first = np.where(up, l, h)
+    second = np.where(up, h, l)
+
+    prices = np.column_stack([o, o, first, second, c, c]).ravel()
+    godziny = (
+        SESJA_OTWARCIE - pd.Timedelta(seconds=1), SESJA_OTWARCIE,
+        pd.Timedelta(hours=18), pd.Timedelta(hours=21),
+        SESJA_ZAMKNIECIE - pd.Timedelta(seconds=1), SESJA_ZAMKNIECIE,
+    )
+    day = pd.DatetimeIndex(bars.index).normalize().to_numpy()
+    offsets = np.array([g.to_timedelta64() for g in godziny])
+    times = (day[:, None] + offsets[None, :]).ravel()
+
+    ticks = pd.DataFrame({
+        "timestamp": pd.DatetimeIndex(times).astype("datetime64[ns]"),
+        "bid": prices,
+        "ask": prices * (1.0 + spread_pct),
+    })
+    if "volume" in bars:
+        vol = np.zeros((len(bars), 6))
+        vol[:, 4] = bars["volume"].fillna(0).to_numpy(float)
         ticks["volume"] = vol.ravel()
     return ticks

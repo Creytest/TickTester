@@ -276,13 +276,13 @@ def ema9_19():
     s.line(e9, T, YELLOW, label="EMA 9")
     s.line(e19, T, BLUE, label="EMA 19")
 
-    s = Seg(fig, 1, "2. DOTKNIĘCIE EMA 9 = LONG", "Wejście od razu przy dotknięciu,\nbez czekania na zamknięcie świecy.", n, (lo, hi))
+    s = Seg(fig, 1, "2. DOTKNIĘCIE EMA 9 = LONG", "Wejście od razu przy dotknięciu,\nbez czekania na zamknięcie świecy.\nTylko 9:30–10:00 czasu NY.", n, (lo, hi))
     s.candles(B, T + 1, {T: GREEN})
     s.line(e9, T + 1, YELLOW)
     s.line(e19, T + 1, BLUE)
     s.entry(T - 0.5, entry, GREEN, "long")
 
-    s = Seg(fig, 2, "3. SL ZA EMA 19, TP 2:1", "Po zysku równym ryzyku SL na wejście.\nTylko 9:30–10:00 czasu NY.", n, (lo, hi))
+    s = Seg(fig, 2, "3. SL POD EMA 19, TP 2:1", "TP dwa razy dalej od wejścia niż SL.\nGdy zysk dojdzie do ryzyka, SL idzie na wejście.\nSL szerszy niż 1,5 ATR = pomijamy wejście.", n, (lo, hi))
     s.candles(B, n, {T: GREEN})
     s.line(e9, n, YELLOW)
     s.line(e19, n, BLUE)

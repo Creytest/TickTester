@@ -233,7 +233,7 @@ def renko():
     s.line(e9, touch, YELLOW, label="EMA 9")
     s.line(e20, touch, BLUE, label="EMA 20")
 
-    s = Seg(fig, 1, "2. COFNIĘCIE I CEGŁA PRZEZ EMA 9", "Cofnięcie do EMA 20, potem cegła\nzamyka się nad EMA 9 = long. Short lustrzanie.", n, (lo, hi))
+    s = Seg(fig, 1, "2. COFNIĘCIE I CEGŁA PRZEZ EMA 9", "Gdy EMA 9 jest nad EMA 20: cofnięcie do EMA 20,\npotem cegła zamyka się nad EMA 9 = long.", n, (lo, hi))
     bricks(s, SIG + 1, {SIG: GREEN})
     s.line(e9, SIG + 1, YELLOW)
     s.line(e20, SIG + 1, BLUE)

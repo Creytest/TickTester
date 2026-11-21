@@ -4,9 +4,15 @@ import pandas as pd
 
 NAME = "MOC to MOO"
 
-# Autor grał akcjami Berkshire (BRK.A). Testujemy na S&P 500 (US500):
-# ten sam efekt nocny, a akcji nie mamy w danych.
+# Autor grał akcjami Berkshire (BRK.A). W run_all_assets (ticki)
+# testujemy na S&P 500 (US500): ten sam efekt nocny, a akcji nie mamy
+# w tickach. BRK.A na świecach dziennych z Yahoo:
+#   python narzedzia/test_dzienny.py --strategia MOC_MOO --aktywa BRK.A
 ASSETS = ["US500"]
+
+# Handel tylko na otwarciu i zamknięciu sesji — test_dzienny.py
+# zamienia świece dzienne na ticki o 9:30 i 16:00 NY (na_ticki_sesja).
+SWIECE_DZIENNE = "sesja"
 
 # Wejście 16:00 i wyjście 9:30 NY wypadają na granicy świec 15m,
 # więc mniejszy interwał nic nie zmienia.

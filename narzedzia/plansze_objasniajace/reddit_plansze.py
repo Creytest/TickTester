@@ -201,13 +201,17 @@ def renko():
     H = 14
     B, e9, e20 = B[H:], e9[H:], e20[H:]
     n = len(B)
-    # sygnał: po dotknięciu EMA 20 knotem cegła wzrostowa zamyka się nad EMA 9
+    # sygnał (jak w strategies/reddit/Renko_EMA9_20.py): cofnięcie = low cegły (knot albo korpus) <= EMA 20,
+    # potem cegła wzrostowa otwiera się na/pod EMA 9 i zamyka nad nią
     touch = next(i for i in range(1, n) if B[i][2] <= e20[i] and e9[i] > e20[i])
     SIG = next(i for i in range(touch + 1, n) if B[i][3] > B[i][0] and B[i][0] <= e9[i] < B[i][3])
     o, h, l, c = B[SIG]
-    knot = min(b[2] for b in B[touch:SIG + 1])
-    entry, sl = c, knot - 0.1
-    tp = entry + (1 + (min(o, c) - knot))
+    if l > o - 0.5:  # cegła sygnałowa z widocznym knotem (EMA liczone z zamknięć, więc bez zmian)
+        l = o - 0.6
+        B[SIG] = (o, h, l, c)
+    # SL tick pod knotem cegły sygnałowej, TP = cegła + jej knot (TP_FRACTION = 1,0)
+    entry, sl = c, l - 0.1
+    tp = entry + (c - l)
     EXIT = next(i for i in range(SIG + 1, n) if B[i][1] >= tp)
     n = EXIT + 3
     lo, hi = ylim_of(B, n, pad=0.1)
@@ -229,14 +233,14 @@ def renko():
     s.line(e9, touch, YELLOW, label="EMA 9")
     s.line(e20, touch, BLUE, label="EMA 20")
 
-    s = Seg(fig, 1, "2. COFNIĘCIE I CEGŁA PRZEZ EMA 9", "Knot dotyka EMA 20, potem cegła\nzamyka się nad EMA 9 = long. Short lustrzanie.", n, (lo, hi))
+    s = Seg(fig, 1, "2. COFNIĘCIE I CEGŁA PRZEZ EMA 9", "Gdy EMA 9 jest nad EMA 20: cofnięcie do EMA 20,\npotem cegła zamyka się nad EMA 9 = long.", n, (lo, hi))
     bricks(s, SIG + 1, {SIG: GREEN})
     s.line(e9, SIG + 1, YELLOW)
     s.line(e20, SIG + 1, BLUE)
-    s.tag(touch, B[touch][2], "dotknięcie", FG, True, size=16, off=0.5)
+    s.tag(touch, B[touch][2], "cofnięcie", FG, True, size=16, off=0.5)
     s.entry(SIG, entry, GREEN, "long")
 
-    s = Seg(fig, 2, "3. SL ZA KNOTEM, TP = CEGŁA + KNOT", "TP w odległości cegły i knota (1:1).\nWariant autora: połowa tego (1:0,5).", n, (lo, hi))
+    s = Seg(fig, 2, "3. SL ZA KNOTEM, TP = CEGŁA + KNOT", "TP w odległości cegły i knota (1:1, autor: 70% WR).\nAutor podaje też 1:0,5 (80% WR).", n, (lo, hi))
     bricks(s, n, {SIG: GREEN})
     s.line(e9, n, YELLOW)
     s.line(e20, n, BLUE)

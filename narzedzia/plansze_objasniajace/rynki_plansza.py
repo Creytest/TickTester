@@ -40,6 +40,7 @@ ASSET_CARDS = {
     "SPY": ("SPY", "S&P 500", "ETF"),
     "BTCUSDT Spot": ("BTCUSDT", "Bitcoin", "Binance Spot"),
     "BTCUSD": ("BTCUSD", "Bitcoin", "kryptowaluta"),
+    "BRK.A": ("BRK.A", "Berkshire Hath.", "akcje, klasa A"),
 }
 MONTHS = ["stycznia", "lutego", "marca", "kwietnia", "maja", "czerwca", "lipca",
           "sierpnia", "września", "października", "listopada", "grudnia"]
@@ -153,3 +154,7 @@ if __name__ == "__main__":
     plansza(["XAUUSD", "Bitcoin", "EURUSD", "Brent", "US500"], ["5min", "15min", "30min"],
             ROOT / "nagrania" / "TikTok" / "plansza_rynki.png",
             "5 pełnych lat: od początku 2021 do końca 2025 roku")
+    # MOC to MOO: akcje autora (BRK.A) na świecach dziennych, 20 lat
+    # (test_dzienny.py --strategia MOC_MOO --aktywa BRK.A --od 2006-01-01).
+    plansza(["BRK.A"], ["1D"], ROOT / "nagrania" / "Reddit" / "MOC_MOO" / "plansza_rynki.png",
+            period_text("2006-01-01", "2025-12-31"))

@@ -22,6 +22,34 @@ ATR_MULT = 3.0
 # None: szczyt liczony tylko z wczytanych świec.
 HISTORY_HIGH = None
 
+# Szczyty wszech czasów sprzed początku naszych plików z tickami
+# (wartość, dzień, źródło). Plik może zaczynać się po prawdziwym szczycie
+# (np. US500 od 2020-11, BTCUSDT Binance Futures od 2020-09) — wtedy
+# „nowy szczyt” z pliku nie byłby prawdziwym ATH. main bierze
+# max(szczyt z pliku, szczyt z tej tabeli), jeśli dzień jest przed
+# rozgrzewką. Ceny referencyjne (indeks/kontrakt/indeks cen), nie CFD
+# — CFD może różnić się o kilka ticków.
+KNOWN_ATH = {
+    # Spot XAU/USD 2075,32 (FXStreet, 2020-08-07, sesja azjatycka).
+    "XAUUSD": (2075.32, "2020-08-07", "FXStreet: XAU/USD refreshes record high above $2,075"),
+    # EUR/USD 1,6038 (CNN Money, 2008-07-15).
+    "EURUSD": (1.6038, "2008-07-15", "CNN Money: Dollar hits new low versus euro"),
+    # Brent 146,08 USD (Fox Business; lipiec 2008, dzień niepodany —
+    # bierzemy koniec miesiąca). Śróddzienny rekord bywa podawany jako
+    # 147,50 (11.07.2008) — niesprawdzone; dla 2021–2025 bez różnicy
+    # (szczyt 2022 ok. 139 USD).
+    "Brent": (146.08, "2008-07-31", "Fox Business: What are Brent crude's price records?"),
+    # S&P 500 3588,11 śróddziennie (Market Realist, 2020-09-02).
+    "US500": (3588.11, "2020-09-02", "Market Realist: S&P 500 all-time high"),
+    # BTC 19 783,06 USD (Fortune za CoinDesk Price Index, 2017-12-17).
+    "BTCUSDT": (19783.06, "2017-12-17", "Fortune / CoinDesk: bitcoin record high short of $20,000"),
+}
+
+# Kombinacje z mniejszą liczbą transakcji są poza X/N i medianą,
+# na końcu tabeli (narzedzia/plansze.py). Próg do decyzji Kamila.
+MIN_TRADES = 30
+NO_TRADES_TEXT = "brak nowych ATH"
+
 
 def all_time_high(bars: pd.DataFrame) -> pd.Series:
     """Szczyt wszech czasów sprzed danej świecy (bez niej)."""

@@ -49,7 +49,7 @@ from narzedzia import plot_tick_backtest_xauusd as single
 from narzedzia import swiece_dzienne as sd
 from narzedzia.tick_config import COMMISSION, TICK_SIZE
 from narzedzia.odcinki import folder_strategii
-from narzedzia.plansze import save_plansze
+from narzedzia.plansze import save_plansze, split_by_trades
 from narzedzia.summary_chart import save_summary_chart
 from narzedzia.plansze_objasniajace.rynki_plansza import period_text, plansza as rynki_plansza
 
@@ -194,6 +194,9 @@ def main(strategy=STRATEGY, assets=ASSETS_TO_TEST, start_date=START_DATE,
     summary.to_csv(table, index=False, sep=";", decimal=",")
 
     ok = summary[summary["status"] == "OK"] if "status" in summary else summary.iloc[0:0]
+    # Mało transakcji → poza statystyką (atrybut strategii, patrz run_all_assets.MIN_TRADES).
+    min_trades = getattr(module, "MIN_TRADES", None)
+    zero_text = getattr(module, "NO_TRADES_TEXT", "brak transakcji")
     costs = (
         "świece dzienne, koszty przybliżone: "
         + "; ".join(_costs_text(a) for a in dict.fromkeys(ok["asset"]) if a in sd.AKTYWA_DZIENNE)
@@ -205,14 +208,16 @@ def main(strategy=STRATEGY, assets=ASSETS_TO_TEST, start_date=START_DATE,
 
     if not ok.empty:
         save_summary_chart(out_dir / f"{table.stem}.html", ok,
-                           title=f"{name} | świece dzienne | {period}", costs=costs)
+                           title=f"{name} | świece dzienne | {period}", costs=costs,
+                           min_trades=min_trades, zero_text=zero_text)
         if SAVE_PLANSZE:
             plansze_dir = out_dir / f"plansze_{strategy}_{start_date}_{end_date}"
             # Strategia sesyjna i tak liczy na danych dziennych — na planszy 1D.
             rynki_plansza(list(dict.fromkeys(ok["asset"])), ["1D" if sesja else TIMEFRAME],
                           plansze_dir / "0_rynki.png", period_text(start_date, end_date))
             save_plansze(plansze_dir, ok, equities, title=name, period=period,
-                         costs=costs, claim_win_rate=claim_win_rate)
+                         costs=costs, claim_win_rate=claim_win_rate,
+                         min_trades=min_trades, zero_text=zero_text)
 
     print("\n" + "=" * 60)
     print(f"PODSUMOWANIE | {name} | świece dzienne | {period}")
@@ -222,8 +227,9 @@ def main(strategy=STRATEGY, assets=ASSETS_TO_TEST, start_date=START_DATE,
                         "cagr_%", "max_drawdown_%", "buy_hold_%", "buy_hold_cagr_%") if c in summary]
     print(summary[show].astype(object).fillna("–").to_string(index=False))
     if not ok.empty:
-        print(f"\nNa plusie po kosztach: {int((ok['return_%'] > 0).sum())} z {len(ok)}. "
-              f"Mediana wyniku netto: {ok['return_%'].median():.2f}%.")
+        counted, _ = split_by_trades(ok, min_trades)
+        print(f"\nNa plusie po kosztach: {int((counted['return_%'] > 0).sum())} z {len(counted)}. "
+              f"Mediana wyniku netto: {counted['return_%'].median():.2f}%.")
     print(f"\nWyniki zapisane w: {out_dir}")
     return summary
 

@@ -11,6 +11,12 @@ Plansze wyników do filmu (PNG 1920×1080, kolory kanału).
     na plusie, czerwona na minusie).
 3_tabela.png — pełna tabela wyników do pobrania z opisu.
 
+min_trades (opcja, domyślnie wyłączona): kombinacje z mniejszą liczbą
+transakcji nie wchodzą do X/N na plusie, median ani wykresu kapitału.
+W tabeli stoją na końcu, na szaro, z dopiskiem (np. „brak nowych ATH”
+przy 0 transakcji albo „za mało transakcji (< 30)”). Strategia włącza
+to atrybutem MIN_TRADES (i NO_TRADES_TEXT), patrz split_by_trades.
+
 Fonty: Anton (nagłówki, liczby) i Inter (reszta). Jeśli nie są
 zainstalowane w systemie, używany jest font zastępczy. Tytuł
 i duże liczby same zmniejszają się, gdy nie mieszczą się
@@ -61,6 +67,42 @@ def combinations_text(data: pd.DataFrame) -> str:
     )
 
 
+def split_by_trades(data: pd.DataFrame, min_trades=None):
+    """
+    (liczone, pominięte): kombinacje z co najmniej min_trades
+    transakcjami i reszta. min_trades=None — nic nie pomijamy.
+    """
+    data = data.reset_index(drop=True)
+    if not min_trades or "trades" not in data.columns:
+        return data, data.iloc[0:0]
+
+    trades = pd.to_numeric(data["trades"], errors="coerce").fillna(0)
+    keep = trades >= min_trades
+    return (
+        data[keep].reset_index(drop=True),
+        data[~keep].reset_index(drop=True),
+    )
+
+
+def low_trades_text(trades, min_trades, zero_text="brak transakcji") -> str:
+    """Dopisek przy pominiętej kombinacji."""
+    trades = 0 if pd.isna(trades) else int(trades)
+    if trades == 0:
+        return zero_text
+    return f"za mało transakcji (< {int(min_trades)})"
+
+
+def skipped_note(skipped: pd.DataFrame, min_trades) -> str:
+    """Np. "Poza statystyką: 4 kombinacje z < 30 transakcji"."""
+    if skipped.empty:
+        return ""
+    return (
+        "Poza statystyką: "
+        + count_text(len(skipped), "kombinacja", "kombinacje", "kombinacji")
+        + f" z < {int(min_trades)} transakcji (koniec tabeli)"
+    )
+
+
 def save_plansze(
     folder,
     summary: pd.DataFrame,
@@ -69,6 +111,8 @@ def save_plansze(
     period: str,
     costs: str,
     claim_win_rate=None,
+    min_trades=None,
+    zero_text: str = "brak transakcji",
 ) -> list[Path]:
     """
     Zapisuje trzy plansze do folderu i zwraca ich ścieżki.
@@ -78,12 +122,17 @@ def save_plansze(
     timestamp i equity}.
     claim_win_rate — Win Rate obiecany przez autora w procentach
     (np. 90) albo None.
+    min_trades — kombinacje z mniejszą liczbą transakcji poza
+    statystyką, na końcu tabeli (None: wszystkie liczone).
+    zero_text — dopisek przy 0 transakcji, np. "brak nowych ATH".
     """
     folder = Path(folder)
     folder.mkdir(parents=True, exist_ok=True)
 
     data = summary.reset_index(drop=True)
     subtitle = f"{combinations_text(data)}  |  {period}  |  po kosztach"
+    counted, skipped = split_by_trades(data, min_trades)
+    note = skipped_note(skipped, min_trades)
 
     paths = [
         folder / "1_mediany.png",
@@ -100,9 +149,10 @@ def save_plansze(
     # ustawienia Matplotlib, np. włącza pionową siatkę. Plansze
     # rysujemy więc na ustawieniach domyślnych.
     with plt.style.context("default"):
-        _medians(paths[0], data, title, subtitle, claim_win_rate)
-        _equity_chart(paths[1], data, equities, title, subtitle)
-        _table(paths[2], data, title, subtitle, costs)
+        _medians(paths[0], counted, title, subtitle, claim_win_rate, note)
+        _equity_chart(paths[1], counted, equities, title, subtitle, note)
+        _table(paths[2], counted, title, subtitle, costs,
+               skipped=skipped, min_trades=min_trades, zero_text=zero_text)
 
     return paths
 
@@ -111,7 +161,7 @@ def save_plansze(
 # 1. WYKRES KAPITAŁU
 # ============================================================
 
-def _equity_chart(path, data, equities, title, subtitle):
+def _equity_chart(path, data, equities, title, subtitle, note=""):
     curves = {}
 
     for _, row in data.iterrows():
@@ -186,7 +236,9 @@ def _equity_chart(path, data, equities, title, subtitle):
     ax.grid(axis="y", color="#1C2026", linewidth=1)
 
     _header(fig, title, subtitle)
-    fig.subplots_adjust(left=0.08, right=0.80, top=0.80, bottom=0.08)
+    _note(fig, note)
+    fig.subplots_adjust(left=0.08, right=0.80, top=0.80,
+                        bottom=0.12 if note else 0.08)
     _save(fig, path)
 
 
@@ -194,11 +246,12 @@ def _equity_chart(path, data, equities, title, subtitle):
 # 2. MEDIANY
 # ============================================================
 
-def _medians(path, data, title, subtitle, claim_win_rate):
+def _medians(path, data, title, subtitle, claim_win_rate, note=""):
     returns = data["return_%"].astype(float)
     profitable = int((returns > 0).sum())
-    win_rate = float(data["win_rate_%"].astype(float).median())
-    profit_factor = float(data["profit_factor"].astype(float).median())
+    # Przy pustym zbiorze (wszystko poza statystyką) mediany to NaN → „–”.
+    win_rate = float(data["win_rate_%"].astype(float).median()) if len(data) else float("nan")
+    profit_factor = float(data["profit_factor"].astype(float).median()) if len(data) else float("nan")
 
     # Mediana wyniku netto jest na planszy 2, więc tu jej
     # nie powtarzamy. Win Rate bez obietnicy autora jest szary
@@ -207,7 +260,9 @@ def _medians(path, data, title, subtitle, claim_win_rate):
         win_rate_label = (
             f"mediana Win Rate\nobiecane: {_num(claim_win_rate, 0)}%"
         )
-        win_rate_color = GREEN if win_rate >= claim_win_rate else RED
+        win_rate_color = GREEN if win_rate >= claim_win_rate else (
+            RED if pd.notna(win_rate) else WHITE
+        )
     else:
         win_rate_label = "mediana\nWin Rate"
         win_rate_color = WHITE
@@ -251,6 +306,7 @@ def _medians(path, data, title, subtitle, claim_win_rate):
     # Wszystkie liczby tej samej wielkości, każda z odstępem od
     # sąsiednich (najwyżej 80% szerokości swojej kolumny).
     _fit_width(fig, values, width * 0.8, min_size=60)
+    _note(fig, note)
 
     _save(fig, path)
 
@@ -259,7 +315,11 @@ def _medians(path, data, title, subtitle, claim_win_rate):
 # 3. TABELA
 # ============================================================
 
-def _table(path, data, title, subtitle, costs):
+def _table(path, data, title, subtitle, costs, skipped=None,
+           min_trades=None, zero_text="brak transakcji"):
+    if skipped is None:
+        skipped = data.iloc[0:0]
+
     columns = [
         ("Aktywo", 0.06, "left"),
         ("Interwał", 0.21, "left"),
@@ -275,7 +335,9 @@ def _table(path, data, title, subtitle, costs):
     _header(fig, title, subtitle)
 
     top, bottom = 0.76, 0.10
-    row_height = min(0.055, (top - bottom) / (len(data) + 1))
+    # Pominięte kombinacje: wiersz odstępu i szare wiersze na końcu.
+    rows = len(data) + (len(skipped) + 1 if len(skipped) else 0)
+    row_height = min(0.055, (top - bottom) / (rows + 1))
     font_size = 24 if row_height >= 0.05 else 18
 
     for name, x, align in columns:
@@ -306,6 +368,27 @@ def _table(path, data, title, subtitle, costs):
             fig.text(x, y, text, ha=align, va="center", color=color,
                      fontsize=font_size, fontfamily=_body_font())
 
+    if len(skipped):
+        y = top - row_height * (len(data) + 1)
+        fig.text(0.06, y, "Poza statystyką (X/N na plusie i mediany):",
+                 ha="left", va="center", color=GRAY,
+                 fontsize=font_size - 4, fontfamily=_body_font())
+
+        for i, (_, row) in enumerate(skipped.iterrows()):
+            y = top - row_height * (len(data) + 2 + i)
+            trades = pd.to_numeric(row["trades"], errors="coerce")
+            cells = [
+                (columns[0], row["asset"]),
+                (columns[1], _timeframe(row["timeframe"])),
+                (columns[2], _pct(row["return_%"])),
+                # Dopisek zamiast CAGR … Max Drawdown.
+                (("", 0.45, "left"), low_trades_text(trades, min_trades, zero_text)),
+                (columns[7], "0" if pd.isna(trades) else str(int(trades))),
+            ]
+            for (_, x, align), text in cells:
+                fig.text(x, y, text, ha=align, va="center", color=GRAY,
+                         fontsize=font_size, fontfamily=_body_font())
+
     fig.text(0.04, 0.04, f"Koszty: {costs}.", ha="left", va="center",
              color=GRAY, fontsize=14, fontfamily=_body_font())
 
@@ -330,6 +413,13 @@ def _header(fig, title, subtitle):
     _fit_width(fig, [heading], 0.92, min_size=26)
     fig.text(0.04, 0.855, subtitle, ha="left", va="center",
              color=GRAY, fontsize=22, fontfamily=_body_font())
+
+
+def _note(fig, text):
+    """Szary dopisek u dołu planszy (np. pominięte kombinacje)."""
+    if text:
+        fig.text(0.04, 0.03, text, ha="left", va="center", color=GRAY,
+                 fontsize=16, fontfamily=_body_font())
 
 
 def _fit_width(fig, texts, max_width, min_size):

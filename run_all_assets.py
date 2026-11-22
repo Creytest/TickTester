@@ -74,6 +74,11 @@ from narzedzia.plansze_objasniajace.rynki_plansza import period_text, plansza as
 #                                 zamknięcie między nimi → kupno; wyjście: zamknięcie nad EMA i nad poprzednim high;
 #                                 tylko long, bez SL (100% kapitału), 15m/1h/4h
 #
+# ---------------- Strategie z YouTube (strategies/youtube) ----------------
+#   "MACD_EMA200"               — MACD + 200 EMA (TradingLab, „BEST MACD Trading Strategy [86% Win Rate]”, 4,6 mln wyśw.):
+#                                 MACD 12/26/9 przecina sygnał w górę pod zerem + close nad EMA 200 → long (short lustrzanie),
+#                                 SL na EMA 200, TP 1,5 × SL, 1% ryzyka, 15m/1h/4h (wersja podstawowa, bez S/R „na oko”)
+#
 # ---------------- Strategie z książek (strategies/ksiazki) ----------------
 # Wszystkie naraz:
 # STRATEGY = ["ConnorsCumulativeRSI", "ConnorsCumulativeRSI_50", "ConnorsCumulativeRSI_Control",
@@ -158,7 +163,8 @@ from narzedzia.plansze_objasniajace.rynki_plansza import period_text, plansza as
 # Już przetestowane (TikTok):
 # STRATEGY = ["EMA9", "LuxAlgo_SR_Breaks_MSTS", "CloudMA_EMA30_74", "BigBeluga_Stoch_80percent", "RSI6_80_20", "SFP_Volume"]
 # STRATEGY = ["EMA9_VWAP", "SR_Retest", "SSL_IFVG"]
-STRATEGY = ["EMA_SMA_Pullback"]
+# STRATEGY = ["EMA_SMA_Pullback"]
+STRATEGY = ["MACD_EMA200"]
 
 # Każde aktywo jest testowane na każdym z tych interwałów.
 # Strategia może je nadpisać własną listą TIMEFRAMES.

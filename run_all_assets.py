@@ -42,7 +42,7 @@ from narzedzia.plansze_objasniajace.rynki_plansza import period_text, plansza as
 # ---------------- Strategie z Reddita (strategies/reddit) ----------------
 # Wszystkie naraz:
 # STRATEGY = ["IBS_MeanReversion", "IBS_GoldFutures", "RSI_90", "MOC_MOO", "RSI_MACD", "Gold_ThuFri", "ATH_ATR",
-#             "HolyGrail", "ElephantBar_MA200", "EMA9_19_Scalping", "SecondEntry", "Renko_EMA9_20"]
+#             "HolyGrail", "ElephantBar_MA200", "EMA9_19_Scalping", "SecondEntry", "Renko_EMA9_20", "EMA_SMA_Pullback"]
 #   "IBS_MeanReversion"         — IBS Mean Reversion (zamknięcie pod progiem + IBS < 0,3, wyjście nad wczorajszym high), 1D
 #                                 wariant wyjścia: EXIT_MODE w pliku strategii ("high" / "close")
 #   "IBS_GoldFutures"           — IBS - gold futures (wybicie Initial Balance 8:20–9:20 NY, SL za IB, TP = szerokość IB,
@@ -70,6 +70,9 @@ from narzedzia.plansze_objasniajace.rynki_plansza import period_text, plansza as
 #                                 cofnięcie knotem do EMA 20, cegła zamyka się z powrotem przez EMA 9 → wejście na ticku
 #                                 zamknięcia, SL tick za knotem, TP = cegła + knot (TP_FRACTION = 0.5: połowa); EURUSD cegła
 #                                 4 pipsy, reszta: 1 cegła / 5 min handlu (kalibracja na 30 dniach); "5min" = tylko rozgrzewka
+#   "EMA_SMA_Pullback"          — EMA/SMA Pullback (The-Goat-Trader, r/Daytrading): EMA 10 > SMA 20, obie rosną lub płaskie,
+#                                 zamknięcie między nimi → kupno; wyjście: zamknięcie nad EMA i nad poprzednim high;
+#                                 tylko long, bez SL (100% kapitału), 15m/1h/4h
 #
 # ---------------- Strategie z książek (strategies/ksiazki) ----------------
 # Wszystkie naraz:
@@ -154,7 +157,8 @@ from narzedzia.plansze_objasniajace.rynki_plansza import period_text, plansza as
 # Błąd jednej strategii nie zatrzymuje kolejnych.
 # Już przetestowane (TikTok):
 # STRATEGY = ["EMA9", "LuxAlgo_SR_Breaks_MSTS", "CloudMA_EMA30_74", "BigBeluga_Stoch_80percent", "RSI6_80_20", "SFP_Volume"]
-STRATEGY = ["EMA9_VWAP", "SR_Retest", "SSL_IFVG"]
+# STRATEGY = ["EMA9_VWAP", "SR_Retest", "SSL_IFVG"]
+STRATEGY = ["EMA_SMA_Pullback"]
 
 # Każde aktywo jest testowane na każdym z tych interwałów.
 # Strategia może je nadpisać własną listą TIMEFRAMES.

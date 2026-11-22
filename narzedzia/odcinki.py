@@ -25,6 +25,7 @@ ODCINEK_ZRODLA = {
     "tradingview": "TradingView",
     "tradingview_porownawcze": "TradingViewPorownawcze",
     "ksiazki": "Ksiazki",
+    "youtube": "YouTube",
 }
 
 # Strategie, które idą do innego odcinka niż ich folder, np. {"RSI_90": "RSI"}.

@@ -151,7 +151,7 @@ def wszystkie_strategie():
 if __name__ == "__main__":
     wszystkie_strategie()
     # Plansza ogólna odcinka TikTok (5 rynków × 5/15/30 min).
-    plansza(["XAUUSD", "Bitcoin", "EURUSD", "Brent", "US500"], ["5min", "15min", "30min"],
+    plansza(["XAUUSD", "BTCUSDT", "EURUSD", "Brent", "US500"], ["5min", "15min", "30min"],
             ROOT / "nagrania" / "TikTok" / "plansza_rynki.png",
             "5 pełnych lat: od początku 2021 do końca 2025 roku")
     # MOC to MOO: akcje autora (BRK.A) na świecach dziennych, 20 lat

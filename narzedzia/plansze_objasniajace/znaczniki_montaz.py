@@ -1,5 +1,5 @@
 """Znaczniki do montażu (DaVinci): okręgi, ramki i strzałki w prawo, PNG z przezroczystym tłem.
-Kolory kanału: zielony #00D084, czerwony #FF3B30, biały #F2F2F2.
+Kolory kanału: zielony #00D084, czerwony #FF3B30, biały #F2F2F2, czarny #0B0D10 (na jasne tło, np. wykres HTML).
 
 Uruchomienie (z głównego folderu repo):
     python narzedzia/plansze_objasniajace/znaczniki_montaz.py
@@ -16,8 +16,9 @@ from PIL import Image, ImageDraw
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / "nagrania" / "_montaz" / "znaczniki"
 S = 4  # nadpróbkowanie (gładkie krawędzie)
-KOLORY = {"zielony": (0, 208, 132, 255), "czerwony": (255, 59, 48, 255), "bialy": (242, 242, 242, 255)}
-STRZALKA = {"zielony": "zielona", "czerwony": "czerwona", "bialy": "biala"}
+KOLORY = {"zielony": (0, 208, 132, 255), "czerwony": (255, 59, 48, 255), "bialy": (242, 242, 242, 255),
+           "czarny": (11, 13, 16, 255)}
+STRZALKA = {"zielony": "zielona", "czerwony": "czerwona", "bialy": "biala", "czarny": "czarna"}
 KATY = [60, 45, 30, 15, 0, -15, -30, -45, -60]  # dodatni = w górę, ujemny = w dół; zawsze w prawo
 
 
@@ -61,7 +62,7 @@ def strzalka(c, kat, path, n=400):
 
 
 def podglad(path):
-    P = Image.new("RGBA", (9 * 180, 3 * 180), (11, 13, 16, 255))
+    P = Image.new("RGBA", (9 * 180, len(KOLORY) * 180), (110, 116, 124, 255))  # szare tło: widać biały i czarny
     for j, k in enumerate(KOLORY):
         for i, a in enumerate(KATY):
             im = Image.open(OUT / "strzalki" / f"strzalka_{STRZALKA[k]}_{nazwa_kata(a)}.png").resize((180, 180))

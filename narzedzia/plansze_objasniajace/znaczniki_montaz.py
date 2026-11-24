@@ -3,7 +3,7 @@ Kolory kanału: zielony #00D084, czerwony #FF3B30, biały #F2F2F2, czarny #0B0D1
 
 Uruchomienie (z głównego folderu repo):
     python narzedzia/plansze_objasniajace/znaczniki_montaz.py
-→ nagrania/_montaz/znaczniki/ (okrag_<kolor>[_bardzo_gruby], ramka_*, strzalki/strzalka_<kolor>_<nachylenie>.png)
+→ nagrania/_montaz/znaczniki/ (prostokat_tlo_0B0D10 — zasłona plansz 1-2-3, okrag_<kolor>[_bardzo_gruby], ramka_*, strzalki/strzalka_<kolor>_<nachylenie>.png)
 
 W DaVinci: PNG na ścieżkę V2 nad nagraniem, Inspector → Transform (Position, Zoom,
 Rotation Angle dla kąta pośredniego), fade ~5 klatek na początku i końcu.
@@ -61,6 +61,11 @@ def strzalka(c, kat, path, n=400):
     im.resize((n, n), Image.LANCZOS).save(path)
 
 
+def prostokat_tla(path):
+    """Pełny ekran w kolorze tła plansz 1-2-3 (#0B0D10) — zasłona do odsłaniania segmentów."""
+    Image.new("RGB", (1920, 1080), KOLORY["czarny"][:3]).save(path)
+
+
 def podglad(path):
     P = Image.new("RGBA", (9 * 180, len(KOLORY) * 180), (110, 116, 124, 255))  # szare tło: widać biały i czarny
     for j, k in enumerate(KOLORY):
@@ -78,6 +83,7 @@ def main():
         ramka(c, OUT / f"ramka_{k}.png")
         for a in KATY:
             strzalka(c, a, OUT / "strzalki" / f"strzalka_{STRZALKA[k]}_{nazwa_kata(a)}.png")
+    prostokat_tla(OUT / "prostokat_tlo_0B0D10.png")
     podglad(OUT / "strzalki_podglad.jpg")
     print("ok", OUT.relative_to(ROOT))
 

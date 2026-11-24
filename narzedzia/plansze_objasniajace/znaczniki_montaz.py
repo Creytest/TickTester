@@ -1,9 +1,9 @@
 """Znaczniki do montażu (DaVinci): okręgi, ramki i strzałki w prawo, PNG z przezroczystym tłem.
-Kolory kanału: zielony #00D084, czerwony #FF3B30, biały #F2F2F2.
+Kolory kanału: zielony #00D084, czerwony #FF3B30, biały #F2F2F2, czarny #0B0D10 (na jasne tło, np. wykres HTML).
 
 Uruchomienie (z głównego folderu repo):
     python narzedzia/plansze_objasniajace/znaczniki_montaz.py
-→ nagrania/_montaz/znaczniki/ (okrag_*, ramka_*, strzalki/strzalka_<kolor>_<nachylenie>.png)
+→ nagrania/_montaz/znaczniki/ (okrag_<kolor>[_bardzo_gruby], ramka_*, strzalki/strzalka_<kolor>_<nachylenie>.png)
 
 W DaVinci: PNG na ścieżkę V2 nad nagraniem, Inspector → Transform (Position, Zoom,
 Rotation Angle dla kąta pośredniego), fade ~5 klatek na początku i końcu.
@@ -16,8 +16,9 @@ from PIL import Image, ImageDraw
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / "nagrania" / "_montaz" / "znaczniki"
 S = 4  # nadpróbkowanie (gładkie krawędzie)
-KOLORY = {"zielony": (0, 208, 132, 255), "czerwony": (255, 59, 48, 255), "bialy": (242, 242, 242, 255)}
-STRZALKA = {"zielony": "zielona", "czerwony": "czerwona", "bialy": "biala"}
+KOLORY = {"zielony": (0, 208, 132, 255), "czerwony": (255, 59, 48, 255), "bialy": (242, 242, 242, 255),
+           "czarny": (11, 13, 16, 255)}
+STRZALKA = {"zielony": "zielona", "czerwony": "czerwona", "bialy": "biala", "czarny": "czarna"}
 KATY = [60, 45, 30, 15, 0, -15, -30, -45, -60]  # dodatni = w górę, ujemny = w dół; zawsze w prawo
 
 
@@ -25,9 +26,15 @@ def nazwa_kata(a):
     return "poziomo" if a == 0 else (f"gora_{a}st" if a > 0 else f"dol_{-a}st")
 
 
-def okrag(c, path):
+# Grubość obwódki w px na kanwie 400×400. Okrąg mocno pomniejszany w DaVinci (małe rzeczy na ekranie)
+# traci grubość proporcjonalnie, więc linia jest gruba: 40 px = po Zoom 0,25 nadal ~10 px.
+OKRAG_GRUBOSC = {"": 40, "_bardzo_gruby": 70}
+
+
+def okrag(c, path, grubosc=40):
     im = Image.new("RGBA", (400 * S, 400 * S), (0, 0, 0, 0))
-    ImageDraw.Draw(im).ellipse([20 * S, 20 * S, 380 * S, 380 * S], outline=c, width=14 * S)
+    m = grubosc // 2 + 4  # margines, żeby obwódka nie wychodziła poza kanwę
+    ImageDraw.Draw(im).ellipse([m * S, m * S, (400 - m) * S, (400 - m) * S], outline=c, width=grubosc * S)
     im.resize((400, 400), Image.LANCZOS).save(path)
 
 
@@ -55,7 +62,7 @@ def strzalka(c, kat, path, n=400):
 
 
 def podglad(path):
-    P = Image.new("RGBA", (9 * 180, 3 * 180), (11, 13, 16, 255))
+    P = Image.new("RGBA", (9 * 180, len(KOLORY) * 180), (110, 116, 124, 255))  # szare tło: widać biały i czarny
     for j, k in enumerate(KOLORY):
         for i, a in enumerate(KATY):
             im = Image.open(OUT / "strzalki" / f"strzalka_{STRZALKA[k]}_{nazwa_kata(a)}.png").resize((180, 180))
@@ -66,7 +73,8 @@ def podglad(path):
 def main():
     (OUT / "strzalki").mkdir(parents=True, exist_ok=True)
     for k, c in KOLORY.items():
-        okrag(c, OUT / f"okrag_{k}.png")
+        for sufiks, g in OKRAG_GRUBOSC.items():
+            okrag(c, OUT / f"okrag_{k}{sufiks}.png", g)
         ramka(c, OUT / f"ramka_{k}.png")
         for a in KATY:
             strzalka(c, a, OUT / "strzalki" / f"strzalka_{STRZALKA[k]}_{nazwa_kata(a)}.png")

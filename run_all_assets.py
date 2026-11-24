@@ -164,7 +164,12 @@ from narzedzia.plansze_objasniajace.rynki_plansza import period_text, plansza as
 # STRATEGY = ["EMA9", "LuxAlgo_SR_Breaks_MSTS", "CloudMA_EMA30_74", "BigBeluga_Stoch_80percent", "RSI6_80_20", "SFP_Volume"]
 # STRATEGY = ["EMA9_VWAP", "SR_Retest", "SSL_IFVG"]
 # STRATEGY = ["EMA_SMA_Pullback"]
-STRATEGY = ["MACD_EMA200"]
+# STRATEGY = ["MACD_EMA200"]
+# Przeliczenie BTC na BTCUSDT (Binance Futures) strategii TikTok liczonych
+# jeszcze na "Bitcoin" (CFD) — razem z TYLKO_AKTYWA = ["BTCUSDT"] niżej.
+# Wiersze innych aktywów zostają z poprzedniego podsumowania, a stare
+# wiersze "Bitcoin" znikają (ZASTEPUJE).
+STRATEGY = ["LuxAlgo_SR_Breaks_MSTS", "EMA9", "BigBeluga_Stoch_80percent", "CloudMA_EMA30_74"]
 
 # Każde aktywo jest testowane na każdym z tych interwałów.
 # Strategia może je nadpisać własną listą TIMEFRAMES.
@@ -192,6 +197,12 @@ ASSETS_TO_TEST = ["XAUUSD", "BTCUSDT", "EURUSD", "Brent", "US500"]
 # interwałem znika z poprzedniego podsumowania, a BTCUSDT zajmuje
 # jego miejsce. Dzięki temu test samego BTCUSDT nie daje 18 kombinacji.
 ZASTEPUJE = {"BTCUSDT": "Bitcoin"}
+
+# Przeliczenie tylko wybranych aktywów, np. ["BTCUSDT"]: zawęża listę
+# aktywów strategii (ASSETS strategii albo ASSETS_TO_TEST). Pozostałe
+# aktywa zostają z poprzedniego podsumowania, plansze i tabela są pełne.
+# None: wszystkie aktywa jak zwykle.
+TYLKO_AKTYWA = ["BTCUSDT"]
 
 # Interaktywny wykres HTML (otwierany w przeglądarce)
 # i/lub statyczny obrazek PNG dla każdej kombinacji.
@@ -228,6 +239,11 @@ def main():
     timeframes = getattr(strategy_module, "TIMEFRAMES", TIMEFRAMES_TO_TEST)
     # Strategia może ograniczyć aktywa własną listą ASSETS.
     assets = getattr(strategy_module, "ASSETS", ASSETS_TO_TEST)
+    if TYLKO_AKTYWA:
+        assets = [a for a in assets if a in TYLKO_AKTYWA]
+        if not assets:
+            print(f"Pominięto: strategia nie testuje {', '.join(TYLKO_AKTYWA)}.")
+            return
     print(f"Strategia: {strategy_name}")
     print(f"Interwały: {', '.join(timeframes)}")
 

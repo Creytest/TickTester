@@ -144,7 +144,8 @@ _USER_AGENT = "Mozilla/5.0 (ticktester)"
 # ============================================================
 
 def plik(asset: str) -> Path:
-    return FOLDER / f"{asset.replace(' ', '_')}.csv"
+    safe = asset.replace(" ", "_").replace(":", "_").replace("^", "_").replace("=", "_")
+    return FOLDER / f"{safe}.csv"
 
 
 def pobierz(asset: str) -> Path:
@@ -210,6 +211,11 @@ def wczytaj(asset: str, od=None, do=None, pobierz_od_nowa: bool = False) -> pd.D
 
 
 def _spec(asset: str) -> dict:
+    # Dowolny symbol z Yahoo bez wpisu w AKTYWA_DZIENNE: "yahoo:SYMBOL" (np. "yahoo:^N225").
+    # Tylko do badań bez transakcji (np. event_study_trend.py --szeroki) — koszty standardowe.
+    if asset.startswith("yahoo:"):
+        return {"zrodlo": "yahoo", "symbol": asset[len("yahoo:"):], "commission": 0.0005,
+                "spread_pct": 0.0, "tick": 0.01, "opis": asset[len("yahoo:"):]}
     if asset not in AKTYWA_DZIENNE:
         raise KeyError(
             f"nieznane aktywo {asset!r} — dopisz je do AKTYWA_DZIENNE "

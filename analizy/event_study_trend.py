@@ -75,6 +75,39 @@ YAHOO_ASSETS = {
     "S&P 500 od 1928": ("SPX", None, False),           # dekady, poza wynikiem wspólnym
 }
 
+# Tryb --szeroki: ~45 rynków z Yahoo (indeksy, waluty, surowce, obligacje), jak w badaniach
+# akademickich (Moskowitz, Ooi, Pedersen 2012: 58 płynnych instrumentów). Cała dostępna
+# historia od 1990 (Yahoo) do END. Wynik wspólny „Wszystkie rynki” + osobno dla każdej grupy.
+# Surowce to ciągłe kontrakty Yahoo (=F) BEZ korekty rolowania: przy zmianie kontraktu cena
+# skacze (zwłaszcza ropa i gaz) — to fałszywy ruch, mówić o tym w filmie.
+# Symbol, który się nie pobierze, jest pomijany (komunikat POMINIĘTO).
+SZEROKI = {
+    "Indeksy": {
+        "S&P 500": "^GSPC", "Nasdaq 100": "^NDX", "Dow Jones": "^DJI", "Russell 2000": "^RUT",
+        "Kanada TSX": "^GSPTSE", "FTSE 100": "^FTSE", "DAX": "^GDAXI", "CAC 40": "^FCHI",
+        "Euro Stoxx 50": "^STOXX50E", "SMI": "^SSMI", "Nikkei 225": "^N225", "Hang Seng": "^HSI",
+        "ASX 200": "^AXJO", "KOSPI": "^KS11", "Bovespa": "^BVSP", "WIG20": "WIG20.WA",
+    },
+    "Waluty": {
+        "EUR/USD": "EURUSD=X", "USD/JPY": "JPY=X", "GBP/USD": "GBPUSD=X", "USD/CHF": "CHF=X",
+        "AUD/USD": "AUDUSD=X", "USD/CAD": "CAD=X", "NZD/USD": "NZDUSD=X", "USD/SEK": "SEK=X",
+        "USD/NOK": "NOK=X", "USD/MXN": "MXN=X", "USD/PLN": "PLN=X",
+    },
+    "Surowce": {
+        "Złoto": "GC=F", "Srebro": "SI=F", "Platyna": "PL=F", "Miedź": "HG=F", "Ropa WTI": "CL=F",
+        "Olej opałowy": "HO=F", "Gaz ziemny": "NG=F", "Kukurydza": "ZC=F", "Pszenica": "ZW=F",
+        "Soja": "ZS=F", "Kawa": "KC=F", "Cukier": "SB=F", "Bawełna": "CT=F", "Bydło": "LE=F",
+    },
+    "Obligacje": {
+        "Obligacje USA 20+ (TLT)": "TLT", "Obligacje USA 7-10 (IEF)": "IEF",
+        "Obligacje USA 1-3 (SHY)": "SHY", "Obligacje korporacyjne (LQD)": "LQD",
+        "Obligacje USA 10 lat (futures)": "ZN=F", "Obligacje USA 30 lat (futures)": "ZB=F",
+    },
+}
+# Wykresy z monetą na rynek (~47 rynków × 1000 ≈ pół godziny). Szybki podgląd:
+# N_SIM_SZEROKI=100 python analizy/event_study_trend.py --szeroki
+N_SIM_SZEROKI = int(__import__("os").environ.get("N_SIM_SZEROKI", 1000))
+
 # Długa historia z plików CSV (np. Stooq). Brak pliku = pominięte.
 DAILY_CSV = {
     "Dow Jones (Stooq)": r"D:\Tickdata\Dzienne\dji_d.csv",
@@ -490,6 +523,8 @@ def save_charts(summary, vr, name):
 def save_summary_chart(summary):
     for degree in DEGREES:
         rows = summary[(summary["definicja"] == "murphy") & (summary["stopien"] == degree)]
+        if rows["rynek"].nunique() > 10:   # tryb --szeroki: same grupy i wynik wspólny
+            rows = rows[rows["rynek"].isin(pooled_names())]
         chart_market(
             rows, OUTPUT_DIR / f"murphy_rynki_{degree}.png",
             "TREND WG MURPHY'EGO: CZY IDZIE DALEJ?",
@@ -507,7 +542,34 @@ def _safe(name: str) -> str:
 # START
 # ============================================================
 
-def series_list(synthetic: bool):
+GROUP_OF: dict = {}   # rynek → grupa (tylko tryb --szeroki)
+
+
+def series_list(synthetic: bool, szeroki: bool = False):
+    if szeroki and not synthetic:
+        from narzedzia.swiece_dzienne import wczytaj
+        for grupa, rynki in SZEROKI.items():
+            for name, symbol in rynki.items():
+                try:
+                    close = wczytaj(f"yahoo:{symbol}", do=END)["close"]
+                except (FileNotFoundError, KeyError, OSError, RuntimeError, ValueError) as error:
+                    print(f"POMINIĘTO {name} ({symbol}): {error}")
+                    continue
+                if len(close) < 1500:
+                    print(f"POMINIĘTO {name} ({symbol}): tylko {len(close)} świec")
+                    continue
+                GROUP_OF[name] = grupa
+                yield name, close, True
+        return
+    if szeroki and synthetic:
+        rng = np.random.default_rng(11)
+        dates = pd.bdate_range("2005-01-01", "2025-12-31")
+        for k, grupa in enumerate(SZEROKI):
+            for j in range(2):
+                name = f"Sztuczny {grupa} {j + 1}"
+                GROUP_OF[name] = grupa
+                yield name, pd.Series(100 * np.exp(np.cumsum(rng.normal(0, 0.01, len(dates)))), index=dates), True
+        return
     if synthetic:
         rng = np.random.default_rng(7)
         dates = pd.bdate_range("2003-01-01", "2025-12-31")
@@ -547,17 +609,26 @@ def series_list(synthetic: bool):
 
 
 POOLED_NAME = "Wszystkie rynki"
+GROUP_ORDER: list = []   # nazwy rynków w kolejności to_pool
+
+
+def pooled_names() -> set:
+    return {POOLED_NAME} | {f"{g} (razem)" for g in SZEROKI}
 
 
 def main():
     synthetic = "--sztuczne" in sys.argv
-    out_dir = OUTPUT_DIR / "sztuczne" if synthetic else OUTPUT_DIR
+    szeroki = "--szeroki" in sys.argv
+    out_dir = OUTPUT_DIR.parent / "wyniki_event_study_szeroki" if szeroki else OUTPUT_DIR
+    out_dir = out_dir / "sztuczne" if synthetic else out_dir
+    if szeroki:
+        globals()["N_SIM"] = N_SIM_SZEROKI
     globals()["OUTPUT_DIR"] = out_dir
     out_dir.mkdir(parents=True, exist_ok=True)
     rng = np.random.default_rng(SEED)
 
     all_rows, all_dec, all_vr, all_desc, to_pool = [], [], [], [], []
-    for name, close, in_pool in series_list(synthetic):
+    for name, close, in_pool in series_list(synthetic, szeroki):
         print("\n" + "=" * 60 + f"\n{name}\n" + "=" * 60)
         rows, dec, vr, desc, pooled = study(name, close, rng)
         all_rows += rows
@@ -566,6 +637,7 @@ def main():
         all_desc += desc
         if in_pool:
             to_pool.append(pooled)
+            GROUP_ORDER.append(name)
         summary = save_tables(all_rows, all_dec, all_vr, all_desc, to_pool, out_dir)
         save_charts(summary, pd.DataFrame(all_vr), name)
         for r in rows:
@@ -576,7 +648,7 @@ def main():
         summary = save_tables(all_rows, all_dec, all_vr, all_desc, to_pool, out_dir)
         save_summary_chart(summary)
         print("\n" + POOLED_NAME + " (" + ", ".join(
-            n for n in summary.loc[summary["rynek"] != POOLED_NAME, "rynek"].unique()) + ")")
+            n for n in summary.loc[~summary["rynek"].isin(pooled_names()), "rynek"].unique()) + ")")
         for _, r in summary[(summary["rynek"] == POOLED_NAME)
                             & (summary["stopien"] == MAIN_DEGREE)].iterrows():
             print_row(r)
@@ -585,13 +657,18 @@ def main():
 
 def save_tables(all_rows, all_dec, all_vr, all_desc, to_pool, out_dir) -> pd.DataFrame:
     rows = list(all_rows)
+    if GROUP_OF and len(to_pool) == len(GROUP_ORDER):
+        for grupa in SZEROKI:
+            part = [p for p, n in zip(to_pool, GROUP_ORDER) if GROUP_OF.get(n) == grupa]
+            if len(part) > 1:
+                rows += pool_rows(f"{grupa} (razem)", part)
     if len(to_pool) > 1:
         rows += pool_rows(POOLED_NAME, to_pool)
     summary = pd.DataFrame(rows)
     for col in ("moneta_p", "losowe_dni_p"):
         if col in summary:
             mask = ((summary["definicja"] == "murphy") & (summary["stopien"] == MAIN_DEGREE)
-                    & (summary["rynek"] != POOLED_NAME))
+                    & ~summary["rynek"].isin(pooled_names()))
             summary.loc[mask, f"{col}_holm"] = holm(summary.loc[mask, col])
     summary.to_csv(out_dir / "summary.csv", index=False)
     pd.DataFrame(all_dec).to_csv(out_dir / "dekady.csv", index=False)

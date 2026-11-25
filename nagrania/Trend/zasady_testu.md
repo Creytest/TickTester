@@ -44,12 +44,19 @@ Porównawczo (ta sama metoda pomiaru):
 ## Dane
 
 - Świece dzienne (1D) z ticków, ceny Bid, zamknięcie dnia o północy
-  GMT+2 (17:00 Nowy Jork): XAUUSD, EURUSD (od 2003), Brent (od 2010),
-  Bitcoin CFD (od 2017; dłuższa historia niż Binance BTCUSDT od 2020-09),
-  US500 (od 2020-11). Do 2025-12-31.
-- Długa historia z plików CSV (Stooq), jeśli są: S&P 500, Dow Jones,
-  złoto. Liczone osobno, nie wchodzą do wyniku „Wszystkie rynki”
-  (złoto i S&P powtarzałyby rynki z ticków).
+  GMT+2 (17:00 Nowy Jork): XAUUSD, EURUSD (od 2003), Brent (od 2010).
+  Do 2025-12-31.
+- Świece dzienne z Yahoo (narzedzia/swiece_dzienne.py, yfinance):
+  S&P 500 (indeks ^GSPC, od 2003 jak reszta rynków) i Bitcoin
+  (BTC-USD, od 2014-09). Wchodzą do wyniku „Wszystkie rynki”.
+- Zmiana 2026-11-25 (przed pierwszym uruchomieniem na prawdziwych danych):
+  US500 CFD (od 2020-11) i Bitcoin CFD (od 2017) zastąpione powyższymi,
+  bo mają krótszą historię. Dane dzienne, więc spread CFD nie ma znaczenia.
+- S&P 500 od 1928 (ten sam indeks, cała historia) liczony osobno,
+  do wyników w podziale na dekady. Nie wchodzi do „Wszystkie rynki”
+  (powtarzałby S&P od 2003).
+- Długa historia z plików CSV (Stooq), jeśli są: Dow Jones, złoto.
+  Liczone osobno, nie wchodzą do wyniku „Wszystkie rynki”.
 - Tylko ceny zamknięcia (Dow, s. 47). Bez kosztów: to badanie pamięci
   rynku, nie transakcje.
 

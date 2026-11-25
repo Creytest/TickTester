@@ -5,7 +5,8 @@ Dane tickowe z Dukascopy pobierają się dniami. Strategie na świecach
 dziennych (np. IBS Mean Reversion) potrzebują tylko OHLC z każdego
 dnia, a te pobierają się w sekundy:
 
-    Yahoo Finance     — QQQ od 1999, SPY od 1993, BTC-USD od 2014-09
+    Yahoo Finance     — QQQ od 1999, SPY od 1993, BTC-USD od 2014-09,
+                        indeks S&P 500 (^GSPC) od 1928
                         (biblioteka yfinance: pip install yfinance),
     ticki z D:\\Tickdata — np. XAUUSD od 2003 (świece 1D z ticków, które już masz),
     Binance (klines)  — BTCUSDT Spot od 2017-08-17,
@@ -82,6 +83,16 @@ AKTYWA_DZIENNE = {
         "tick": 0.01,
         "opis": "S&P 500 ETF",
     },
+    # Indeks S&P 500 (Yahoo ^GSPC) od 1928 — sam indeks, bez dywidend.
+    # Do badań na długiej historii (np. analizy/event_study_trend.py);
+    # indeksem nie da się handlować wprost, koszty jak dla SPY.
+    "SPX": {
+        "zrodlo": "yahoo", "symbol": "^GSPC", "od": "1927-01-01",
+        "commission": 0.0005,
+        "spread_pct": 0.0001,
+        "tick": 0.01,
+        "opis": "S&P 500 (indeks)",
+    },
     # Złoto spot: świece 1D z Twoich ticków XAUUSD (Tickstory, od 2003-08,
     # GMT+2 US-DST = dzień kończy się o 17:00 NY). Pierwsze wczytanie trwa
     # kilka minut (ticki rok po roku), potem plik CSV w FOLDER.
@@ -143,7 +154,7 @@ def pobierz(asset: str) -> Path:
     print(f"Pobieranie {asset} ({zrodlo}: {spec['symbol']})...")
 
     if zrodlo == "yahoo":
-        bars = _yahoo(spec["symbol"])
+        bars = _yahoo(spec["symbol"], spec.get("od", "1990-01-01"))
     elif zrodlo == "ticki":
         bars = _ticki(spec["symbol"])
     elif zrodlo == "stooq":
@@ -240,7 +251,7 @@ def _stooq(symbol: str, asset: str) -> pd.DataFrame:
         tmp.unlink(missing_ok=True)
 
 
-def _yahoo(symbol: str) -> pd.DataFrame:
+def _yahoo(symbol: str, start: str = "1990-01-01") -> pd.DataFrame:
     """
     Świece dzienne z Yahoo Finance (yfinance). Ceny skorygowane o splity,
     bez korekty o dywidendy (auto_adjust=False, kolumny Open/High/Low/Close).
@@ -250,7 +261,7 @@ def _yahoo(symbol: str) -> pd.DataFrame:
     except ImportError:
         raise RuntimeError("Brak biblioteki yfinance — zainstaluj: pip install yfinance") from None
     df = yf.download(
-        symbol, start="1990-01-01", interval="1d", auto_adjust=False,
+        symbol, start=start, interval="1d", auto_adjust=False,
         progress=False, multi_level_index=False,
     )
     if df is None or df.empty:

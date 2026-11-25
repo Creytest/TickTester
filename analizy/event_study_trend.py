@@ -62,13 +62,21 @@ from analizy.trend_definicje import (
 # ============================================================
 
 # Świece 1D z ticków (cała historia do END).
-TICK_ASSETS = ["XAUUSD", "EURUSD", "Brent", "Bitcoin", "US500"]
+TICK_ASSETS = ["XAUUSD", "EURUSD", "Brent"]
 START = "2003-01-01"
 END = "2025-12-31"
+# S&P 500 i Bitcoin z Yahoo (narzedzia/swiece_dzienne.py, pip install yfinance):
+# dłuższa historia niż ticki (US500 CFD od 2020-11, Bitcoin CFD od 2017).
+# nazwa: (aktywo w AKTYWA_DZIENNE, od, czy wchodzi do „Wszystkie rynki”)
+# S&P 500 w wyniku wspólnym od START (jak reszta rynków), cała historia osobno.
+YAHOO_ASSETS = {
+    "S&P 500": ("SPX", START, True),
+    "Bitcoin": ("BTCUSD", None, True),                 # od 2014-09
+    "S&P 500 od 1928": ("SPX", None, False),           # dekady, poza wynikiem wspólnym
+}
 
 # Długa historia z plików CSV (np. Stooq). Brak pliku = pominięte.
 DAILY_CSV = {
-    "S&P 500 (Stooq)": r"D:\Tickdata\Dzienne\spx_d.csv",
     "Dow Jones (Stooq)": r"D:\Tickdata\Dzienne\dji_d.csv",
     "Złoto (Stooq)": r"D:\Tickdata\Dzienne\xauusd_d.csv",
 }
@@ -524,6 +532,12 @@ def series_list(synthetic: bool):
             yield asset, daily_bars_from_ticks(asset, START, END)["close"], True
         except (FileNotFoundError, KeyError, OSError) as error:
             print(f"POMINIĘTO {asset}: {error}")
+    from narzedzia.swiece_dzienne import wczytaj
+    for name, (asset, od, in_pool) in YAHOO_ASSETS.items():
+        try:
+            yield name, wczytaj(asset, od=od, do=END)["close"], in_pool
+        except (FileNotFoundError, KeyError, OSError, RuntimeError, ValueError) as error:
+            print(f"POMINIĘTO {name}: {error}")
     for name, path in DAILY_CSV.items():
         try:
             df = load_daily_csv(path)

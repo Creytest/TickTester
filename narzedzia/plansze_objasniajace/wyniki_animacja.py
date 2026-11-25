@@ -4,7 +4,7 @@ Dwie sceny:
     1_krzywe.mp4  — krzywe kapitału wszystkich kombinacji rysują się równolegle (szare), mediana
                     grubą linią w kolorze znaku, licznik „X/N na plusie” i mediana zmieniają się
                     na żywo; na końcu podpisy jak na planszy 2_wykres_kapitalu,
-    2_liczby.mp4  — duże liczby: X/N na plusie i mediana wyniku netto (odliczanie).
+    2_liczby.mp4  — duże liczby: X/N na plusie, mediana Profit Factor i mediana wyniku netto (odliczanie).
 Liczby i krzywe są te same co na planszach (podsumowanie_*.csv i *_kapital.csv z wyniki/),
 łącznie z MIN_TRADES strategii.
 
@@ -70,7 +70,8 @@ def wczytaj(strategy: str):
         curves[P._label(row)] = (eq.resample("1D").last().dropna() / eq.iloc[0] - 1) * 100
     if not curves:
         sys.exit("Brak krzywych kapitału (*_kapital.csv).")
-    return module, okres.replace("_", " – "), pd.DataFrame(curves).sort_index().ffill().fillna(0.0)
+    pf = float(data["profit_factor"].astype(float).median())          # jak na planszy 1_mediany
+    return module, okres.replace("_", " – "), pd.DataFrame(curves).sort_index().ffill().fillna(0.0), pf
 
 
 def _modul(strategy: str) -> str:
@@ -89,7 +90,7 @@ def sztuczne(strategy: str):
         for tf in ("15m", "1h", "4h"):
             r = rng.normal(-0.0002, 0.006, len(idx))
             curves[f"{asset} {tf}"] = (np.exp(np.cumsum(r)) - 1) * 100
-    return module, "2021-01-01 – 2025-12-31 (DANE SZTUCZNE)", pd.DataFrame(curves, index=idx)
+    return module, "2021-01-01 – 2025-12-31 (DANE SZTUCZNE)", pd.DataFrame(curves, index=idx), 0.94
 
 
 # ============================================================
@@ -177,7 +178,7 @@ def scena_krzywe(frame: pd.DataFrame, title: str, subtitle: str, path: Path, vid
     render(fig, update, RYSOWANIE + TRZYMAJ, path, video)
 
 
-def scena_liczby(frame: pd.DataFrame, title: str, path: Path, video: bool) -> None:
+def scena_liczby(frame: pd.DataFrame, pf: float, title: str, path: Path, video: bool) -> None:
     last = frame.iloc[-1]
     n, plus, med = len(last), int((last > 0).sum()), float(last.median())
     fig, ax = P._figure()
@@ -185,22 +186,27 @@ def scena_liczby(frame: pd.DataFrame, title: str, path: Path, video: bool) -> No
     head = fig.text(0.5, 0.88, title.upper(), ha="center", va="center", color=P.WHITE, fontsize=48,
                     fontfamily=P._heading_font(), fontweight=P._heading_weight())
     P._fit_width(fig, [head], 0.92, min_size=26)
-    big1 = fig.text(0.27, 0.52, "", ha="center", va="center", fontsize=170,
-                    fontfamily=P._heading_font(), fontweight=P._heading_weight())
-    big2 = fig.text(0.73, 0.52, "", ha="center", va="center", fontsize=170,
-                    fontfamily=P._heading_font(), fontweight=P._heading_weight())
-    fig.text(0.27, 0.27, "kombinacji na plusie", ha="center", va="center", color=P.GRAY, fontsize=34,
-             fontfamily=P._body_font())
-    fig.text(0.73, 0.27, "mediana wyniku netto", ha="center", va="center", color=P.GRAY, fontsize=34,
-             fontfamily=P._body_font())
+    xs = (0.18, 0.5, 0.82)
+    big = [fig.text(x, 0.52, "", ha="center", va="center", fontsize=140, fontfamily=P._heading_font(),
+                    fontweight=P._heading_weight()) for x in xs]
+    for x, label in zip(xs, ("kombinacji\nna plusie", "mediana\nProfit Factor", "mediana\nwyniku netto")):
+        fig.text(x, 0.25, label, ha="center", va="center", color=P.GRAY, fontsize=32,
+                 fontfamily=P._body_font(), linespacing=1.3)
+    # rozmiar dobrany do końcowych liczb (najszersze), wspólny dla trzech
+    for txt, final in zip(big, (f"{n}/{n}", P._num(pf, 2) if not np.isnan(pf) else "–", P._pct(med))):
+        txt.set_text(final)
+    P._fit_width(fig, big, 0.27, min_size=60)
 
     def update(t):
         a = ease(t / 2.0)
+        done = a >= 1
         p = int(round(plus * a))
-        big1.set_text(f"{p}/{n}")
-        big1.set_color(P.profitable_color(p, n) if a >= 1 else P.WHITE)
-        big2.set_text(P._pct(med * a))
-        big2.set_color(P._sign_color(med) if a >= 1 else P.WHITE)
+        big[0].set_text(f"{p}/{n}")
+        big[0].set_color(P.profitable_color(p, n) if done else P.WHITE)
+        big[1].set_text(P._num(pf * a, 2) if not np.isnan(pf) else "–")
+        big[1].set_color(P.profit_factor_color(pf) if done else P.WHITE)
+        big[2].set_text(P._pct(med * a))
+        big[2].set_color(P._sign_color(med) if done else P.WHITE)
 
     render(fig, update, 2.0 + TRZYMAJ, path, video)
 
@@ -214,14 +220,14 @@ def main():
     if video and not ffmpeg_ok():
         sys.exit("Brak ffmpeg. Zainstaluj: pip install imageio-ffmpeg (albo dopisz --png).")
     syn = "--sztuczne" in sys.argv
-    module, okres, frame = sztuczne(strategy) if syn else wczytaj(strategy)
+    module, okres, frame, pf = sztuczne(strategy) if syn else wczytaj(strategy)
     name = getattr(module, "NAME", strategy)
     out = folder_wynikow(strategy) / ("animacja_sztuczne" if syn else "animacja")
     out.mkdir(parents=True, exist_ok=True)
     subtitle = f"{okres} · {P.count_text(len(frame.columns), 'kombinacja', 'kombinacje', 'kombinacji')}"
     print(f"{name}: {len(frame.columns)} krzywych → {out}")
     scena_krzywe(frame, name, subtitle, out / "1_krzywe", video)
-    scena_liczby(frame, name, out / "2_liczby", video)
+    scena_liczby(frame, pf, name, out / "2_liczby", video)
 
 
 if __name__ == "__main__":

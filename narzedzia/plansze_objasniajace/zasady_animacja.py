@@ -1,8 +1,9 @@
-"""Animowane zasady strategii: wersja MP4 każdej planszy 1-2-3 (1920×1080, 30 kl./s + PNG ostatniej klatki).
+"""Animowane zasady strategii: wersja MP4 każdej planszy 1-2-3 na jednym kadrze (1920×1080, 30 kl./s + PNG).
 
 Skrypt nie rysuje niczego od nowa. Uruchamia istniejące plansze (tiktok_plansze.py, reddit_plansze.py,
 ibs_plansza.py), przechwytuje gotową figurę zamiast zapisu PNG i pokazuje ją krok po kroku:
-  - każdy segment (1., 2., 3.) dostaje cały ekran, z tytułem i opisem u góry,
+  - jeden wykres na całą szerokość; kroki 1., 2., 3. dorysowują się na nim po kolei i zostają
+    na ekranie (tytuły kroków u góry jak na planszy, opis bieżącego kroku pod nimi),
   - wykres odsłania się od lewej do prawej (świece pojawiają się po kolei, napisy, gdy kursor do nich dojdzie),
   - krok 2. i 3. zaczyna odsłanianie od miejsca, w którym skończył poprzedni.
 Każda zmiana planszy 1-2-3 przechodzi więc od razu do animacji.
@@ -125,24 +126,43 @@ def _x(info, x):
     return X_L + (x - info.x0) / info.w * X_W
 
 
+def _te_same_osie(a, b) -> bool:
+    return all(abs(u - v) < 1e-9 for u, v in zip(a.get_xlim() + a.get_ylim(), b.get_xlim() + b.get_ylim()))
+
+
 def pokaz_krok(fig, segs, j):
-    """Segment j na cały ekran, reszta ukryta."""
+    """Jeden kadr: wykres kroku j na całą szerokość, a pod nim wykresy kroków 1..j−1 (te same świece,
+    więc ich napisy i linie zostają na ekranie). Tytuły kroków u góry jak na planszy: przeszłe szare,
+    bieżący biały, przyszłe ukryte. Opis tylko bieżącego kroku."""
+    cur = segs[j]
     for k, info in enumerate(segs):
-        on = k == j
+        on = k == j or (k < j and _te_same_osie(info.seg.ax, cur.seg.ax))
         for ax in info.axes:
-            ax.set_visible(on)
-        for t in info.texts:
-            t.set_visible(on)
-    info = segs[j]
-    for ax, (x0, y0, w, h) in zip(info.axes, info.poz_a):
-        ax.set_position([_x(info, x0), y0, w / info.w * X_W, h])
-    for k, (t, (x, y)) in enumerate(zip(info.texts, info.poz_t)):
-        if k == 0:            # tytuł kroku
-            t.set_position((0.5, 0.965)); t.set_fontsize(60)
-        elif k == 1:          # opis kroku
-            t.set_position((0.5, 0.855)); t.set_fontsize(24)
-        else:
-            t.set_position((_x(info, x), y))
+            # z wcześniejszych kroków zostaje tylko wykres ceny; ich panele wskaźników
+            # (z nieprzezroczystym tłem) zakryłyby panel bieżącego kroku
+            ax.set_visible(k == j or (on and ax is info.seg.ax))
+        for n, (t, (x, y)) in enumerate(zip(info.texts, info.poz_t)):
+            if n == 0:                                    # tytuł: zostaje w swojej kolumnie
+                t.set_visible(k <= j)
+                t.set_color(T.FG if k == j else T.GREY)
+            elif n == 1:                                  # opis: tylko bieżący, na środku
+                t.set_visible(k == j)
+                t.set_position((0.5, 0.83))
+                t.set_fontsize(24)
+            else:
+                t.set_visible(on)
+                t.set_position((_x(info, x), y))
+    # Napisy na wykresie, które bieżący krok rysuje jeszcze raz (np. „EMA 74” na końcu linii),
+    # chowamy w starszych krokach; starsze osie na wierzch, żeby ich napisy nie znikały pod świecami.
+    biezace = {t.get_text() for ax in cur.axes for t in ax.texts}
+    for k, info in enumerate(segs):
+        for ax, (x0, y0, w, h) in zip(info.axes, info.poz_a):
+            ax.set_position([_x(info, x0), y0, w / info.w * X_W, h])
+            ax.set_zorder(len(segs) - k)
+            ax.patch.set_alpha(0.0)
+            if k < j:
+                for t in ax.texts:
+                    t.set_alpha(0.0 if t.get_text() in biezace else 1.0)
 
 
 def odslon(info, p, a, b):
@@ -160,6 +180,8 @@ def odslon(info, p, a, b):
                 if art.get_transform() == ax.transData and art.get_text():
                     art.set_visible(art.get_position()[0] <= x + 0.3)
                 continue
+            if isinstance(art, Rectangle) and art.get_zorder() <= 1 and art.get_x() <= x0 + 0.5:
+                continue                                  # tło panelu wskaźnika: widoczne od razu w całości
             try:
                 art.set_clip_path(clip)
             except (AttributeError, TypeError):

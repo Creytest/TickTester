@@ -100,7 +100,6 @@ def main():
     rng = np.random.default_rng(2012)
 
     # sumy po rynkach dla każdego miesiąca kalendarzowego: prawdziwe, long, moneta-kierunek, moneta-wykres
-    idx_all = None
     acc = {}
     rynki_rows, grupa_of = [], {}
 

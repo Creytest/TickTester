@@ -277,7 +277,10 @@ def _yahoo(symbol: str, start: str = "1990-01-01") -> pd.DataFrame:
     df = df.astype(float)
     # Ostatnia świeca może być niedokończona (dzisiejsza sesja).
     today = pd.Timestamp.now().normalize()
-    return df[(df.index < today) & (df["close"] > 0)].dropna(subset=["close"])
+    df = df[(df.index < today) & (df["close"] > 0)].dropna(subset=["close"])
+    if df.empty:
+        raise RuntimeError(f"Yahoo zwrócił dla {symbol!r} same puste świece (brak notowań albo limit zapytań)")
+    return df
 
 
 def _ticki(asset: str) -> pd.DataFrame:

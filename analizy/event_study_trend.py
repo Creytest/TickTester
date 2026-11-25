@@ -548,18 +548,23 @@ GROUP_OF: dict = {}   # rynek → grupa (tylko tryb --szeroki)
 def series_list(synthetic: bool, szeroki: bool = False):
     if szeroki and not synthetic:
         from narzedzia.swiece_dzienne import wczytaj
+        pominiete = []
         for grupa, rynki in SZEROKI.items():
             for name, symbol in rynki.items():
                 try:
                     close = wczytaj(f"yahoo:{symbol}", do=END)["close"]
-                except (FileNotFoundError, KeyError, OSError, RuntimeError, ValueError) as error:
-                    print(f"POMINIĘTO {name} ({symbol}): {error}")
+                except Exception as error:  # jeden zły rynek nie przerywa całego badania
+                    print(f"POMINIĘTO {name} ({symbol}): {type(error).__name__}: {error}")
+                    pominiete.append(symbol)
                     continue
                 if len(close) < 1500:
                     print(f"POMINIĘTO {name} ({symbol}): tylko {len(close)} świec")
                     continue
                 GROUP_OF[name] = grupa
                 yield name, close, True
+        if pominiete:
+            print(f"\nPominięte rynki ({len(pominiete)}): {', '.join(pominiete)}. "
+                  "Uruchom ponownie później: pobrane pliki zostają, dociągną się tylko brakujące.")
         return
     if szeroki and synthetic:
         rng = np.random.default_rng(11)

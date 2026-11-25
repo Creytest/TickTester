@@ -104,8 +104,8 @@ SZEROKI = {
         "Obligacje USA 10 lat (futures)": "ZN=F", "Obligacje USA 30 lat (futures)": "ZB=F",
     },
 }
-# Mniej wykresów z monetą na rynek niż w trybie zwykłym (45 rynków × 1000 trwałoby kilka godzin).
-# Pas przypadku dla wyniku wspólnego i tak jest wąski, bo sumuje wszystkie rynki.
+# Wykresy z monetą na rynek (~47 rynków × 1000 ≈ pół godziny). Szybki podgląd:
+# N_SIM_SZEROKI=100 python analizy/event_study_trend.py --szeroki
 N_SIM_SZEROKI = int(__import__("os").environ.get("N_SIM_SZEROKI", 1000))
 
 # Długa historia z plików CSV (np. Stooq). Brak pliku = pominięte.

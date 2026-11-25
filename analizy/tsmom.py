@@ -210,20 +210,26 @@ def wykres(ts: pd.Series, lg: pd.Series, coin: pd.DataFrame, path: Path, n_rynko
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
+    import matplotlib.ticker  # noqa: F401
     from narzedzia.plansze import count_text
     bg, fg, green, grey = "#0B0D10", "#F2F2F2", "#00D084", "#6B7280"
     x = ts.index.to_timestamp()
-    eq = lambda s: np.log1p(s.fillna(0)).cumsum()  # noqa: E731  (log kapitału)
-    c = np.log1p(coin.fillna(0)).cumsum()
+    # Kapitał jako wielokrotność startu na skali logarytmicznej: przy dźwigni z celem zmienności
+    # „zawsze long” rośnie wykładniczo i na zwykłej osi przykrywa resztę.
+    eq = lambda s: np.exp(np.log1p(s.fillna(0)).cumsum())  # noqa: E731
+    c = np.exp(np.log1p(coin.fillna(0)).cumsum())
     lo, hi = c.quantile(0.025, axis=1), c.quantile(0.975, axis=1)
     fig, ax = plt.subplots(figsize=(19.2, 10.8), dpi=100)
     fig.patch.set_facecolor(bg)
     ax.set_facecolor(bg)
-    ax.fill_between(x, np.expm1(lo) * 100, np.expm1(hi) * 100, color=grey, alpha=0.35, lw=0,
+    ax.fill_between(x, lo, hi, color=grey, alpha=0.35, lw=0,
                     label="95% wykresów z monety (ta sama reguła)")
-    ax.plot(x, np.expm1(eq(lg)) * 100, color=grey, lw=2.5, label="zawsze long")
-    ax.plot(x, np.expm1(eq(ts)) * 100, color=green, lw=3.5, label="TSMOM (12 mies.)")
-    ax.set_ylabel("zysk portfela, % (bez kosztów)", color=grey, fontsize=16)
+    ax.plot(x, eq(lg), color=grey, lw=2.5, label="zawsze long")
+    ax.plot(x, eq(ts), color=green, lw=3.5, label="TSMOM (12 mies.)")
+    ax.set_yscale("log")
+    ax.yaxis.set_major_formatter(lambda v, _: f"{v:g}×")
+    ax.yaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
+    ax.set_ylabel("kapitał / kapitał startowy (skala log., bez kosztów)", color=grey, fontsize=16)
     ax.tick_params(colors=grey, labelsize=14)
     for sp in ax.spines.values():
         sp.set_visible(False)

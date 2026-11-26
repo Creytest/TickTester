@@ -12,7 +12,8 @@ Użycie:
     python narzedzia/plansze_objasniajace/zasady_animacja.py                 # wszystkie strategie
     python narzedzia/plansze_objasniajace/zasady_animacja.py LuxAlgo_SR_Breaks_MSTS IBS_MeanReversion
     python narzedzia/plansze_objasniajace/zasady_animacja.py --lista
-Zapis: obok planszy, nagrania/<Odcinek>/<Strategia>/zasady_animacja.mp4 (+ .png).
+Zapis: obok planszy, pod tą samą nazwą: nagrania/<Odcinek>/<Strategia>/plansza_zasady.png → plansza_zasady.mp4
+(z --png tylko ostatnia klatka: zasady_animacja.png, żeby nie nadpisać planszy).
 Wideo wymaga ffmpeg (w PATH albo `pip install imageio-ffmpeg`); same PNG: --png.
 """
 from __future__ import annotations
@@ -86,14 +87,14 @@ def _savefig(self, path, *a, **k):
 
 
 def plansze():
-    """{folder strategii: (figura, segmenty)} ze wszystkich skryptów plansz."""
+    """{ścieżka PNG planszy: (figura, segmenty)} ze wszystkich skryptów plansz."""
     T.Seg.__init__, T.Seg.candles, Figure.savefig = _seg_init, _seg_candles, _savefig
     try:
         for fn in T.ALL + R.ALL + [I.main]:
             fn()
     finally:
         T.Seg.__init__, T.Seg.candles, Figure.savefig = _init, _candles, _orig_save
-    return {path.parent: (fig, _segs.get(fig, [])) for fig, path in _zlapane}
+    return {path: (fig, _segs.get(fig, [])) for fig, path in _zlapane}
 
 
 # ============================================================
@@ -226,22 +227,25 @@ def animuj(fig, segs, cel: Path, video: bool):
                 update(k / FPS)
                 writer.grab_frame(facecolor=T.BG)
         print(f"  {cel.with_suffix('.mp4')}  ({czas:.0f} s)")
-    update(czas)
-    fig.savefig(cel.with_suffix(".png"), facecolor=T.BG)
+    else:
+        update(czas)
+        fig.savefig(cel.parent / "zasady_animacja.png", facecolor=T.BG)
+        print(f"  {cel.parent / 'zasady_animacja.png'}")
     plt.close(fig)
 
 
 def main():
     wszystkie = plansze()
     if "--lista" in ARGV:
-        for folder in wszystkie:
-            print(folder.name)
+        for path in wszystkie:
+            print(path.parent.name)
         return
     wybrane = [a for a in ARGV if not a.startswith("--")]
     video = "--png" not in ARGV
     if video and not ffmpeg_ok():
         sys.exit("Brak ffmpeg. Zainstaluj: pip install imageio-ffmpeg (albo dopisz --png).")
-    for folder, (fig, segs) in wszystkie.items():
+    for path, (fig, segs) in wszystkie.items():
+        folder = path.parent
         if wybrane and folder.name not in wybrane:
             plt.close(fig)
             continue
@@ -249,7 +253,10 @@ def main():
             print(f"POMINIĘTO {folder.name}: plansza bez segmentów")
             continue
         print(folder.name)
-        animuj(fig, segs, folder / "zasady_animacja", video)
+        if video:   # do 2026-11-26 MP4 nazywało się zasady_animacja.mp4 (+ PNG ostatniej klatki)
+            for stary in (folder / "zasady_animacja.mp4", folder / "zasady_animacja.png"):
+                stary.unlink(missing_ok=True)
+        animuj(fig, segs, path.with_suffix(""), video)
 
 
 if __name__ == "__main__":

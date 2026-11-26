@@ -74,13 +74,14 @@ def period_text(start: str, end: str) -> str:
     return f"Od {s.day} {MONTHS[s.month - 1]} {s.year} do {e.day} {MONTHS[e.month - 1]} {e.year}"
 
 
-def plansza(assets, timeframes, path, period):
-    """assets: nazwy z tick_config (np. "Bitcoin"), timeframes: np. "15min"."""
+def plansza(assets, timeframes, path, period, halo=0.18):
+    """assets: nazwy z tick_config (np. "Bitcoin"), timeframes: np. "15min".
+    halo: krycie poświaty wokół kropek (rynki_animacja.py renderuje też mocniejszą do pulsu)."""
     with plt.rc_context({"font.family": ["Inter", "DejaVu Sans"]}):
-        _plansza(assets, timeframes, path, period)
+        _plansza(assets, timeframes, path, period, halo)
 
 
-def _plansza(assets, timeframes, path, period):
+def _plansza(assets, timeframes, path, period, halo=0.18):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     cards = [ASSET_CARDS.get(a, (a, a, "")) for a in assets]
@@ -118,7 +119,7 @@ def _plansza(assets, timeframes, path, period):
         for j in range(n):
             x = X0 + j * (CW + GAP)
             card(x, y, CW, RH, fc=BG)
-            ax.plot([x + CW / 2], [y + RH / 2], "o", ms=22, color=GREEN, mec=BG, mew=0, alpha=0.18)
+            ax.plot([x + CW / 2], [y + RH / 2], "o", ms=22, color=GREEN, mec=BG, mew=0, alpha=halo)
             ax.plot([x + CW / 2], [y + RH / 2], "o", ms=11, color=GREEN)
     ax.text(L + LW / 2, 450, "INTERWAŁ", color=GREY, fontsize=16, ha="center", va="bottom", fontweight="bold")
 
@@ -130,13 +131,16 @@ def _plansza(assets, timeframes, path, period):
     print("ok", path.relative_to(ROOT) if path.is_relative_to(ROOT) else path)
 
 
-def wszystkie_strategie():
-    """Plansza rynków w folderze każdej strategii (bez wariantów _Control/_Standard)."""
+def cele():
+    """Wszystkie plansze rynków: [(aktywa, interwały, ścieżka PNG, okres)].
+    Tej samej listy używa rynki_animacja.py (MP4 obok każdego PNG)."""
     sys.path.insert(0, str(ROOT))
     import run_all_assets as cfg
     from narzedzia.odcinki import ODCINEK_ZRODLA, WARIANTY, folder_strategii
 
     period = period_text(cfg.START_DATE, cfg.END_DATE)
+    out = []
+    # Plansza rynków w folderze każdej strategii (bez wariantów _Control/_Standard).
     for source in ODCINEK_ZRODLA:
         for file in sorted((ROOT / "strategies" / source).glob("*.py")):
             name = file.stem
@@ -145,20 +149,23 @@ def wszystkie_strategie():
             module = importlib.import_module(f"strategies.{source}.{name}")
             assets = getattr(module, "ASSETS", cfg.ASSETS_TO_TEST)
             timeframes = getattr(module, "TIMEFRAMES", cfg.TIMEFRAMES_TO_TEST)
-            plansza(assets, timeframes, folder_strategii(name) / "plansza_rynki.png", period)
+            out.append((assets, timeframes, folder_strategii(name) / "plansza_rynki.png", period))
+    # Plansza ogólna odcinka TikTok (5 rynków × 5/15/30 min).
+    out.append((["XAUUSD", "BTCUSDT", "EURUSD", "Brent", "US500"], ["5min", "15min", "30min"],
+                ROOT / "nagrania" / "TikTok" / "plansza_rynki.png",
+                "5 pełnych lat: od początku 2021 do końca 2025 roku"))
+    # MOC to MOO: akcje autora (BRK.A) na świecach dziennych, 20 lat
+    # (test_dzienny.py --strategia MOC_MOO --aktywa BRK.A --od 2006-01-01) — nadpisuje planszę strategii.
+    out.append((["BRK.A"], ["1D"], ROOT / "nagrania" / "Reddit" / "MOC_MOO" / "plansza_rynki.png",
+                period_text("2006-01-01", "2025-12-31")))
+    # Gold Thursday-Friday: autor pisze o 20 latach — ticki XAUUSD od 2006
+    # (run_all_assets: START_DATE = "2006-01-01", CHUNK_YEARS = 5).
+    out.append((["XAUUSD"], ["5min"], ROOT / "nagrania" / "Reddit" / "Gold_ThuFri" / "plansza_rynki.png",
+                period_text("2006-01-01", "2025-12-31")))
+    # Ta sama ścieżka drugi raz = wyjątek powyżej wygrywa (jak dotąd: zapisywał się później).
+    return list({str(c[2]): c for c in out}.values())
 
 
 if __name__ == "__main__":
-    wszystkie_strategie()
-    # Plansza ogólna odcinka TikTok (5 rynków × 5/15/30 min).
-    plansza(["XAUUSD", "BTCUSDT", "EURUSD", "Brent", "US500"], ["5min", "15min", "30min"],
-            ROOT / "nagrania" / "TikTok" / "plansza_rynki.png",
-            "5 pełnych lat: od początku 2021 do końca 2025 roku")
-    # MOC to MOO: akcje autora (BRK.A) na świecach dziennych, 20 lat
-    # (test_dzienny.py --strategia MOC_MOO --aktywa BRK.A --od 2006-01-01).
-    plansza(["BRK.A"], ["1D"], ROOT / "nagrania" / "Reddit" / "MOC_MOO" / "plansza_rynki.png",
-            period_text("2006-01-01", "2025-12-31"))
-    # Gold Thursday-Friday: autor pisze o 20 latach — ticki XAUUSD od 2006
-    # (run_all_assets: START_DATE = "2006-01-01", CHUNK_YEARS = 5).
-    plansza(["XAUUSD"], ["5min"], ROOT / "nagrania" / "Reddit" / "Gold_ThuFri" / "plansza_rynki.png",
-            period_text("2006-01-01", "2025-12-31"))
+    for assets, timeframes, path, period in cele():
+        plansza(assets, timeframes, path, period)

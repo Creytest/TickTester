@@ -11,6 +11,8 @@ Użycie:
     python narzedzia/plansze_objasniajace/wyniki_animacja.py BigBeluga_Stoch_80percent
     python narzedzia/plansze_objasniajace/wyniki_animacja.py BigBeluga_Stoch_80percent --sekundy 1 2 3
     python narzedzia/plansze_objasniajace/wyniki_animacja.py BigBeluga_Stoch_80percent --testowe   # bez wyników
+    python narzedzia/plansze_objasniajace/wyniki_animacja.py --wszystkie             # każda strategia z wynikami
+    python narzedzia/plansze_objasniajace/wyniki_animacja.py --wszystkie --odcinek TikTok
 Opcje: --sekundy (czas animacji, domyślnie 2; kilka wartości = kilka wersji),
        --trzymaj (sekundy stopklatki na końcu, domyślnie 1), --claim-win-rate 90, --png (tylko PNG).
 Wyniki: nagrania/<Odcinek>/<Strategia>/wyniki/animacja/ (z --testowe: animacja_dane_testowe/).
@@ -42,7 +44,7 @@ from matplotlib.animation import FFMpegWriter  # noqa: E402
 for _f in (Path(__file__).resolve().parent / "fonts").glob("*.[ot]tf"):
     font_manager.fontManager.addfont(str(_f))
 
-from narzedzia.odcinki import folder_wynikow  # noqa: E402
+from narzedzia.odcinki import NAGRANIA, folder_wynikow  # noqa: E402
 
 FPS = 30
 RYSOWANIE = 0.8   # część czasu na rysowanie krzywych; reszta na wejście podpisów
@@ -176,9 +178,43 @@ def anim_krzywe(fig, sekundy: float):
     return update
 
 
+def strategie_z_wynikami(odcinek: str | None = None) -> list[str]:
+    """Strategie z podsumowaniem run_all_assets w nagrania/<Odcinek>/<Strategia>/wyniki*/."""
+    names = []
+    for table in sorted(NAGRANIA.glob("*/*/wyniki*/podsumowanie_*.csv")):
+        if odcinek and table.parts[-4].lower() != odcinek.lower():
+            continue
+        # podsumowanie_<Strategia>_<start>_<koniec>.csv
+        name = table.stem.removeprefix("podsumowanie_").rsplit("_", 2)[0]
+        if name not in names:
+            names.append(name)
+    return names
+
+
+def animuj(strategy: str, args, video: bool) -> None:
+    module = _modul(strategy)
+    title = getattr(module, "NAME", strategy)
+    claim = args.claim_win_rate if args.claim_win_rate is not None else getattr(module, "CLAIM_WIN_RATE", None)
+    summary, equities, period = testowe() if args.testowe else wczytaj(strategy)
+    _, counted, _, subtitle, note = P.plansze_context(summary, period, getattr(module, "MIN_TRADES", None))
+
+    out = folder_wynikow(strategy) / ("animacja_dane_testowe" if args.testowe else "animacja")
+    out.mkdir(parents=True, exist_ok=True)
+    print(f"{title} → {out}")
+    for s in args.sekundy:
+        tag = f"{s:g}s".replace(".", ",")
+        with plt.style.context("default"):
+            fig, numbers = P.medians_figure(counted, title, subtitle, claim, note)
+            render(fig, anim_mediany(fig, numbers, s), s, args.trzymaj, out / f"1_mediany_{tag}", video)
+            fig = P.equity_figure(counted, equities, title, subtitle, note)
+            render(fig, anim_krzywe(fig, s), s, args.trzymaj, out / f"2_wykres_kapitalu_{tag}", video)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("strategia")
+    ap.add_argument("strategia", nargs="?")
+    ap.add_argument("--wszystkie", action="store_true", help="każda strategia z wynikami w nagrania/")
+    ap.add_argument("--odcinek", help="z --wszystkie: tylko ten odcinek, np. TikTok")
     ap.add_argument("--sekundy", type=float, nargs="+", default=[2.0])
     ap.add_argument("--trzymaj", type=float, default=1.0)
     ap.add_argument("--claim-win-rate", type=float, default=None)
@@ -189,22 +225,25 @@ def main():
     video = not args.png
     if video and not ffmpeg_ok():
         sys.exit("Brak ffmpeg. Zainstaluj: pip install imageio-ffmpeg (albo dopisz --png).")
-    module = _modul(args.strategia)
-    title = getattr(module, "NAME", args.strategia)
-    claim = args.claim_win_rate if args.claim_win_rate is not None else getattr(module, "CLAIM_WIN_RATE", None)
-    summary, equities, period = testowe() if args.testowe else wczytaj(args.strategia)
-    _, counted, _, subtitle, note = P.plansze_context(summary, period, getattr(module, "MIN_TRADES", None))
-
-    out = folder_wynikow(args.strategia) / ("animacja_dane_testowe" if args.testowe else "animacja")
-    out.mkdir(parents=True, exist_ok=True)
-    print(f"{title} → {out}")
-    for s in args.sekundy:
-        tag = f"{s:g}s".replace(".", ",")
-        with plt.style.context("default"):
-            fig, numbers = P.medians_figure(counted, title, subtitle, claim, note)
-            render(fig, anim_mediany(fig, numbers, s), s, args.trzymaj, out / f"1_mediany_{tag}", video)
-            fig = P.equity_figure(counted, equities, title, subtitle, note)
-            render(fig, anim_krzywe(fig, s), s, args.trzymaj, out / f"2_wykres_kapitalu_{tag}", video)
+    if args.wszystkie:
+        names = strategie_z_wynikami(args.odcinek)
+        if not names:
+            sys.exit("Brak wyników run_all_assets w nagrania/ (podsumowanie_*.csv).")
+    elif args.strategia:
+        names = [args.strategia]
+    else:
+        ap.error("podaj strategię albo --wszystkie")
+    bledy = []
+    for name in names:
+        try:
+            animuj(name, args, video)
+        except (SystemExit, Exception) as err:      # jedna zepsuta strategia nie zatrzymuje reszty
+            if len(names) == 1:
+                raise
+            print(f"{name}: pominięta — {err}")
+            bledy.append(name)
+    if len(names) > 1:
+        print(f"Gotowe: {len(names) - len(bledy)}/{len(names)}" + (f", pominięte: {', '.join(bledy)}" if bledy else ""))
 
 
 if __name__ == "__main__":

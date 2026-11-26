@@ -122,10 +122,14 @@ def testowe():
 # RENDER
 # ============================================================
 
+FFMPEG = "ffmpeg"
+
+
 def ffmpeg_ok() -> bool:
+    global FFMPEG
     try:
         import imageio_ffmpeg
-        matplotlib.rcParams["animation.ffmpeg_path"] = imageio_ffmpeg.get_ffmpeg_exe()
+        FFMPEG = imageio_ffmpeg.get_ffmpeg_exe()
         return True
     except ImportError:
         return shutil.which("ffmpeg") is not None
@@ -133,6 +137,8 @@ def ffmpeg_ok() -> bool:
 
 def render(fig, update, sekundy: float, trzymaj: float, path: Path, video: bool) -> None:
     if video:
+        # plt.style.context("default") resetuje rcParams, więc ścieżkę ustawiamy tuż przed zapisem.
+        matplotlib.rcParams["animation.ffmpeg_path"] = FFMPEG
         writer = FFMpegWriter(fps=FPS, codec="libx264", bitrate=12000, extra_args=["-pix_fmt", "yuv420p"])
         with writer.saving(fig, str(path.with_suffix(".mp4")), dpi=P.DPI):
             for k in range(int(round((sekundy + trzymaj) * FPS))):
@@ -240,6 +246,7 @@ def main():
         except (SystemExit, Exception) as err:      # jedna zepsuta strategia nie zatrzymuje reszty
             if len(names) == 1:
                 raise
+            plt.close("all")
             print(f"{name}: pominięta — {err}")
             bledy.append(name)
     if len(names) > 1:

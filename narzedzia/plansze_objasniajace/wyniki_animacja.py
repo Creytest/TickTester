@@ -51,7 +51,7 @@ FPS = 30
 # a DaVinci/odtwarzacze czytają HD jako BT.709 — czerwony #FF3B30 robi się pomarańczowy.
 YUV_BT709 = ["-vf", "scale=out_color_matrix=bt709:out_range=tv", "-pix_fmt", "yuv420p",
              "-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", "-color_range", "tv"]
-RYSOWANIE = 0.8   # część czasu na rysowanie krzywych; reszta na wejście podpisów
+RYSOWANIE = 0.85  # część czasu na rysowanie krzywych (stałe tempo); reszta na wejście podpisów
 LICZBA = 0.5      # część czasu na wejście jednej liczby (kolejne startują co 1/4 czasu)
 
 
@@ -178,7 +178,7 @@ def anim_krzywe(fig, sekundy: float):
     n = max((len(x) for _, x, _ in lines), default=1)
 
     def update(t):
-        a = ease(t / (sekundy * RYSOWANIE))
+        a = min(max(t / (sekundy * RYSOWANIE), 0.0), 1.0)   # liniowo: bez zwalniania na końcu
         k = max(1, int(round(a * (n - 1))) + 1)
         for ln, x, y in lines:
             ln.set_data(x[:k], y[:k])

@@ -149,8 +149,11 @@ def render(fig, update, sekundy: float, trzymaj: float, path: Path, video: bool)
                 update(k / FPS)
                 writer.grab_frame(facecolor=P.BLACK)
         print(f"  {path.with_suffix('.mp4')}")
-    update(sekundy)
-    fig.savefig(path.with_suffix(".png"), dpi=P.DPI, facecolor=P.BLACK)
+    else:
+        # Bez wideo: tylko ostatnia klatka (= plansza PNG z plansze_<...>/).
+        update(sekundy)
+        fig.savefig(path.with_suffix(".png"), dpi=P.DPI, facecolor=P.BLACK)
+        print(f"  {path.with_suffix('.png')}")
     plt.close(fig)
 
 
@@ -210,6 +213,13 @@ def animuj(strategy: str, args, video: bool) -> None:
 
     out = folder_wynikow(strategy) / ("animacja_dane_testowe" if args.testowe else "animacja")
     out.mkdir(parents=True, exist_ok=True)
+    # Stare sceny sprzed 2026-11-26 (1_krzywe, 2_liczby) i PNG ostatnich klatek — usuwamy,
+    # żeby w folderze były tylko aktualne animacje (PNG tych plansz są w plansze_<...>/).
+    stare = [*out.glob("1_krzywe.*"), *out.glob("2_liczby.*")]
+    if video:
+        stare += [*out.glob("1_mediany_*.png"), *out.glob("2_wykres_kapitalu_*.png")]
+    for f in stare:
+        f.unlink(missing_ok=True)
     print(f"{title} → {out}")
     for s in args.sekundy:
         tag = f"{s:g}s".replace(".", ",")

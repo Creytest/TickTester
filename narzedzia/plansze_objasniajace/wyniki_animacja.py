@@ -47,6 +47,10 @@ for _f in (Path(__file__).resolve().parent / "fonts").glob("*.[ot]tf"):
 from narzedzia.odcinki import NAGRANIA, folder_wynikow  # noqa: E402
 
 FPS = 30
+# RGB → YUV wg BT.709 i oznaczenie pliku jako BT.709. Bez tego ffmpeg liczy BT.601,
+# a DaVinci/odtwarzacze czytają HD jako BT.709 — czerwony #FF3B30 robi się pomarańczowy.
+YUV_BT709 = ["-vf", "scale=out_color_matrix=bt709:out_range=tv", "-pix_fmt", "yuv420p",
+             "-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", "-color_range", "tv"]
 RYSOWANIE = 0.8   # część czasu na rysowanie krzywych; reszta na wejście podpisów
 LICZBA = 0.5      # część czasu na wejście jednej liczby (kolejne startują co 1/4 czasu)
 
@@ -139,7 +143,7 @@ def render(fig, update, sekundy: float, trzymaj: float, path: Path, video: bool)
     if video:
         # plt.style.context("default") resetuje rcParams, więc ścieżkę ustawiamy tuż przed zapisem.
         matplotlib.rcParams["animation.ffmpeg_path"] = FFMPEG
-        writer = FFMpegWriter(fps=FPS, codec="libx264", bitrate=12000, extra_args=["-pix_fmt", "yuv420p"])
+        writer = FFMpegWriter(fps=FPS, codec="libx264", bitrate=12000, extra_args=YUV_BT709)
         with writer.saving(fig, str(path.with_suffix(".mp4")), dpi=P.DPI):
             for k in range(int(round((sekundy + trzymaj) * FPS))):
                 update(k / FPS)

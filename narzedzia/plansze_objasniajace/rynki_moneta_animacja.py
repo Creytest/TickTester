@@ -46,6 +46,10 @@ ROOT = Path(__file__).resolve().parents[2]
 WYNIKI = ROOT / "nagrania" / "Trend" / "wyniki_event_study_szeroki"
 OUT = ROOT / "nagrania" / "Trend" / "wyniki_animacja_rynki"
 FPS = 30
+# RGB → YUV wg BT.709 i oznaczenie pliku jako BT.709. Bez tego ffmpeg liczy BT.601,
+# a DaVinci/odtwarzacze czytają HD jako BT.709 — czerwony #FF3B30 robi się pomarańczowy.
+YUV_BT709 = ["-vf", "scale=out_color_matrix=bt709:out_range=tv", "-pix_fmt", "yuv420p",
+             "-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", "-color_range", "tv"]
 DEFINICJA, STOPIEN = "murphy", ets.MAIN_DEGREE
 N_MONET = 1000
 PUNKTY = 160                      # punktów na mini wykres
@@ -204,7 +208,7 @@ def ffmpeg_ok() -> bool:
 def render(fig, update, sekundy: float, nazwa: str, video: bool) -> None:
     n = int(round(sekundy * FPS))
     if video:
-        writer = FFMpegWriter(fps=FPS, codec="libx264", bitrate=12000, extra_args=["-pix_fmt", "yuv420p"])
+        writer = FFMpegWriter(fps=FPS, codec="libx264", bitrate=12000, extra_args=YUV_BT709)
         with writer.saving(fig, str(OUT / f"{nazwa}.mp4"), dpi=100):
             for k in range(n):
                 update(k / FPS)

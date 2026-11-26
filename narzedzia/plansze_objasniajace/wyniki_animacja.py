@@ -1,21 +1,25 @@
-"""Animowane wyniki strategii z run_all_assets (MP4 1920×1080, 30 kl./s + PNG ostatniej klatki).
+"""Animowane plansze wyników strategii — 1:1 jak PNG z narzedzia/plansze.py (MP4 1920×1080, 30 kl./s).
 
-Dwie sceny:
-    1_krzywe.mp4  — krzywe kapitału wszystkich kombinacji rysują się równolegle (szare), mediana
-                    grubą linią w kolorze znaku, licznik „X/N na plusie” i mediana zmieniają się
-                    na żywo; na końcu podpisy jak na planszy 2_wykres_kapitalu,
-    2_liczby.mp4  — duże liczby: X/N na plusie, mediana Profit Factor i mediana wyniku netto (odliczanie).
-Liczby i krzywe są te same co na planszach (podsumowanie_*.csv i *_kapital.csv z wyniki/),
-łącznie z MIN_TRADES strategii.
+    1_mediany.mp4          — plansza 1_mediany: trzy duże liczby wchodzą po kolei
+                             (pojawiają się i odliczają od zera do wartości z planszy),
+    2_wykres_kapitalu.mp4  — plansza 2_wykres_kapitalu: krzywe kapitału rysują się od lewej
+                             do prawej, podpisy (mediana, najlepsza, najgorsza) na końcu.
+Figury buduje ten sam kod co PNG (plansze.medians_figure / equity_figure), więc ostatnia
+klatka = plansza PNG. Tabela (3_tabela.png) zostaje statyczna.
 
 Użycie:
-    python narzedzia/plansze_objasniajace/wyniki_animacja.py LuxAlgo_SR_Breaks_MSTS
-    python narzedzia/plansze_objasniajace/wyniki_animacja.py LuxAlgo_SR_Breaks_MSTS --sztuczne   # podgląd
-Wyniki: nagrania/<Odcinek>/<Strategia>/wyniki/animacja/.
-Wideo wymaga ffmpeg: w PATH albo `pip install imageio-ffmpeg`. Same PNG: --png.
+    python narzedzia/plansze_objasniajace/wyniki_animacja.py BigBeluga_Stoch_80percent
+    python narzedzia/plansze_objasniajace/wyniki_animacja.py BigBeluga_Stoch_80percent --sekundy 1 2 3
+    python narzedzia/plansze_objasniajace/wyniki_animacja.py BigBeluga_Stoch_80percent --testowe   # bez wyników
+Opcje: --sekundy (czas animacji, domyślnie 2; kilka wartości = kilka wersji),
+       --trzymaj (sekundy stopklatki na końcu, domyślnie 1), --claim-win-rate 90, --png (tylko PNG).
+Wyniki: nagrania/<Odcinek>/<Strategia>/wyniki/animacja/ (z --testowe: animacja_dane_testowe/).
+Dane: podsumowanie_<Strategia>_*.csv i *_kapital.csv z run_all_assets, MIN_TRADES strategii.
+Wideo wymaga ffmpeg: w PATH albo `pip install imageio-ffmpeg`.
 """
 from __future__ import annotations
 
+import argparse
 import importlib
 import shutil
 import sys
@@ -24,19 +28,25 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
 from narzedzia import plansze as P  # noqa: E402  (ładuje też fonty i kolory)
 import matplotlib  # noqa: E402
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
+from matplotlib import font_manager  # noqa: E402
 from matplotlib.animation import FFMpegWriter  # noqa: E402
+
+# Anton/Inter z repo — jak w run_all_assets (przez rynki_plansza), więc fonty = PNG.
+for _f in (Path(__file__).resolve().parent / "fonts").glob("*.[ot]tf"):
+    font_manager.fontManager.addfont(str(_f))
 
 from narzedzia.odcinki import folder_wynikow  # noqa: E402
 
 FPS = 30
-RYSOWANIE = 9.0       # sekund rysowania krzywych
-TRZYMAJ = 3.0
+RYSOWANIE = 0.8   # część czasu na rysowanie krzywych; reszta na wejście podpisów
+LICZBA = 0.5      # część czasu na wejście jednej liczby (kolejne startują co 1/4 czasu)
 
 
 def ease(t: float) -> float:
@@ -48,49 +58,62 @@ def ease(t: float) -> float:
 # DANE
 # ============================================================
 
-def wczytaj(strategy: str):
-    folder = folder_wynikow(strategy)
-    pliki = sorted(folder.glob(f"podsumowanie_{strategy}_*.csv"), key=lambda p: p.stat().st_mtime)
-    if not pliki:
-        sys.exit(f"Brak podsumowania w {folder}. Najpierw run_all_assets dla {strategy}.")
-    table = pliki[-1]
-    okres = table.stem.removeprefix(f"podsumowanie_{strategy}_")      # 2021-01-01_2025-12-31
-    data = pd.read_csv(table, sep=";", decimal=",")
-    data = data[data["status"] == "OK"]
-    module = importlib.import_module(_modul(strategy))
-    data, _ = P.split_by_trades(data, getattr(module, "MIN_TRADES", None))
-    curves = {}
-    for _, row in data.iterrows():
-        path = folder / f"{strategy}_{row['asset'].replace(' ', '_')}_{row['timeframe']}_{okres}_kapital.csv"
-        if not path.exists():
-            print(f"Brak krzywej {path.name} — pominięta")
-            continue
-        eq = pd.read_csv(path, sep=";", decimal=",", parse_dates=["timestamp"]).set_index("timestamp")["equity"]
-        eq = eq.astype(float).sort_index()
-        curves[P._label(row)] = (eq.resample("1D").last().dropna() / eq.iloc[0] - 1) * 100
-    if not curves:
-        sys.exit("Brak krzywych kapitału (*_kapital.csv).")
-    pf = float(data["profit_factor"].astype(float).median())          # jak na planszy 1_mediany
-    return module, okres.replace("_", " – "), pd.DataFrame(curves).sort_index().ffill().fillna(0.0), pf
-
-
-def _modul(strategy: str) -> str:
-    for path in (Path(__file__).resolve().parents[2] / "strategies").rglob(f"{strategy}.py"):
-        rel = path.relative_to(Path(__file__).resolve().parents[2]).with_suffix("")
-        return ".".join(rel.parts)
+def _modul(strategy: str):
+    for path in (ROOT / "strategies").rglob(f"{strategy}.py"):
+        return importlib.import_module(".".join(path.relative_to(ROOT).with_suffix("").parts))
     sys.exit(f"Nie znaleziono strategies/**/{strategy}.py")
 
 
-def sztuczne(strategy: str):
-    module = importlib.import_module(_modul(strategy))
-    rng = np.random.default_rng(4)
-    idx = pd.bdate_range("2021-01-01", "2025-12-31")
-    curves = {}
-    for asset in ("XAUUSD", "BTCUSDT", "EURUSD", "Brent", "US500"):
-        for tf in ("15m", "1h", "4h"):
-            r = rng.normal(-0.0002, 0.006, len(idx))
-            curves[f"{asset} {tf}"] = (np.exp(np.cumsum(r)) - 1) * 100
-    return module, "2021-01-01 – 2025-12-31 (DANE SZTUCZNE)", pd.DataFrame(curves, index=idx), 0.94
+def wczytaj(strategy: str):
+    """(podsumowanie OK, krzywe {(aktywo, interwał): DataFrame}, okres „2021–2025”) z run_all_assets."""
+    folder = folder_wynikow(strategy)
+    pliki = sorted(folder.glob(f"podsumowanie_{strategy}_*.csv"), key=lambda p: p.stat().st_mtime)
+    if not pliki:
+        sys.exit(f"Brak podsumowania w {folder}. Najpierw run_all_assets dla {strategy} "
+                 f"(albo --testowe).")
+    table = pliki[-1]
+    start, end = table.stem.removeprefix(f"podsumowanie_{strategy}_").split("_")
+    data = pd.read_csv(table, sep=";", decimal=",")
+    data = data[data["status"] == "OK"].reset_index(drop=True)
+    equities = {}
+    for asset, tf in zip(data["asset"], data["timeframe"]):
+        path = folder / f"{strategy}_{str(asset).replace(' ', '_')}_{tf}_{start}_{end}_kapital.csv"
+        if path.exists():
+            equities[(asset, tf)] = pd.read_csv(path, sep=";", decimal=",")
+        else:
+            print(f"Brak krzywej {path.name} — pominięta")
+    return data, equities, f"{start[:4]}–{end[:4]}"
+
+
+# Dane testowe: wyniki końcowe, Win Rate i PF z planszy BigBeluga Two-Pole + Stochastic 7,3,3
+# (zrzut Kamila 2026-11-26); przebieg krzywych między startem a końcem wymyślony.
+TESTOWE = [
+    ("XAUUSD", "15m", -99.8, 27.8, 0.55), ("XAUUSD", "1h", -70.1, 29.2, 0.63),
+    ("XAUUSD", "4h", -21.6, 29.5, 0.69), ("BTCUSDT", "15m", -100.0, 30.3, 0.46),
+    ("BTCUSDT", "1h", -86.1, 31.6, 0.55), ("BTCUSDT", "4h", -16.4, 34.1, 0.80),
+    ("EURUSD", "15m", -100.0, 31.2, 0.52), ("EURUSD", "1h", -78.5, 29.7, 0.62),
+    ("EURUSD", "4h", -22.4, 32.1, 0.75), ("Brent", "15m", -99.9, 25.6, 0.43),
+    ("Brent", "1h", -85.4, 23.8, 0.45), ("Brent", "4h", -14.1, 32.6, 0.85),
+    ("US500", "15m", -100.0, 25.9, 0.44), ("US500", "1h", -67.5, 31.4, 0.67),
+    ("US500", "4h", -7.0, 33.3, 0.91),
+]
+
+
+def testowe():
+    rng = np.random.default_rng(7)
+    idx = pd.date_range("2021-01-01", "2025-12-31", freq="1D")
+    t = np.linspace(0, 1, len(idx))
+    rows, equities = [], {}
+    for asset, tf, ret, wr, pf in TESTOWE:
+        target = np.log(max(1 + ret / 100, 2e-4))
+        k = {"15m": 6.0, "1h": 1.5, "4h": 0.3}[tf]               # niższy interwał = szybszy spadek
+        trend = target * (1 - np.exp(-k * t)) / (1 - np.exp(-k))
+        noise = np.cumsum(rng.normal(0, 0.006, len(idx)))
+        noise -= t * noise[-1]                                   # most: koniec dokładnie w wyniku
+        equities[(asset, tf)] = pd.DataFrame({"timestamp": idx, "equity": 10_000 * np.exp(trend + noise)})
+        rows.append({"asset": asset, "timeframe": tf, "status": "OK", "return_%": ret,
+                     "win_rate_%": wr, "profit_factor": pf, "trades": 100})
+    return pd.DataFrame(rows), equities, "2021–2025"
 
 
 # ============================================================
@@ -106,128 +129,82 @@ def ffmpeg_ok() -> bool:
         return shutil.which("ffmpeg") is not None
 
 
-def render(fig, update, sekundy, path: Path, video: bool) -> None:
+def render(fig, update, sekundy: float, trzymaj: float, path: Path, video: bool) -> None:
     if video:
         writer = FFMpegWriter(fps=FPS, codec="libx264", bitrate=12000, extra_args=["-pix_fmt", "yuv420p"])
         with writer.saving(fig, str(path.with_suffix(".mp4")), dpi=P.DPI):
-            for k in range(int(round(sekundy * FPS))):
+            for k in range(int(round((sekundy + trzymaj) * FPS))):
                 update(k / FPS)
                 writer.grab_frame(facecolor=P.BLACK)
         print(f"  {path.with_suffix('.mp4')}")
     update(sekundy)
     fig.savefig(path.with_suffix(".png"), dpi=P.DPI, facecolor=P.BLACK)
-    print(f"  {path.with_suffix('.png')}")
     plt.close(fig)
 
 
-def scena_krzywe(frame: pd.DataFrame, title: str, subtitle: str, path: Path, video: bool) -> None:
-    median = frame.median(axis=1)
-    n = len(frame.columns)
-    fig, ax = P._figure()
-    P._header(fig, title, subtitle)
-    P._fit_width(fig, [fig.texts[0]], 0.62, min_size=24)   # miejsce na licznik po prawej
-    fig.subplots_adjust(left=0.08, right=0.80, top=0.80, bottom=0.08)
-    lo, hi = frame.min().min(), frame.max().max()
-    pad = (hi - lo) * 0.06
-    ax.set_xlim(frame.index[0], frame.index[-1])
-    ax.set_ylim(min(lo, 0) - pad, max(hi, 0) + pad)
-    ax.axhline(0, color=P.GRAY, linewidth=1.2, linestyle="--")
-    ax.set_ylabel("Zmiana kapitału", color=P.GRAY, fontsize=18, fontfamily=P._body_font())
-    ax.yaxis.set_major_formatter(lambda v, _: P._pct(v, 0))
-    ax.tick_params(colors=P.GRAY, labelsize=18)
-    for side in ("top", "right"):
-        ax.spines[side].set_visible(False)
-    for side in ("left", "bottom"):
-        ax.spines[side].set_color("#2A2E35")
-    ax.grid(axis="y", color="#1C2026", linewidth=1)
-
-    lines = [ax.plot([], [], color=P.WHITE, alpha=0.22, linewidth=1.6)[0] for _ in frame.columns]
-    med_line, = ax.plot([], [], linewidth=5)
-    licznik = fig.text(0.96, 0.92, "", ha="right", va="center", fontsize=44,
-                       fontfamily=P._heading_font(), fontweight=P._heading_weight())
-    med_txt = fig.text(0.96, 0.855, "", ha="right", va="center", fontsize=24, fontfamily=P._body_font())
-    labels = []
-    x = frame.index
-    vals = frame.to_numpy()
+def anim_mediany(fig, numbers, sekundy: float):
+    """Liczby po kolei: każda się pojawia i odlicza od zera; podpis wchodzi razem z nią."""
+    step = (1 - LICZBA) / max(len(numbers) - 1, 1)
 
     def update(t):
-        k = max(1, int(round(ease(t / RYSOWANIE) * (len(x) - 1))) + 1)
-        for j, ln in enumerate(lines):
-            ln.set_data(x[:k], vals[:k, j])
-        m = median.iloc[k - 1]
-        med_line.set_data(x[:k], median.iloc[:k])
-        med_line.set_color(P._sign_color(m))
-        plus = int((vals[k - 1] > 0).sum())
-        licznik.set_text(f"{plus}/{n} NA PLUSIE")
-        licznik.set_color(P.profitable_color(plus, n))
-        med_txt.set_text(f"mediana {P._pct(m)}")
-        med_txt.set_color(P._sign_color(m))
-        if t >= RYSOWANIE and not labels:      # podpisy jak na planszy 2_wykres_kapitalu
-            end, last = x[-1], frame.iloc[-1]
-            gap = (hi - lo) * 0.06
-            spec = [(median.iloc[-1], f"mediana {P._pct(median.iloc[-1])}", P._sign_color(median.iloc[-1]), 26, "bold")]
-            for y, name in ((last.max(), last.idxmax()), (last.min(), last.idxmin())):
-                if all(abs(y - o) > gap for o, *_ in spec):
-                    spec.append((y, f"{name} {P._pct(y)}", P._sign_color(y), 22, "normal"))
-                    lines[list(frame.columns).index(name)].set_alpha(0.55)
-            for y, text, col, size, weight in spec:
-                labels.append(ax.annotate(text, (end, y), xytext=(14, 0), textcoords="offset points",
-                                          va="center", color=col, fontsize=size, fontfamily=P._body_font(),
-                                          fontweight=weight, annotation_clip=False))
-
-    render(fig, update, RYSOWANIE + TRZYMAJ, path, video)
+        for i, (text, label, value, fmt) in enumerate(numbers):
+            a = ease((t / sekundy - i * step) / LICZBA)
+            text.set_alpha(a)
+            label.set_alpha(a)
+            ok = value is not None and pd.notna(value) and np.isfinite(value)
+            text.set_text(fmt(value * a) if ok and a < 1 else fmt(value))
+    return update
 
 
-def scena_liczby(frame: pd.DataFrame, pf: float, title: str, path: Path, video: bool) -> None:
-    last = frame.iloc[-1]
-    n, plus, med = len(last), int((last > 0).sum()), float(last.median())
-    fig, ax = P._figure()
-    ax.axis("off")
-    head = fig.text(0.5, 0.88, title.upper(), ha="center", va="center", color=P.WHITE, fontsize=48,
-                    fontfamily=P._heading_font(), fontweight=P._heading_weight())
-    P._fit_width(fig, [head], 0.92, min_size=26)
-    xs = (0.18, 0.5, 0.82)
-    big = [fig.text(x, 0.52, "", ha="center", va="center", fontsize=140, fontfamily=P._heading_font(),
-                    fontweight=P._heading_weight()) for x in xs]
-    for x, label in zip(xs, ("kombinacji\nna plusie", "mediana\nProfit Factor", "mediana\nwyniku netto")):
-        fig.text(x, 0.25, label, ha="center", va="center", color=P.GRAY, fontsize=32,
-                 fontfamily=P._body_font(), linespacing=1.3)
-    # rozmiar dobrany do końcowych liczb (najszersze), wspólny dla trzech
-    for txt, final in zip(big, (f"{n}/{n}", P._num(pf, 2) if not np.isnan(pf) else "–", P._pct(med))):
-        txt.set_text(final)
-    P._fit_width(fig, big, 0.27, min_size=60)
+def anim_krzywe(fig, sekundy: float):
+    """Krzywe (gid="krzywa") rysują się od lewej do prawej, potem wchodzą podpisy."""
+    ax = fig.axes[0]
+    ax.set_xlim(ax.get_xlim())          # osie jak na końcowej planszy, nie skaczą
+    ax.set_ylim(ax.get_ylim())
+    lines = [(ln, ln.get_xdata(), ln.get_ydata()) for ln in ax.lines if ln.get_gid() == "krzywa"]
+    texts = list(ax.texts)
+    n = max((len(x) for _, x, _ in lines), default=1)
 
     def update(t):
-        a = ease(t / 2.0)
-        done = a >= 1
-        p = int(round(plus * a))
-        big[0].set_text(f"{p}/{n}")
-        big[0].set_color(P.profitable_color(p, n) if done else P.WHITE)
-        big[1].set_text(P._num(pf * a, 2) if not np.isnan(pf) else "–")
-        big[1].set_color(P.profit_factor_color(pf) if done else P.WHITE)
-        big[2].set_text(P._pct(med * a))
-        big[2].set_color(P._sign_color(med) if done else P.WHITE)
-
-    render(fig, update, 2.0 + TRZYMAJ, path, video)
+        a = ease(t / (sekundy * RYSOWANIE))
+        k = max(1, int(round(a * (n - 1))) + 1)
+        for ln, x, y in lines:
+            ln.set_data(x[:k], y[:k])
+        b = ease((t / sekundy - RYSOWANIE) / (1 - RYSOWANIE))
+        for txt in texts:
+            txt.set_alpha(b)
+    return update
 
 
 def main():
-    args = [a for a in sys.argv[1:] if not a.startswith("--")]
-    if not args:
-        sys.exit(__doc__)
-    strategy = args[0]
-    video = "--png" not in sys.argv
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("strategia")
+    ap.add_argument("--sekundy", type=float, nargs="+", default=[2.0])
+    ap.add_argument("--trzymaj", type=float, default=1.0)
+    ap.add_argument("--claim-win-rate", type=float, default=None)
+    ap.add_argument("--testowe", action="store_true")
+    ap.add_argument("--png", action="store_true")
+    args = ap.parse_args()
+
+    video = not args.png
     if video and not ffmpeg_ok():
         sys.exit("Brak ffmpeg. Zainstaluj: pip install imageio-ffmpeg (albo dopisz --png).")
-    syn = "--sztuczne" in sys.argv
-    module, okres, frame, pf = sztuczne(strategy) if syn else wczytaj(strategy)
-    name = getattr(module, "NAME", strategy)
-    out = folder_wynikow(strategy) / ("animacja_sztuczne" if syn else "animacja")
+    module = _modul(args.strategia)
+    title = getattr(module, "NAME", args.strategia)
+    claim = args.claim_win_rate if args.claim_win_rate is not None else getattr(module, "CLAIM_WIN_RATE", None)
+    summary, equities, period = testowe() if args.testowe else wczytaj(args.strategia)
+    _, counted, _, subtitle, note = P.plansze_context(summary, period, getattr(module, "MIN_TRADES", None))
+
+    out = folder_wynikow(args.strategia) / ("animacja_dane_testowe" if args.testowe else "animacja")
     out.mkdir(parents=True, exist_ok=True)
-    subtitle = f"{okres} · {P.count_text(len(frame.columns), 'kombinacja', 'kombinacje', 'kombinacji')}"
-    print(f"{name}: {len(frame.columns)} krzywych → {out}")
-    scena_krzywe(frame, name, subtitle, out / "1_krzywe", video)
-    scena_liczby(frame, pf, name, out / "2_liczby", video)
+    print(f"{title} → {out}")
+    for s in args.sekundy:
+        tag = f"{s:g}s".replace(".", ",")
+        with plt.style.context("default"):
+            fig, numbers = P.medians_figure(counted, title, subtitle, claim, note)
+            render(fig, anim_mediany(fig, numbers, s), s, args.trzymaj, out / f"1_mediany_{tag}", video)
+            fig = P.equity_figure(counted, equities, title, subtitle, note)
+            render(fig, anim_krzywe(fig, s), s, args.trzymaj, out / f"2_wykres_kapitalu_{tag}", video)
 
 
 if __name__ == "__main__":

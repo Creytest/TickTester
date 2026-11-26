@@ -40,6 +40,10 @@ import reddit_plansze as R  # noqa: E402
 import ibs_plansza as I  # noqa: E402
 
 FPS = 30
+# RGB → YUV wg BT.709 i oznaczenie pliku jako BT.709. Bez tego ffmpeg liczy BT.601,
+# a DaVinci/odtwarzacze czytają HD jako BT.709 — czerwony #FF3B30 robi się pomarańczowy.
+YUV_BT709 = ["-vf", "scale=out_color_matrix=bt709:out_range=tv", "-pix_fmt", "yuv420p",
+             "-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", "-color_range", "tv"]
 NA_SWIECE = 0.11      # s odsłaniania na jedną jednostkę osi x (≈ jedną świecę)
 MIN_KROK, MAX_KROK = 1.5, 5.5
 PAUZA = 2.2           # s stop-klatki po każdym kroku
@@ -216,7 +220,7 @@ def animuj(fig, segs, cel: Path, video: bool):
         odslon(segs[j], p, a, b)
 
     if video:
-        writer = FFMpegWriter(fps=FPS, codec="libx264", bitrate=12000, extra_args=["-pix_fmt", "yuv420p"])
+        writer = FFMpegWriter(fps=FPS, codec="libx264", bitrate=12000, extra_args=YUV_BT709)
         with writer.saving(fig, str(cel.with_suffix(".mp4")), dpi=100):
             for k in range(int(round(czas * FPS))):
                 update(k / FPS)

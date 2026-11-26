@@ -47,7 +47,11 @@ for _f in (Path(__file__).resolve().parent / "fonts").glob("*.[ot]tf"):
 from narzedzia.odcinki import NAGRANIA, folder_wynikow  # noqa: E402
 
 FPS = 30
-RYSOWANIE = 0.8   # część czasu na rysowanie krzywych; reszta na wejście podpisów
+# RGB → YUV wg BT.709 i oznaczenie pliku jako BT.709. Bez tego ffmpeg liczy BT.601,
+# a DaVinci/odtwarzacze czytają HD jako BT.709 — czerwony #FF3B30 robi się pomarańczowy.
+YUV_BT709 = ["-vf", "scale=out_color_matrix=bt709:out_range=tv", "-pix_fmt", "yuv420p",
+             "-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", "-color_range", "tv"]
+RYSOWANIE = 0.85  # część czasu na rysowanie krzywych (stałe tempo); reszta na wejście podpisów
 LICZBA = 0.5      # część czasu na wejście jednej liczby (kolejne startują co 1/4 czasu)
 
 
@@ -139,14 +143,17 @@ def render(fig, update, sekundy: float, trzymaj: float, path: Path, video: bool)
     if video:
         # plt.style.context("default") resetuje rcParams, więc ścieżkę ustawiamy tuż przed zapisem.
         matplotlib.rcParams["animation.ffmpeg_path"] = FFMPEG
-        writer = FFMpegWriter(fps=FPS, codec="libx264", bitrate=12000, extra_args=["-pix_fmt", "yuv420p"])
+        writer = FFMpegWriter(fps=FPS, codec="libx264", bitrate=12000, extra_args=YUV_BT709)
         with writer.saving(fig, str(path.with_suffix(".mp4")), dpi=P.DPI):
             for k in range(int(round((sekundy + trzymaj) * FPS))):
                 update(k / FPS)
                 writer.grab_frame(facecolor=P.BLACK)
         print(f"  {path.with_suffix('.mp4')}")
-    update(sekundy)
-    fig.savefig(path.with_suffix(".png"), dpi=P.DPI, facecolor=P.BLACK)
+    else:
+        # Bez wideo: tylko ostatnia klatka (= plansza PNG z plansze_<...>/).
+        update(sekundy)
+        fig.savefig(path.with_suffix(".png"), dpi=P.DPI, facecolor=P.BLACK)
+        print(f"  {path.with_suffix('.png')}")
     plt.close(fig)
 
 
@@ -174,7 +181,7 @@ def anim_krzywe(fig, sekundy: float):
     n = max((len(x) for _, x, _ in lines), default=1)
 
     def update(t):
-        a = ease(t / (sekundy * RYSOWANIE))
+        a = min(max(t / (sekundy * RYSOWANIE), 0.0), 1.0)   # liniowo: bez zwalniania na końcu
         k = max(1, int(round(a * (n - 1))) + 1)
         for ln, x, y in lines:
             ln.set_data(x[:k], y[:k])
@@ -206,6 +213,13 @@ def animuj(strategy: str, args, video: bool) -> None:
 
     out = folder_wynikow(strategy) / ("animacja_dane_testowe" if args.testowe else "animacja")
     out.mkdir(parents=True, exist_ok=True)
+    # Stare sceny sprzed 2026-11-26 (1_krzywe, 2_liczby) i PNG ostatnich klatek — usuwamy,
+    # żeby w folderze były tylko aktualne animacje (PNG tych plansz są w plansze_<...>/).
+    stare = [*out.glob("1_krzywe.*"), *out.glob("2_liczby.*")]
+    if video:
+        stare += [*out.glob("1_mediany_*.png"), *out.glob("2_wykres_kapitalu_*.png")]
+    for f in stare:
+        f.unlink(missing_ok=True)
     print(f"{title} → {out}")
     for s in args.sekundy:
         tag = f"{s:g}s".replace(".", ",")

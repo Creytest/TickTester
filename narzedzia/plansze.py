@@ -103,6 +103,17 @@ def skipped_note(skipped: pd.DataFrame, min_trades) -> str:
     )
 
 
+def plansze_context(summary: pd.DataFrame, period: str, min_trades=None):
+    """
+    (wszystkie, liczone, pominięte, podtytuł, dopisek) — wspólne
+    dla plansz PNG i ich animacji.
+    """
+    data = summary.reset_index(drop=True)
+    subtitle = f"{combinations_text(data)}  |  {period}  |  po kosztach"
+    counted, skipped = split_by_trades(data, min_trades)
+    return data, counted, skipped, subtitle, skipped_note(skipped, min_trades)
+
+
 def save_plansze(
     folder,
     summary: pd.DataFrame,
@@ -129,10 +140,8 @@ def save_plansze(
     folder = Path(folder)
     folder.mkdir(parents=True, exist_ok=True)
 
-    data = summary.reset_index(drop=True)
-    subtitle = f"{combinations_text(data)}  |  {period}  |  po kosztach"
-    counted, skipped = split_by_trades(data, min_trades)
-    note = skipped_note(skipped, min_trades)
+    data, counted, skipped, subtitle, note = plansze_context(
+        summary, period, min_trades)
 
     paths = [
         folder / "1_mediany.png",
@@ -162,6 +171,16 @@ def save_plansze(
 # ============================================================
 
 def _equity_chart(path, data, equities, title, subtitle, note=""):
+    _save(equity_figure(data, equities, title, subtitle, note), path)
+
+
+def equity_figure(data, equities, title, subtitle, note=""):
+    """
+    Figura planszy 2_wykres_kapitalu (bez zapisu). Krzywe mają
+    gid="krzywa", podpisy to ax.texts — animacja
+    (plansze_objasniajace/wyniki_animacja.py) przycina je klatka
+    po klatce, więc ostatnia klatka = ta plansza.
+    """
     curves = {}
 
     for _, row in data.iterrows():
@@ -189,7 +208,7 @@ def _equity_chart(path, data, equities, title, subtitle, note=""):
 
         for column in frame.columns:
             ax.plot(frame.index, frame[column], color=WHITE,
-                    alpha=0.22, linewidth=1.6)
+                    alpha=0.22, linewidth=1.6, gid="krzywa")
 
         color = _sign_color(median.iloc[-1])
 
@@ -211,9 +230,10 @@ def _equity_chart(path, data, equities, title, subtitle, note=""):
                 # Podpisana krzywa jaśniejsza, żeby było widać,
                 # do której linii odnosi się podpis.
                 ax.plot(frame.index, frame[name], color=WHITE,
-                        alpha=0.55, linewidth=2)
+                        alpha=0.55, linewidth=2, gid="krzywa")
 
-        ax.plot(median.index, median, color=color, linewidth=5)
+        ax.plot(median.index, median, color=color, linewidth=5,
+                gid="krzywa")
 
         for y, text, text_color, size, weight in labels:
             ax.annotate(
@@ -239,7 +259,7 @@ def _equity_chart(path, data, equities, title, subtitle, note=""):
     _note(fig, note)
     fig.subplots_adjust(left=0.08, right=0.80, top=0.80,
                         bottom=0.12 if note else 0.08)
-    _save(fig, path)
+    return fig
 
 
 # ============================================================
@@ -247,6 +267,16 @@ def _equity_chart(path, data, equities, title, subtitle, note=""):
 # ============================================================
 
 def _medians(path, data, title, subtitle, claim_win_rate, note=""):
+    fig, _ = medians_figure(data, title, subtitle, claim_win_rate, note)
+    _save(fig, path)
+
+
+def medians_figure(data, title, subtitle, claim_win_rate, note=""):
+    """
+    Figura planszy 1_mediany (bez zapisu) i lista
+    (tekst liczby, podpis, wartość, format) dla trzech dużych liczb —
+    animacja odlicza je od zera do wartości z planszy.
+    """
     returns = data["return_%"].astype(float)
     profitable = int((returns > 0).sum())
     # Przy pustym zbiorze (wszystko poza statystyką) mediany to NaN → „–”.
@@ -267,6 +297,12 @@ def _medians(path, data, title, subtitle, claim_win_rate, note=""):
         win_rate_label = "mediana\nWin Rate"
         win_rate_color = WHITE
 
+    total = len(data)
+    numbers = [
+        (profitable, lambda v: f"{int(round(v))}/{total}"),
+        (win_rate, lambda v: _pct(v, 0, sign=False)),
+        (profit_factor, lambda v: _num(v, 2)),
+    ]
     items = [
         (
             f"{profitable}/{len(data)}",
@@ -290,7 +326,7 @@ def _medians(path, data, title, subtitle, claim_win_rate, note=""):
 
     # Blok liczb i podpisów wyśrodkowany w pionie pod nagłówkiem.
     width = 1 / len(items)
-    values = []
+    values, labels = [], []
     for i, (value, label, color) in enumerate(items):
         x = width * (i + 0.5)
         # Liczba stoi na stałej linii nad podpisem — przy
@@ -300,15 +336,20 @@ def _medians(path, data, title, subtitle, claim_win_rate, note=""):
             fontsize=150, fontfamily=_heading_font(),
             fontweight=_heading_weight(),
         ))
-        fig.text(x, 0.38, label, ha="center", va="top", color=WHITE,
-                 fontsize=32, fontfamily=_body_font(), linespacing=1.3)
+        labels.append(fig.text(
+            x, 0.38, label, ha="center", va="top", color=WHITE,
+            fontsize=32, fontfamily=_body_font(), linespacing=1.3,
+        ))
 
     # Wszystkie liczby tej samej wielkości, każda z odstępem od
     # sąsiednich (najwyżej 80% szerokości swojej kolumny).
     _fit_width(fig, values, width * 0.8, min_size=60)
     _note(fig, note)
 
-    _save(fig, path)
+    return fig, [
+        (text, label, value, fmt)
+        for text, label, (value, fmt) in zip(values, labels, numbers)
+    ]
 
 
 # ============================================================

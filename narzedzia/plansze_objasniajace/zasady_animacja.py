@@ -253,9 +253,7 @@ def main():
             print(f"POMINIĘTO {folder.name}: plansza bez segmentów")
             continue
         print(folder.name)
-        if video:   # do 2026-11-26 MP4 nazywało się zasady_animacja.mp4 (+ PNG ostatniej klatki)
-            for stary in (folder / "zasady_animacja.mp4", folder / "zasady_animacja.png"):
-                stary.unlink(missing_ok=True)
+        # Do 2026-11-26 MP4 nazywało się zasady_animacja.mp4 — nie kasujemy go (może być w montażu).
         animuj(fig, segs, path.with_suffix(""), video)
 
 

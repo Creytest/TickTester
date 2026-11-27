@@ -227,13 +227,8 @@ def animuj(strategy: str, args, video: bool) -> None:
     _, counted, _, subtitle, note = P.plansze_context(summary, period, getattr(module, "MIN_TRADES", None))
 
     out.mkdir(parents=True, exist_ok=True)
-    # Do 2026-11-26 animacje szły do osobnego wyniki/animacja/ — teraz leżą obok PNG,
-    # więc stary folder (i stare sceny 1_krzywe/2_liczby) usuwamy.
-    stary = folder_wynikow(strategy) / "animacja"
-    if not args.testowe and stary.is_dir():
-        shutil.rmtree(stary)
-    for f in [*out.glob("1_krzywe.*"), *out.glob("2_liczby.*")]:
-        f.unlink(missing_ok=True)
+    # Starego wyniki/animacja/ (do 2026-11-26) NIE kasujemy: klipy z niego mogą być w montażu
+    # w DaVinci, a skasowany plik = klip offline. Usuń go ręcznie, gdy nie jest już potrzebny.
     print(f"{title} → {out}")
     if video:
         rynki_animacja(*rynki, out / "0_rynki.mp4")

@@ -1,5 +1,6 @@
 """Animowane plansze wyników strategii — 1:1 jak PNG z narzedzia/plansze.py (MP4 1920×1080, 30 kl./s).
 
+    0_rynki.mp4            — plansza 0_rynki: zapętlony połysk + pulsujące zielone (rynki_animacja.py),
     1_mediany.mp4          — plansza 1_mediany: trzy duże liczby wchodzą po kolei
                              (pojawiają się i odliczają od zera do wartości z planszy),
     2_wykres_kapitalu.mp4  — plansza 2_wykres_kapitalu: krzywe kapitału rysują się od lewej
@@ -15,7 +16,9 @@ Użycie:
     python narzedzia/plansze_objasniajace/wyniki_animacja.py --wszystkie --odcinek TikTok
 Opcje: --sekundy (czas animacji, domyślnie 2; kilka wartości = kilka wersji),
        --trzymaj (sekundy stopklatki na końcu, domyślnie 1), --claim-win-rate 90, --png (tylko PNG).
-Wyniki: nagrania/<Odcinek>/<Strategia>/wyniki/animacja/ (z --testowe: animacja_dane_testowe/).
+Wyniki: obok PNG, w tym samym folderze plansz z run_all_assets
+    nagrania/<Odcinek>/<Strategia>/wyniki/plansze_<Strategia>_<start>_<koniec>/0_rynki.mp4, 1_mediany.mp4, …
+(kilka wartości --sekundy → 1_mediany_1s.mp4, 1_mediany_2s.mp4; z --testowe: wyniki/animacja_dane_testowe/).
 Dane: podsumowanie_<Strategia>_*.csv i *_kapital.csv z run_all_assets, MIN_TRADES strategii.
 Wideo wymaga ffmpeg: w PATH albo `pip install imageio-ffmpeg`.
 """
@@ -45,6 +48,9 @@ for _f in (Path(__file__).resolve().parent / "fonts").glob("*.[ot]tf"):
     font_manager.fontManager.addfont(str(_f))
 
 from narzedzia.odcinki import NAGRANIA, folder_wynikow  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from rynki_animacja import animacja as rynki_animacja  # noqa: E402
+from rynki_plansza import period_text  # noqa: E402
 
 FPS = 30
 # RGB → YUV wg BT.709 i oznaczenie pliku jako BT.709. Bez tego ffmpeg liczy BT.601,
@@ -71,7 +77,8 @@ def _modul(strategy: str):
 
 
 def wczytaj(strategy: str):
-    """(podsumowanie OK, krzywe {(aktywo, interwał): DataFrame}, okres „2021–2025”) z run_all_assets."""
+    """(podsumowanie OK, krzywe {(aktywo, interwał): DataFrame}, okres „2021–2025”, folder plansz,
+    (aktywa, interwały, okres słownie) do 0_rynki) z run_all_assets."""
     folder = folder_wynikow(strategy)
     pliki = sorted(folder.glob(f"podsumowanie_{strategy}_*.csv"), key=lambda p: p.stat().st_mtime)
     if not pliki:
@@ -80,6 +87,8 @@ def wczytaj(strategy: str):
     table = pliki[-1]
     start, end = table.stem.removeprefix(f"podsumowanie_{strategy}_").split("_")
     data = pd.read_csv(table, sep=";", decimal=",")
+    # 0_rynki jak w run_all_assets: wszystkie aktywa i interwały z podsumowania (też bez transakcji).
+    rynki = (list(dict.fromkeys(data["asset"])), list(dict.fromkeys(data["timeframe"])), period_text(start, end))
     data = data[data["status"] == "OK"].reset_index(drop=True)
     equities = {}
     for asset, tf in zip(data["asset"], data["timeframe"]):
@@ -88,7 +97,7 @@ def wczytaj(strategy: str):
             equities[(asset, tf)] = pd.read_csv(path, sep=";", decimal=",")
         else:
             print(f"Brak krzywej {path.name} — pominięta")
-    return data, equities, f"{start[:4]}–{end[:4]}"
+    return data, equities, f"{start[:4]}–{end[:4]}", folder / f"plansze_{strategy}_{start}_{end}", rynki
 
 
 # Dane testowe: wyniki końcowe, Win Rate i PF z planszy BigBeluga Two-Pole + Stochastic 7,3,3
@@ -150,7 +159,7 @@ def render(fig, update, sekundy: float, trzymaj: float, path: Path, video: bool)
                 writer.grab_frame(facecolor=P.BLACK)
         print(f"  {path.with_suffix('.mp4')}")
     else:
-        # Bez wideo: tylko ostatnia klatka (= plansza PNG z plansze_<...>/).
+        # Bez wideo: tylko ostatnia klatka (= plansza PNG z run_all_assets, nadpisuje ją tym samym).
         update(sekundy)
         fig.savefig(path.with_suffix(".png"), dpi=P.DPI, facecolor=P.BLACK)
         print(f"  {path.with_suffix('.png')}")
@@ -208,26 +217,33 @@ def animuj(strategy: str, args, video: bool) -> None:
     module = _modul(strategy)
     title = getattr(module, "NAME", strategy)
     claim = args.claim_win_rate if args.claim_win_rate is not None else getattr(module, "CLAIM_WIN_RATE", None)
-    summary, equities, period = testowe() if args.testowe else wczytaj(strategy)
+    if args.testowe:
+        summary, equities, period = testowe()
+        out = folder_wynikow(strategy) / "animacja_dane_testowe"
+        rynki = (list(dict.fromkeys(summary["asset"])), list(dict.fromkeys(summary["timeframe"])),
+                 period_text("2021-01-01", "2025-12-31"))
+    else:
+        summary, equities, period, out, rynki = wczytaj(strategy)
     _, counted, _, subtitle, note = P.plansze_context(summary, period, getattr(module, "MIN_TRADES", None))
 
-    out = folder_wynikow(strategy) / ("animacja_dane_testowe" if args.testowe else "animacja")
     out.mkdir(parents=True, exist_ok=True)
-    # Stare sceny sprzed 2026-11-26 (1_krzywe, 2_liczby) i PNG ostatnich klatek — usuwamy,
-    # żeby w folderze były tylko aktualne animacje (PNG tych plansz są w plansze_<...>/).
-    stare = [*out.glob("1_krzywe.*"), *out.glob("2_liczby.*")]
-    if video:
-        stare += [*out.glob("1_mediany_*.png"), *out.glob("2_wykres_kapitalu_*.png")]
-    for f in stare:
+    # Do 2026-11-26 animacje szły do osobnego wyniki/animacja/ — teraz leżą obok PNG,
+    # więc stary folder (i stare sceny 1_krzywe/2_liczby) usuwamy.
+    stary = folder_wynikow(strategy) / "animacja"
+    if not args.testowe and stary.is_dir():
+        shutil.rmtree(stary)
+    for f in [*out.glob("1_krzywe.*"), *out.glob("2_liczby.*")]:
         f.unlink(missing_ok=True)
     print(f"{title} → {out}")
+    if video:
+        rynki_animacja(*rynki, out / "0_rynki.mp4")
     for s in args.sekundy:
-        tag = f"{s:g}s".replace(".", ",")
+        tag = "" if len(args.sekundy) == 1 else "_" + f"{s:g}s".replace(".", ",")
         with plt.style.context("default"):
             fig, numbers = P.medians_figure(counted, title, subtitle, claim, note)
-            render(fig, anim_mediany(fig, numbers, s), s, args.trzymaj, out / f"1_mediany_{tag}", video)
+            render(fig, anim_mediany(fig, numbers, s), s, args.trzymaj, out / f"1_mediany{tag}", video)
             fig = P.equity_figure(counted, equities, title, subtitle, note)
-            render(fig, anim_krzywe(fig, s), s, args.trzymaj, out / f"2_wykres_kapitalu_{tag}", video)
+            render(fig, anim_krzywe(fig, s), s, args.trzymaj, out / f"2_wykres_kapitalu{tag}", video)
 
 
 def main():

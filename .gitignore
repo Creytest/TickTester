@@ -12,3 +12,6 @@ wyniki/
 # Wyniki liczone u siebie (backtesty, event study, porównania):
 # nagrania/<Odcinek>/<Strategia>/wyniki*/ — w gicie zostają plansze, grafiki i zasady.
 nagrania/**/wyniki*/
+
+# Animacje MP4 plansz (rynki_animacja, zasady_animacja, wyniki_animacja) — liczone u siebie, leżą obok PNG.
+nagrania/**/*.mp4
